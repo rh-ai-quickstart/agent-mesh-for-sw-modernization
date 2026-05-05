@@ -1,6 +1,6 @@
 # RHEL Modernize Agent: Proposal and Implementation Plan
 
-**Authors:** Twinkll Sisodia, Dan Domkowski, Omotola Awofolu
+**Authors:** Twinkll Sisodia
 **Date:** May 5, 2026
 **Status:** Proposal / Draft
 **Tracking Issue:** [ai-quickstart-contrib #44](https://github.com/rh-ai-quickstart/ai-quickstart-contrib/issues/44)
