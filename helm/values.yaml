@@ -1,0 +1,30 @@
+registry: ""
+version: "latest"
+
+namespace: ""
+
+repoUrl: ""
+repoRef: "main"
+
+storage:
+  size: 50Gi
+
+dataGeneration:
+  name: agent-mesh-for-sw-modernization-data-generation
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      cpu: "4"
+      memory: 16Gi
+
+dataIndexing:
+  name: agent-mesh-for-sw-modernization-data-indexing
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+    limits:
+      cpu: "4"
+      memory: 16Gi

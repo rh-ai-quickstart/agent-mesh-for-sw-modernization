@@ -1,0 +1,110 @@
+FROM quay.io/modh/odh-generic-data-science-notebook@sha256:7c1a4ca213b71d342a2d1366171304e469da06d5f15710fab5dd3ce013aa1b73
+
+ARG TOOLCHAINS_XML=java/toolchains.xml
+ARG GRADLE_VERSION=8.7
+ARG GRADLE_VERSIONS="8.5 8.6 8.7"
+ARG GRADLE_USER_HOME=/workspace/.gradle
+ARG MAVEN_VERSIONS="3.9.6 3.9.9"
+ENV OPENCODE_CONFIG_DIR=/workspace/.opencode_config \
+    PYENV_ROOT=/usr/local/pyenv \
+    PATH="/usr/local/pyenv/bin:/usr/local/pyenv/shims:/usr/lib/jvm/java-21/bin:/usr/local/bin:${PATH}" \
+    ADOPTIUM_API="https://api.adoptium.net/v3/binary/latest" \
+    JDTLS_URL="https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz" \
+    GRADLE_VERSION=${GRADLE_VERSION} \
+    GRADLE_USER_HOME=${GRADLE_USER_HOME} \
+    NODE_EXTRA_CA_CERTS=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
+    JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/pki/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit" \
+    MAVEN_USER_HOME=/workspace/.m2
+
+USER root
+
+COPY --chown=0:0 ${TOOLCHAINS_XML} /workspace/.m2/toolchains.xml
+
+# Corporate CA Certificates (optional — place cert at certs/corporate-ca.crt to install)
+COPY certs/ /tmp/build-certs/
+RUN if [ -s /tmp/build-certs/corporate-ca.crt ]; then \
+      cp /tmp/build-certs/corporate-ca.crt /etc/pki/ca-trust/source/anchors/corporate-ca.crt; \
+    fi \
+    && update-ca-trust extract \
+    && test -f /etc/pki/ca-trust/extracted/java/cacerts \
+    && rm -rf /tmp/build-certs
+
+# Combined Tooling & Language Server Installation
+RUN dnf install -y --enablerepo=ubi-9-codeready-builder \
+        npm maven gcc make zlib-devel bzip2 bzip2-devel \
+        sqlite-devel openssl-devel tk-devel libffi-devel xz-devel wget unzip \
+        ncurses-devel \
+    && npm config set prefix /usr/local \
+    && npm install -g opencode-ai@1.3.2 @fission-ai/openspec@1.2.0 opencode-plugin-openspec prettier
+
+# Opencode Binary Link
+RUN OPENCODE_BIN=/usr/local/lib/node_modules/opencode-ai/node_modules/opencode-linux-x64-baseline/bin/opencode \
+    && ln -sf "$OPENCODE_BIN" /usr/local/bin/opencode
+
+# Java & JDTLS
+RUN ARCH=$(uname -m) \
+    && case "$ARCH" in x86_64) JDK_ARCH=x64;; aarch64) JDK_ARCH=aarch64;; *) JDK_ARCH=$ARCH;; esac \
+    && mkdir -p /usr/lib/jvm/java-8 /usr/lib/jvm/java-11 /usr/lib/jvm/java-17 \
+       /usr/lib/jvm/java-21 /usr/lib/jvm/java-25 /opt/jdtls \
+    && curl -LfsS "${ADOPTIUM_API}/8/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse"  | tar -xzC /usr/lib/jvm/java-8  --strip-components=1 --no-same-owner \
+    && curl -LfsS "${ADOPTIUM_API}/11/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse" | tar -xzC /usr/lib/jvm/java-11 --strip-components=1 --no-same-owner \
+    && curl -LfsS "${ADOPTIUM_API}/17/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse" | tar -xzC /usr/lib/jvm/java-17 --strip-components=1 --no-same-owner \
+    && curl -LfsS "${ADOPTIUM_API}/21/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse" | tar -xzC /usr/lib/jvm/java-21 --strip-components=1 --no-same-owner \
+    && curl -LfsS "${ADOPTIUM_API}/25/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse" | tar -xzC /usr/lib/jvm/java-25 --strip-components=1 --no-same-owner \
+    && curl -LfsS "${JDTLS_URL}" | tar -xzC /opt/jdtls --no-same-owner
+
+# Python Runtimes
+RUN curl https://pyenv.run | bash \
+    && pyenv install 2.7 3.8 3.9 3.10 3.11 3.12 3.13 \
+    && pyenv global system
+
+# Python LSP
+RUN pip install --no-cache-dir "python-lsp-server[all]" python-lsp-ruff \
+    pylsp-mypy
+
+# Gradle Pre-Cache
+RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip \
+    && unzip -q /tmp/gradle.zip -d /opt \
+    && ln -sf /opt/gradle-${GRADLE_VERSION}/bin/gradle /usr/local/bin/gradle \
+    && rm /tmp/gradle.zip \
+    && for VERSION in ${GRADLE_VERSIONS}; do \
+         ( set -e \
+           && mkdir -p /tmp/gradle-init-${VERSION} \
+           && cd /tmp/gradle-init-${VERSION} \
+           && touch settings.gradle \
+           && gradle wrapper --gradle-version=${VERSION} --distribution-type=bin \
+           && ./gradlew --version ) || exit 1; \
+       done \
+    && rm -rf /tmp/gradle-init-*
+
+# Maven Pre-Cache
+RUN for VERSION in ${MAVEN_VERSIONS}; do \
+      ( set -e \
+        && mkdir -p /tmp/mvn-init-${VERSION} \
+        && cd /tmp/mvn-init-${VERSION} \
+        && mvn wrapper:wrapper -Dmaven=${VERSION} \
+        && ./mvnw --version ) || exit 1; \
+    done \
+    && rm -rf /tmp/mvn-init-*
+
+# Permissions Management
+RUN mkdir -p /workspace/.jdtls/workspace \
+    && chgrp -R 0 /usr/local/lib/node_modules /usr/local/bin /usr/local/pyenv /workspace/.jdtls /workspace/.m2 ${GRADLE_USER_HOME} \
+    && chmod -R g=u /usr/local/lib/node_modules /usr/local/bin /usr/local/pyenv /workspace/.jdtls \
+    && chmod -R g=u /workspace/.m2 ${GRADLE_USER_HOME}
+
+USER 1001
+
+COPY requirements.txt ./requirements.txt
+
+# Final Application Python Setup
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt \
+    && pip install --no-deps openlit==1.37.4 \
+    && pip install openai-agents \
+    && wget https://www.sqlite.org/src/tarball/sqlite.tar.gz?r=release -O sqlite.tar.gz \
+    && tar xzf sqlite.tar.gz \
+    && cd sqlite/ && ./configure && make sqlite3.c && cd - \
+    && git clone https://github.com/coleifer/pysqlite3.git \
+    && cp sqlite/sqlite3.[ch] pysqlite3 \
+    && cd pysqlite3 && python setup.py build && pip install . && cd -

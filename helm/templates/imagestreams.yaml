@@ -1,0 +1,71 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: agent-mesh-data-generation
+  namespace: {{ .Values.namespace }}
+  labels:
+    opendatahub.io/notebook-image: "true"
+  annotations:
+    opendatahub.io/notebook-image-name: "Agent Mesh - Data Generation"
+    opendatahub.io/notebook-image-desc: "Data generation workbench for Agent Mesh for SW Modernization"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: {{ .Values.version }}
+      from:
+        kind: DockerImage
+        name: {{ .Values.registry }}/agent-mesh-for-sw-modernization-data-generation:{{ .Values.version }}
+      referencePolicy:
+        type: Source
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: agent-mesh-data-indexing
+  namespace: {{ .Values.namespace }}
+  labels:
+    opendatahub.io/notebook-image: "true"
+  annotations:
+    opendatahub.io/notebook-image-name: "Agent Mesh - Data Indexing"
+    opendatahub.io/notebook-image-desc: "Data indexing workbench for Agent Mesh for SW Modernization"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: {{ .Values.version }}
+      from:
+        kind: DockerImage
+        name: {{ .Values.registry }}/agent-mesh-for-sw-modernization-data-indexing:{{ .Values.version }}
+      referencePolicy:
+        type: Source
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: agent-mesh-code-generation
+  namespace: {{ .Values.namespace }}
+  labels:
+    opendatahub.io/notebook-image: "true"
+  annotations:
+    opendatahub.io/notebook-image-name: "Agent Mesh - Code Generation"
+    opendatahub.io/notebook-image-desc: "Code generation workbench for Agent Mesh for SW Modernization"
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: {{ .Values.version }}
+      from:
+        kind: DockerImage
+        name: {{ .Values.registry }}/agent-mesh-for-sw-modernization-code-generation:{{ .Values.version }}
+      referencePolicy:
+        type: Source

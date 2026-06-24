@@ -1,0 +1,64 @@
+apiVersion: kubeflow.org/v1
+kind: Notebook
+metadata:
+  name: {{ .Values.dataIndexing.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    notebooks.opendatahub.io/inject-auth: "true"
+    notebooks.opendatahub.io/last-image-selection: "agent-mesh-data-indexing:{{ .Values.version }}"
+    opendatahub.io/workbench-image-namespace: {{ .Values.namespace }}
+    opendatahub.io/image-display-name: Agent Mesh - Data Indexing
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+  labels:
+    app: {{ .Values.dataIndexing.name }}
+    opendatahub.io/odh-managed: "true"
+    opendatahub.io/dashboard: "true"
+spec:
+  template:
+    spec:
+      {{- if .Values.repoUrl }}
+      initContainers:
+        - name: git-clone
+          image: alpine/git
+          command:
+            - sh
+            - -c
+            - |
+              git clone {{ .Values.repoUrl }} /opt/app-root/src &&
+              cd /opt/app-root/src &&
+              git checkout {{ .Values.repoRef }}
+          volumeMounts:
+            - mountPath: /opt/app-root/src
+              name: workbench-data-indexing-pvc
+      {{- end }}
+      containers:
+        - name: {{ .Values.dataIndexing.name }}
+          image: "{{ .Values.registry }}/{{ .Values.dataIndexing.name }}:{{ .Values.version }}"
+          resources:
+            requests:
+              cpu: {{ .Values.dataIndexing.resources.requests.cpu }}
+              memory: {{ .Values.dataIndexing.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.dataIndexing.resources.limits.cpu }}
+              memory: {{ .Values.dataIndexing.resources.limits.memory }}
+          volumeMounts:
+            - mountPath: /opt/app-root/src
+              name: workbench-data-indexing-pvc
+          envFrom:
+            - secretRef:
+                name: code-understanding-env
+          env:
+            - name: NOTEBOOK_ARGS
+              value: >-
+                --ServerApp.port=8888
+                --ServerApp.token=''
+                --ServerApp.password=''
+                --ServerApp.base_url=/notebook/{{ .Values.namespace }}/{{ .Values.dataIndexing.name }}
+                --ServerApp.quit_button=False
+            - name: JUPYTER_IMAGE
+              value: "{{ .Values.registry }}/{{ .Values.dataIndexing.name }}:{{ .Values.version }}"
+      volumes:
+        - name: workbench-data-indexing-pvc
+          persistentVolumeClaim:
+            claimName: workbench-data-indexing-pvc

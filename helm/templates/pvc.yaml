@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workbench-data-generation-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workbench-data-indexing-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
