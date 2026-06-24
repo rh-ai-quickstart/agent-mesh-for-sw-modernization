@@ -1,274 +1,300 @@
-# RHEL Modernize Agent: AI-Driven Legacy System Migration
 
-Accelerate legacy application modernization to RHEL 10 using an agent mesh of specialized AI agents running entirely on Red Hat AI -- no cloud APIs required.
+** WORK IN PROGRESS - NOT READY FOR USE **
 
-## Table of contents
+NOTES/QUESTIONS:
+- why not build the current repo contents into the images as part of the docker build, avoids the later clone ?
+- in -> Index a repository (Optional) would a pipeline add value or is having user do it manually better?
 
-- [Overview](#overview)
-- [The Problem](#the-problem)
-- [How It Works](#how-it-works)
-  - [Phase 1: Code Archaeology (Days 1-30)](#phase-1-code-archaeology-days-1-30)
-  - [Phase 2: Migration Planning (Days 30-60)](#phase-2-migration-planning-days-30-60)
-  - [Phase 3: Agentic Code Transformation (Days 60-90)](#phase-3-agentic-code-transformation-days-60-90)
-- [Architecture](#architecture)
-  - [Agent Mesh Design](#agent-mesh-design)
-  - [Workbench Images](#workbench-images)
-  - [Model Stack](#model-stack)
-- [User Journey](#user-journey)
-  - [Getting Started](#getting-started)
-  - [Step 1: Point to Your Legacy Repo](#step-1-point-to-your-legacy-repo)
-  - [Step 2: Understand Your Codebase](#step-2-understand-your-codebase)
-  - [Step 3: Generate a Migration Plan](#step-3-generate-a-migration-plan)
-  - [Step 4: Execute the Migration](#step-4-execute-the-migration)
-  - [Step 5: Review and Merge](#step-5-review-and-merge)
+- [Detailed description](#detailed-description)
+  - [Who is this for?](#who-is-this-for)
+  - [Related content](#related-content)
+  - [The business case for using agents in code modernization](#the-business-case-for-uses-agents-in-code-modernization)
+  - [Example use cases](#example-use-cases)
+  - [What this quickstart provides](#what-this-quickstart-provides)
+  - [What you'll build](#what-youll-build)
+  - [Architecture diagrams](#architecture-diagrams)
 - [Requirements](#requirements)
-  - [Minimum Hardware Requirements](#minimum-hardware-requirements)
-  - [Minimum Software Requirements](#minimum-software-requirements)
-- [What Gets Migrated](#what-gets-migrated)
-- [Key Design Decisions](#key-design-decisions)
-- [Success Metrics](#success-metrics)
-- [References](#references)
+  - [Minimum hardware requirements](#minimum-hardware-requirements)
+  - [Minimum software requirements](#minimum-software-requirements)
+  - [Required user permissions](#required-user-permissions)
+- [Deploy](#deploy)
+  - [Clone the repository](#clone-the-repository)
+  - [Building the workbenches (Optional)](#building-the-workbenches-optional)
+  - [Configuring model endpoints](#configuring-model-endpoints)
+  - [Setting up the workbenches](#setting-up-the-workbenches)
+  - [Index a repository (Optional)](#index-a-repository-optional)
+    - [Saving and restoring an index](#saving-and-restoring-an-index)
+  - [Interact with the code explorer](#interact-with-the-code-explorer)
+  - [What you've accomplished](#what-youve-accomplished)
+  - [Recommended next steps](#recommended-next-steps)
+  - [Delete](#delete)
+- [Technical details](#technical-details)
 - [Tags](#tags)
 
-## Overview
+## Detailed description
 
-Organizations running mission-critical applications on RHEL 7/8/9 face a growing modernization challenge. Migrating thousands of legacy applications to RHEL 10 manually requires enormous human effort -- L3Harris estimated thousands of engineer-hours for their migration alone.
+This quickstart demonstrates how to use GraphRAG to build a queryable knowledge graph from a legacy codebase, enabling developers and architects to ask natural language questions about code structure, dependencies, and migration risk without manually reading through thousands of files.
 
-This quickstart deploys an **agent mesh** -- a coordinated set of specialized AI agents -- that automates the heavy lifting of legacy code analysis, migration planning, and code refactoring. It runs entirely within your infrastructure on Red Hat OpenShift AI, making it suitable for disconnected and air-gapped environments common in defense and regulated industries.
+### Who is this for?
 
-**What you give it:** A Git repository URL containing your legacy application code.
+This quickstart is intended for:
 
-**What you get back:** A fully analyzed codebase with a migration plan, refactored code, test suites, and pull requests ready for human review.
+- **Software architects** who need to quickly understand the structure and dependencies of an unfamiliar or legacy codebase
+- **Development teams** planning a modernization or migration effort who need to identify high-risk components and recommended refactoring sequences
+- **Platform engineers** running Red Hat OpenShift AI (RHOAI) who want to provide a self-service code comprehension tool to their teams
 
-## The Problem
+### Related content
 
-Legacy software estates running on older RHEL versions create compounding operational risk:
+- [Microsoft GraphRAG documentation](https://microsoft.github.io/graphrag)
+- [LanceDB documentation](https://lancedb.github.io/lancedb)
+- [Red Hat OpenShift AI documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
+- [SDG Hub documentation](https://github.com/instructlab/sdg)
 
-- **Security exposure:** Aging codebases miss critical patches and lack modern security hardening
-- **Technical debt:** Deprecated APIs, outdated language runtimes (Python 2, older Java/GCC), and missing test coverage
-- **Scale:** Manual migration at enterprise scale (hundreds to thousands of applications) is not feasible with existing teams
-- **Compliance:** Government and defense mandates (GSA AI governance, DoD directives) require auditable, traceable modernization
-- **Disconnected operations:** Defense and aerospace environments (ships, remote facilities) cannot depend on cloud-hosted AI services
+### The business case for uses agents in code modernization
 
-## How It Works
+Legacy codebases impose a significant "code comprehension tax" on engineering teams — time spent reading, tracing, and documenting code before any modernization work can begin. This tax grows with codebase size and age, and is compounded by staff turnover and missing documentation.
 
-The migration proceeds through three phases, each driven by Jupyter notebook workflows running on Red Hat OpenShift AI.
+By indexing a codebase into a GraphRAG knowledge graph, teams can answer architectural questions in minutes rather than days, reduce onboarding time for new engineers, and make data-driven decisions about migration sequencing and risk — all without requiring deep familiarity with the code upfront.
 
-### Phase 1: Code Archaeology (Days 1-30)
+### Example use cases
 
-**Goal:** Deeply understand the legacy codebase before changing anything.
+- **Migration planning**: Ask which modules are most tightly coupled and would be riskiest to refactor first
+- **Dependency analysis**: Identify all modules that depend on a specific package or library
+- **Vulnerability assessment**: Ask whether any dependencies have known security issues
+- **Refactoring sequencing**: Get a recommended order for migrating components to minimize breaking changes
+- **Ad-hoc exploration**: Ask any natural language question about the structure or behaviour of the codebase
 
-A GraphRAG-based knowledge graph is built from your source code using hierarchical bottom-up summarization. Unlike standard LLM approaches that degrade as context windows fill up, this approach indexes the entire codebase into a queryable graph backed by LanceDB -- no details get left behind, even for large legacy codebases that have never been publicly shared.
+### What this quickstart provides
 
-**What happens:**
-1. The synthetic data generation workbench pre-processes your code into structured format with metadata (language-agnostic)
-2. The code understanding workbench builds a GraphRAG index (~1 hour for typical repos)
-3. Automated analysis produces:
-   - **Refactoring catalog** -- every deprecated API, outdated pattern, and compatibility issue identified
-   - **Dependency map** -- full dependency graph with RHEL 10 compatibility status
-   - **Recommended migration path** -- prioritized sequence of changes
-   - **Canned reports** with answers to pre-defined migration questions
+- Pre-built workbench images for Data Generation and Data Indexing
+- Pre-populated GraphRAG indexes for sample repositories stored under `indexes/`
+- Jupyter notebooks for generating new indexes and querying existing ones
+- A configurable pipeline that supports multiple repositories and iterative indexing runs
 
-**You can also:** Query the index interactively through a GUI to ask ad-hoc questions about your codebase -- useful for archaeology on codebases with little or no documentation.
+### What you'll build
 
-### Phase 2: Migration Planning (Days 30-60)
+By the end of this quickstart you will have:
 
-**Goal:** Create a concrete, actionable migration plan from Phase 1 analysis.
+- A running RHOAI workbench environment with the required dependencies installed
+- A GraphRAG index of one or more codebases stored as parquet files under `indexes/`
+- An interactive Jupyter notebook that lets you ask natural language questions about the indexed codebases
 
-Using the refactoring catalog and dependency map from Phase 1, the system generates:
+### Architecture diagrams
 
-- A structured migration plan broken into user stories
-- Each story mapped to specific code changes required
-- Stories organized into a Kanban board via Git issues
-- Prioritization based on dependency order and risk
-
-### Phase 3: Agentic Code Transformation (Days 60-90)
-
-**Goal:** Execute the migration plan through coordinated AI agents.
-
-A **PM harness** orchestrates the work:
-
-1. **Plan creation** -- Converts the migration plan into executable user stories
-2. **Story processing** -- A coding harness picks up stories from the backlog:
-   - **Code generation** using OpenCode and OpenSpec patterns
-   - **Evaluation harness** converts each change into a test suite for functional equivalence
-   - **CI harness** gathers artifacts and creates pull requests
-3. **Human-in-the-loop** -- If automated checks fail, stories move to a "blocked" column for human review, then back to the backlog
-4. **Target:** 80% test coverage with functional equivalence validation
-
-## Architecture
-
-### Agent Mesh Design
-
-Rather than a single monolithic agent, the system uses a mesh of specialized agents, each optimized for a specific task:
-
-```
-                    +------------------+
-                    |   PM Harness     |
-                    | (Orchestration)  |
-                    +--------+---------+
-                             |
-              +--------------+--------------+
-              |              |              |
-     +--------v---+  +-------v----+  +------v-------+
-     |   Coding   |  | Evaluation |  |     CI       |
-     |   Harness  |  |  Harness   |  |   Harness    |
-     +--------+---+  +-------+----+  +------+-------+
-              |              |              |
-              v              v              v
-         Code changes   Test suites    Pull requests
-```
-
-| Harness | Role | Framework | Model |
-|---------|------|-----------|-------|
-| **PM Harness** | Orchestration, story management, Kanban board | CrewAI | Mistral / Ministral |
-| **Coding Harness** | Code analysis, refactoring, generation | OpenCode / OpenSpec | gpt-oss-120B / Devstral-Small-24B |
-| **Evaluation Harness** | Test generation, functional equivalence | CrewAI | Mistral |
-| **CI Harness** | Artifact collection, PR creation | CrewAI | Mistral |
-| **Tracking Agent** | GitLab/GitHub issue management | Custom | Ministral-3-14B |
-
-### Workbench Images
-
-Three custom RHOAI workbench images (Dockerfiles provided to build from scratch):
-
-| Image | Purpose | Key Dependencies |
-|-------|---------|-----------------|
-| **Synthetic Data Generation** | Pre-processes code repos into structured training format using InstructLab Gen 2 SDK | InstructLab SDK modules |
-| **Code Understanding** | Builds and queries GraphRAG index for deep code analysis | GraphRAG (Microsoft), LanceDB, embedding libraries |
-| **Code Migration** | Executes the agentic migration workflow | CrewAI, vLLM client, OpenCode/OpenSpec |
-
-### Model Stack
-
-All models run locally via vLLM on OpenShift AI -- no external API calls required:
-
-| Model | Parameters | Purpose | Context Window |
-|-------|-----------|---------|----------------|
-| **gpt-oss-120B** | 120B | Primary coding agent, GraphRAG construction | 128K |
-| **Devstral-Small-24B** | 24B | Code analysis, refactoring | 256K |
-| **Ministral-3-14B** | 14B | Reasoning, orchestration, structured analysis | - |
-| **e5-mistral-7B** | 7B | Embedding and vector retrieval | - |
-
-**Why smaller models?** Small language models are well suited for agentic workflows requiring reliable, repeatable execution and low-latency responses. They produce sharper probability distributions and more consistent outputs than frontier models, while fitting within the compute constraints of disconnected environments.
-
-## User Journey
-
-### Getting Started
-
-> **TODO:** Detailed installation steps to be added as implementation progresses.
-
-**Prerequisites:**
-- Red Hat OpenShift AI cluster with GPU nodes
-- Access to model weights (downloadable for air-gapped deployment)
-- A Git repository containing your legacy application
-
-### Step 1: Point to Your Legacy Repo
-
-Provide the Git repository URL and branch of the application you want to migrate. The system is language-agnostic -- it handles Python, Java, C++, and other languages found in legacy RHEL environments.
-
-```
-Input: https://github.com/your-org/legacy-app.git (branch: main)
-```
-
-You can index **multiple repositories** into the same knowledge graph, useful when a legacy system spans several repos.
-
-### Step 2: Understand Your Codebase
-
-Launch the **Code Understanding** notebook. The GraphRAG indexing process takes approximately one hour and builds a hierarchical knowledge graph of your entire codebase.
-
-Once indexed, you can:
-- **Run pre-canned reports** that answer common migration questions (deprecated APIs, dependency risks, migration complexity)
-- **Ask ad-hoc questions** through the interactive GUI ("What does this module do?", "What depends on this library?", "What's the risk of upgrading this dependency?")
-
-### Step 3: Generate a Migration Plan
-
-The system produces a structured migration plan:
-- Refactoring catalog with every required change
-- Dependency upgrade path for RHEL 10 compatibility
-- User stories organized by priority and dependency order
-- Stories automatically created as Git issues on a Kanban board
-
-**Review the plan before proceeding.** This is a key human-in-the-loop checkpoint.
-
-### Step 4: Execute the Migration
-
-Launch the **Code Migration** notebook. The agent mesh begins processing stories from the backlog:
-
-1. Coding agent picks up a story, generates the refactored code
-2. Evaluation agent creates a test suite verifying functional equivalence
-3. CI agent bundles the changes into a pull request
-4. If all checks pass, the PR is ready for review
-5. If checks fail, the story moves to "blocked" for human input
-
-### Step 5: Review and Merge
-
-For each pull request:
-- Review the generated code changes
-- Verify the test suite covers the migration
-- Check that functional equivalence is maintained (identical outputs for identical inputs)
-- Merge approved PRs; send blocked items back to the backlog with guidance
+![Code Understanding](docs/images/Code%20Understanding.jpg)
 
 ## Requirements
 
-### Minimum Hardware Requirements
+### Minimum hardware requirements
 
-- GPU nodes with sufficient VRAM for model serving:
-  - gpt-oss-120B: requires multi-GPU setup (e.g., 2x L40S or equivalent)
-  - Smaller models (Devstral, Ministral, e5-mistral): single GPU each
-- Storage for GraphRAG index and model weights
+| Resource | Minimum |
+|---|---|
+| CPU | 4 cores |
+| Memory | 16 GB RAM |
+| Storage | 50 GB (PVC) |
+| GPU | Not required for querying; recommended for indexing large codebases |
 
-### Minimum Software Requirements
+### Minimum software requirements
 
-- Red Hat OpenShift 4.17+
-- Red Hat OpenShift AI (RHOAI)
-- vLLM operator for model serving
-- GPU Operator (NVIDIA)
-- Git CLI
+- Red Hat OpenShift 4.12 or later
+- Red Hat OpenShift AI (RHOAI) 2.8 or later
+- Access to an OpenAI-compatible LLM endpoint for the GraphRAG chat model
+- Access to an OpenAI-compatible embedding model endpoint
+- Podman (for building workbench images)
+- Access to an OCI-compatible image registry
 
-## What Gets Migrated
+### Required user permissions
 
-| Migration Type | Source | Target |
-|---------------|--------|--------|
-| **Python** | Python 2 | Python 3 |
-| **Java** | OpenJDK/Corretto 7, 8, 11 | Java 17, 21, 25 |
-| **C++** | Older GCC toolchains | Modern GCC on RHEL 10 |
-| **System libraries** | OpenSSL 1.x, older systemd | OpenSSL 3.x, RHEL 10 systemd |
-| **Package dependencies** | RHEL 7/8/9 packages | RHEL 10 equivalents |
-| **Kernel compatibility** | Older kernel APIs | RHEL 10 kernel |
+- OpenShift project `edit` or `admin` role to create workbenches and PVCs
+- RHOAI Data Science Project access to create and launch workbenches
+- Read access to the target git repository to be indexed
+- Push access to the OCI registry used to host workbench images (if building custom images)
 
-## Key Design Decisions
+## Deploy
 
-**Disconnected-first:** The entire system runs without internet access. All models, tools, and dependencies are bundled for air-gapped deployment. This is a baseline requirement, not an afterthought.
+### Clone the repository
 
-**Agents do the repetitive work, engineers do the architecture.** The system handles the mechanical translation -- deprecated API replacement, syntax updates, dependency resolution. Engineers focus on architectural decisions, oversight, agent evaluation, and exception handling.
+```bash
+git clone <this-repo-url>
+cd <repo-name>
+```
 
-**Traceability over black boxes.** While model inference is inherently opaque, the orchestration logic, agent code, outputs, and decision trails are fully traceable, auditable, and inspectable. This meets defense and government requirements for operationalized responsible AI.
+### Building the workbenches (Optional)
 
-**Multiple repos, one index.** Unlike tools bound to a single repository, the GraphRAG approach lets you index multiple repositories into a single knowledge graph. This is critical for legacy systems that span many repos.
+If you need to build the workbench images yourself you can run:
 
-**Bottom-up summarization.** The Leiden algorithm-based hierarchical summarization avoids the context window degradation problem. Instead of compacting and losing details as context fills up, the system builds understanding from the bottom up, preserving details that matter.
+```bash
+make build-and-push-all-images REGISTRY=<registry> VERSION=<version>
+```
 
-## Success Metrics
+This is only necessary if you want to modify the images to add additional prerequisites.
 
-This engagement uses brownfield KPIs, not velocity metrics:
+### Configuring model endpoints
 
-| Metric | What It Measures |
-|--------|-----------------|
-| **Functional correctness** | Identical outputs to the original given identical inputs |
-| **Test coverage** | Target 80% coverage on migrated code |
-| **Migration completion rate** | Percentage of stories completed without human intervention |
-| **Developer confidence** | Time-to-contribution on migrated codebase |
-| **Capacity gains** | Engineer-hours saved vs. manual migration estimate |
+The indexing pipeline requires access to two OpenAI-compatible model endpoints — a chat LLM for entity extraction and community report generation, and an embedding model for generating vector embeddings.
 
-> "Velocity without correctness is not success -- it's technical debt generation at AI speed."
+1. Copy the environment template and fill in your model endpoint details:
 
-## References
+   ```bash
+   cp .env.template .env
+   ```
 
-- [Refactoring at Speed: An Agent Mesh Approach to Legacy System Modernization with Red Hat AI](https://www.redhat.com/en/blog/refactoring-speed-mission-agent-mesh-approach-legacy-system-modernization-red-hat-ai) -- Detailed technical blog post on the agent mesh architecture
-- [GitHub Issue: RHEL 10 Modernization Agent Quickstart](https://github.com/rh-ai-quickstart/ai-quickstart-contrib/issues/44) -- Original quickstart proposal and requirements
-- [GraphRAG (Microsoft)](https://github.com/microsoft/graphrag) -- The graph-based RAG framework used for code understanding
-- [InstructLab](https://github.com/instructlab) -- Synthetic data generation toolkit
-- [Red Hat OpenShift AI](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai) -- AI/ML platform
+   The variables to configure are:
+
+   | Variable | Description |
+   |---|---|
+   | `GRAPHRAG_LLM_TOKEN` | API token for the GraphRAG chat model |
+   | `GRAPHRAG_LLM_ID` | Model name (e.g. `gpt-oss-120b`) |
+   | `GRAPHRAG_LLM_API_BASE` | Base URL of the chat model endpoint |
+   | `GRAPHRAG_LLM_PROVIDER` | Provider name (e.g. `openai`) |
+   | `GRAPHRAG_LLM_PROVIDER_GRAPHRAG` | Provider as used by GraphRAG (e.g. `openai_chat`) |
+   | `EMBED_LLM_TOKEN` | API token for the embedding model |
+   | `EMBED_LLM_ID` | Model name (e.g. `e5-mistral-7b-instruct`) |
+   | `EMBED_LLM_API_BASE` | Base URL of the embedding model endpoint |
+   | `EMBED_LLM_PROVIDER` | Provider name (e.g. `openai`) |
+   | `EMBED_LLM_PROVIDER_GRAPHRAG` | Provider as used by GraphRAG (e.g. `openai_embedding`) |
+
+   Recommended models:
+
+   | Role | Model | Context size | Recommended GPU | Notes |
+   |---|---|---|---|---|
+   | GraphRAG chat | [`RedHatAI/gpt-oss-120b`](https://huggingface.co/RedHatAI/gpt-oss-120b) | 128k tokens | 4× H100 | Model weights alone require ~120GB (FP8); additional GPUs needed for 128k KV cache |
+   | Embeddings | [`intfloat/e5-mistral-7b-instruct`](https://huggingface.co/intfloat/e5-mistral-7b-instruct) | 32k tokens | L40S | Context size drives KV cache memory beyond model weight footprint |
+
+   Both models can be served via [vLLM](https://docs.vllm.ai) with an OpenAI-compatible endpoint.
+
+   These values are stored in a Kubernetes Secret in your namespace by the `make install` target and are injected into the workbench pods at startup. They are never stored in the Helm chart or committed to the repository.
+
+### Setting up the workbenches
+
+1. Create the namespace:
+
+   ```bash
+   oc new-project <namespace>
+   ```
+
+2. Create the secret containing your model endpoint credentials:
+
+   ```bash
+   oc create secret generic code-understanding-env --from-env-file=.env -n <namespace>
+   ```
+
+3. Install the Helm chart. This creates the Data Science Project, shared PVC, and both workbenches, and automatically clones this repository into each workbench on startup. No cluster admin permissions are required.
+
+   ```bash
+   helm install code-understanding ./helm \
+     --set registry=<registry> \
+     --set version=<version> \
+     --set namespace=<namespace> \
+     --set repoUrl=<this-repo-url> \
+     --set repoRef=<commit-or-branch>
+   ```
+
+   Alternatively, if you are running from a local clone of this repository, the following Makefile target will handle all steps above automatically, detecting the repo URL and current commit:
+
+   ```bash
+   make install REGISTRY=<registry> VERSION=<version> NAMESPACE=<namespace>
+   ```
+
+4. Launch each workbench:
+   - In the RHOAI dashboard, navigate to **Data Science Projects** and select your project
+   - Under the **Workbenches** tab you will see the `data-generation` and `data-indexing` workbenches created by the Helm chart
+   - Click **Start** for each workbench, then click **Open** once it is running to open JupyterLab in your browser
+   - This repository will already be cloned into the workbench home directory
+
+### Index a repository (Optional)
+
+Skip this section if you want to use the pre-populated indexes already included under `indexes/`.
+
+1. From the **Data Generation** workbench, open `workflows/code_understanding/data_generation_graphrag_pipeline.ipynb`
+2. Update the instance variables for your target repository:
+   - `_GIT_REPO` — URL of the repository to index
+   - `_GIT_BRANCH` — branch to clone
+   - `_LANGUAGES` — list of languages to process. Supported values: `java`, `python`, `shell`, `sql`, `javascript`
+3. Run the notebook — enriched `.txt` files will be written to the `target/` directory
+
+4. From the **Data Indexing** workbench, open `workflows/code_understanding/data_indexing_graphrag_pipeline.ipynb`
+5. Update `_GRAPHRAG_SOURCE_PATH` to point to your desired output directory under `indexes/`
+6. Run the notebook — parquet files will be written to `indexes/<repo-name>/source/output/`
+
+#### Saving and restoring an index
+
+Once an index has been generated you can save it to your local machine for reuse across installs using the JupyterLab file browser:
+
+**To download an index:**
+1. In the JupyterLab file browser, navigate to `indexes/<repo-name>/source/output/`
+2. Select all parquet files, right-click and select **Download**
+3. Store them locally under a folder named `<repo-name>/source/output/`
+
+**To upload a previously saved index:**
+1. In the JupyterLab file browser, navigate to `indexes/` and create a folder named `<repo-name>/source/output/`
+2. Navigate into that folder, right-click and select **Upload Files**
+3. Select the parquet files from your local machine
+4. The index is now available for querying — proceed to [Interact with the code explorer](#interact-with-the-code-explorer)
+
+### Interact with the code explorer
+
+1. From the **Data Indexing** workbench, open `workflows/code_understanding/data_analysis_graphrag_pipeline.ipynb`
+2. Set `_GRAPHRAG_SOURCE_PATH` to point to the index you want to query — for a pre-populated index this will be `indexes/<repo-name>/source`, for a self-generated index this will be the path you set for `_GRAPHRAG_SOURCE_PATH` in the Data Indexing notebook (e.g. `indexes/<repo-name>/source`)
+3. Run the notebook
+4. In the **Ad-Hoc Queries** section, update the `question` variable with your question and run the cell
+
+Example questions:
+- `Which modules would be riskiest to refactor first? Include the fully qualified names.`
+- `What migration order would be recommended when refactoring to reduce breaking changes?`
+- `Are there any vulnerable dependencies or libraries?`
+
+### What you've accomplished
+
+- Set up RHOAI workbenches with the required dependencies for GraphRAG-based code analysis
+- Loaded a pre-populated (or self-generated) GraphRAG index of a legacy codebase
+- Used natural language queries to explore the structure, dependencies, and migration risk of the codebase
+
+### Recommended next steps
+
+- Index additional repositories by repeating the Data Generation and Data Indexing steps with a new `_GRAPHRAG_SOURCE_PATH`
+- Explore the Code Migration workflow to generate refactored code, documentation, and tests based on the insights from the code explorer
+- Integrate the parquet files into a CI/CD pipeline to keep the index up to date as the codebase evolves
+
+### Delete
+
+To remove the workbenches, PVC, and Data Science Project:
+
+```bash
+make uninstall NAMESPACE=<namespace>
+```
+
+Or manually:
+
+```bash
+helm uninstall code-understanding --namespace <namespace>
+```
+
+## Technical details
+
+The code understanding pipeline is built on [Microsoft GraphRAG](https://microsoft.github.io/graphrag), which constructs a hierarchical knowledge graph from a corpus of text documents. In this case, the corpus is the enriched `.txt` representations of source code files, with metadata comments prepended to each file by the Data Generation step.
+
+GraphRAG extracts entities (classes, functions, packages, dependencies), relationships between them, and groups them into communities using graph clustering. It then generates LLM-summarized community reports that capture the high-level purpose and relationships of each cluster. These community reports are stored as parquet files and are the primary data source for global search queries.
+
+Global search — used exclusively in this quickstart — works by mapping a natural language question across the community reports and reducing the results into a single synthesised answer. It does not perform vector similarity search, so the LanceDB vector store built during indexing is not required for querying.
+
+The parquet files produced by indexing are:
+
+| File | Contents |
+|---|---|
+| `entities.parquet` | Extracted code entities (classes, functions, packages, etc.) |
+| `relationships.parquet` | Directed relationships between entities |
+| `communities.parquet` | Graph community assignments |
+| `community_reports.parquet` | LLM-generated summaries of each community |
+| `text_units.parquet` | Source text chunks used during indexing |
 
 ## Tags
 
-`rhel` `modernization` `migration` `agentic-ai` `graphrag` `legacy-code` `python2-to-python3` `java-migration` `disconnected` `air-gapped` `defense` `openshift-ai` `vllm` `code-refactoring`
+* **Title:** Code Understanding with GraphRAG
+* **Description:** Index a legacy codebase into a GraphRAG knowledge graph and ask natural language questions about its structure, dependencies, and migration risk — deployed as RHOAI workbenches via Helm.
+* **Industry:** Adopt and scale AI
+* **Product:** OpenShift AI
+* **Use case:** Agentic software and system modernization
+* **Contributor org:** Red Hat
+
+

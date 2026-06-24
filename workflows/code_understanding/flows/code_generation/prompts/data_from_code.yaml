@@ -18,6 +18,10 @@
           **return value**: "Description of return value and its type"
           **exceptions**: [List of exceptions thrown by this method]
 
+    If the file is empty or contains no code, still return a valid JSON object using the information
+    available from the file path, repository, and language, with empty lists for imports, classes,
+    and methods.
+
     Try to stick to the specific fields in the schema.
     Return only JSON; do not include any markdown formatting, backticks, or preamble.
 

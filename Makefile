@@ -59,6 +59,15 @@ push-data-gen-image:
 push-data-idx-image:
 	$(call push_image,$(DATA_IDX_IMG),data-indexing image)
 
+##@ Notebooks
+
+clean-notebooks:
+	uv run --with nbstripout nbstripout workflows/code_understanding/*.ipynb
+	uv run --with nbformat python -c "\
+import nbformat, sys;\
+[nbformat.write(nb := nbformat.read(p, as_version=4), p) for p in sys.argv[1:]]\
+" workflows/code_understanding/*.ipynb
+
 ##@ Deployment
 
 install:
