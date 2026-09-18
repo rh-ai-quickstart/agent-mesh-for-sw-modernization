@@ -258,7 +258,7 @@ upload-prebuilt-index:
 		-s templates/upload-prebuilt-index-job.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
 	\
 	echo "==> Waiting for prebuilt-index upload to complete..." && \
-	oc wait --for=condition=complete job/upload-prebuilt-index -n $$KFP_NAMESPACE --timeout=600s; JOB_EXIT=$$?; \
+	oc wait --for=condition=complete job/upload-prebuilt-index -n $$KFP_NAMESPACE --timeout=120s; JOB_EXIT=$$?; \
 	if [ $$JOB_EXIT -eq 0 ]; then \
 		oc logs job/upload-prebuilt-index -n $$KFP_NAMESPACE | grep -E 'Uploaded prebuilt index bundle|already installed' || true; \
 	else \
