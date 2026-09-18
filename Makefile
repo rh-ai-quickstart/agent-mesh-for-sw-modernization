@@ -357,9 +357,17 @@ build-console-image:
 	oc start-build code-understanding-console --from-dir=ui --wait -n $$KFP_NAMESPACE
 
 run-console:
-	@set -a && . $(ENV_FILE) && set +a && \
-	AGENTMESH_REPO_URL="$(GIT_REPO_URL)" AGENTMESH_REPO_REF="$(GIT_REPO_BRANCH)" \
-	KFP_NAMESPACE="$$KFP_NAMESPACE" \
+	@set -a && . $(ENV_FILE) && set +a; \
+	if [ -n "$$MLFLOW_TRACKING_URI" ]; then \
+		mlflow_authority=$${MLFLOW_TRACKING_URI#*://}; mlflow_authority=$${mlflow_authority%%/*}; \
+		mlflow_host=$${mlflow_authority%%:*}; mlflow_port=$${mlflow_authority##*:}; \
+		mlflow_service=$${mlflow_host%%.*}; mlflow_namespace=$${mlflow_host#*.}; mlflow_namespace=$${mlflow_namespace%%.*}; \
+		echo "==> Forwarding https://localhost:18443 -> $$mlflow_service:$$mlflow_port"; \
+		oc port-forward -n "$$mlflow_namespace" "svc/$$mlflow_service" 18443:"$$mlflow_port" & \
+		mlflow_port_forward_pid=$$!; \
+		trap 'kill $$mlflow_port_forward_pid 2>/dev/null || true' EXIT INT TERM; \
+		MLFLOW_TRACKING_URI="https://localhost:18443"; \
+	fi; \
 	uv run --project ui --frozen uvicorn --app-dir ui main:app --host 127.0.0.1 --port 8080
 
 deploy-console: apply-console-src build-console-image
