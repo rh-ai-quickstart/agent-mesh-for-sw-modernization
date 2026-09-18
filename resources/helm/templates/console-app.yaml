@@ -1,32 +1,67 @@
 {{- if .Values.console.enabled }}
 ---
-apiVersion: image.openshift.io/v1
-kind: ImageStream
+apiVersion: v1
+kind: ServiceAccount
 metadata:
   name: code-understanding-console
   namespace: {{ .Values.namespace }}
   labels:
     app: code-understanding-console
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.console: >-
+      {"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"code-understanding-console"}}
 ---
-apiVersion: build.openshift.io/v1
-kind: BuildConfig
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
-  name: code-understanding-console
+  name: code-understanding-console-auth-delegator
+  labels:
+    app: code-understanding-console
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: code-understanding-console
+    namespace: {{ .Values.namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: code-understanding-console-viewer
   namespace: {{ .Values.namespace }}
   labels:
     app: code-understanding-console
-spec:
-  output:
-    to:
-      kind: ImageStreamTag
-      name: code-understanding-console:latest
-  source:
-    type: Binary
-  strategy:
-    type: Docker
-    dockerStrategy:
-      dockerfilePath: Dockerfile
-  triggers: []
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [code-understanding-access]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: code-understanding-console-viewer
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: code-understanding-console
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: code-understanding-console-viewer
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: agent-mesh-users
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: code-understanding-access
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: code-understanding-console
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -45,7 +80,7 @@ spec:
       labels:
         app: code-understanding-console
     spec:
-      serviceAccountName: pipeline-upload-job
+      serviceAccountName: code-understanding-console
       containers:
         - name: console
           image: "{{ if .Values.console.image }}{{ .Values.console.image }}{{ else }}image-registry.openshift-image-registry.svc:5000/{{ .Values.namespace }}/code-understanding-console:latest{{ end }}"
@@ -96,10 +131,42 @@ spec:
               cpu: "1"
               memory: 1Gi
               ephemeral-storage: {{ .Values.indexWorkspace.ephemeralStorage.limit }}
+        - name: oauth-proxy
+          image: {{ .Values.console.oauthProxy.image | default "quay.io/openshift/origin-oauth-proxy:4.18" }}
+          args:
+            - --https-address=:8443
+            - --provider=openshift
+            - --openshift-service-account=code-understanding-console
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - '--openshift-sar={"namespace":"{{ .Values.namespace }}","verb":"get","resource":"configmaps","resourceName":"code-understanding-access"}'
+          ports:
+            - name: https
+              containerPort: 8443
+          volumeMounts:
+            - name: proxy-tls
+              mountPath: /etc/tls/private
+            - name: proxy-secret
+              mountPath: /etc/proxy/secrets
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       volumes:
         - name: console-tmp
           emptyDir:
             sizeLimit: {{ .Values.indexWorkspace.ephemeralStorage.limit }}
+        - name: proxy-tls
+          secret:
+            secretName: code-understanding-console-tls
+        - name: proxy-secret
+          secret:
+            secretName: code-understanding-console-proxy
 ---
 apiVersion: v1
 kind: Service
@@ -108,13 +175,15 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     app: code-understanding-console
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: code-understanding-console-tls
 spec:
   selector:
     app: code-understanding-console
   ports:
-    - name: http
-      port: 8080
-      targetPort: http
+    - name: https
+      port: 8443
+      targetPort: https
 ---
 kind: Route
 apiVersion: route.openshift.io/v1
@@ -131,9 +200,9 @@ spec:
     name: code-understanding-console
     weight: 100
   port:
-    targetPort: http
+    targetPort: https
   tls:
-    termination: edge
+    termination: reencrypt
     insecureEdgeTerminationPolicy: Redirect
   wildcardPolicy: None
 {{- end }}

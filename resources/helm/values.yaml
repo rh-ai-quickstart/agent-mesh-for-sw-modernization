@@ -85,6 +85,8 @@ console:
   replicas: 1
   image: ""
   imagePullPolicy: Always
+  oauthProxy:
+    image: quay.io/openshift/origin-oauth-proxy:4.18
 
 consolePlugin:
   enabled: false

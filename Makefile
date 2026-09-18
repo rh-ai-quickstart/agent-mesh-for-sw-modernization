@@ -19,7 +19,8 @@ DEPLOY_EMBEDDING_MODEL ?= false
 	upload-mlflow-assets \
 	run-adhoc-query \
 	run-pipelines \
-	deploy-otel
+	deploy-otel \
+	add-console-user
 
 install:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -353,7 +354,7 @@ build-console-image:
 	helm template agent-mesh-for-sw resources/helm \
 	  --set namespace="$$KFP_NAMESPACE" \
 	  --set console.enabled=true \
-	  -s templates/console-app.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
+	  -s templates/console-app-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
 	oc start-build code-understanding-console --from-dir=ui --follow -n $$KFP_NAMESPACE
 
 run-console-app:
@@ -364,7 +365,36 @@ run-console-app:
 
 deploy-console-app: apply-console-src build-console-image
 	@set -a && . $(ENV_FILE) && set +a && \
-	echo "==> Deploying Code Understanding console..." && \
+	\
+	echo "==> Creating OAuth proxy cookie secret (skipped if already exists)..." && \
+	oc get secret code-understanding-console-proxy -n $$KFP_NAMESPACE >/dev/null 2>&1 || \
+	oc create secret generic code-understanding-console-proxy \
+		--from-literal=session_secret="$$(openssl rand -base64 32 | tr -d '\n')" \
+		-n $$KFP_NAMESPACE && \
+	\
+	echo "==> Creating htpasswd entry for agent-mesh-user1..." && \
+	[ -n "$$DEFAULT_CONSOLE_APP_USER_TOKEN" ] || { echo "Error: DEFAULT_CONSOLE_APP_USER_TOKEN is not set in $(ENV_FILE)." >&2; exit 1; } && \
+	HTPASSWD_ENTRY="$$(htpasswd -nbB agent-mesh-user1 "$$DEFAULT_CONSOLE_APP_USER_TOKEN")" && \
+	oc create secret generic agent-mesh-htpasswd \
+		--from-literal=htpasswd="$$HTPASSWD_ENTRY" \
+		-n openshift-config --dry-run=client -o yaml | oc apply -f - && \
+	\
+	echo "==> Configuring OpenShift HTPasswd identity provider (cluster-admin required)..." && \
+	if ! oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}' 2>/dev/null | grep -qw 'agent-mesh-htpasswd'; then \
+		oc patch oauth cluster --type=json \
+			-p='[{"op":"add","path":"/spec/identityProviders/-","value":{"name":"agent-mesh-htpasswd","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"agent-mesh-htpasswd"}}}}]' 2>/dev/null || \
+		oc patch oauth cluster --type=merge \
+			-p='{"spec":{"identityProviders":[{"name":"agent-mesh-htpasswd","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"agent-mesh-htpasswd"}}}]}}' || \
+		{ echo "Error: failed to configure OAuth IDP — cluster-admin required." >&2; exit 1; }; \
+		echo "HTPasswd identity provider configured."; \
+	else \
+		echo "HTPasswd identity provider already configured, skipping."; \
+	fi && \
+	\
+	echo "==> Creating agent-mesh-users group (skipped if already exists)..." && \
+	oc adm groups new agent-mesh-users 2>/dev/null || true && \
+	\
+	echo "==> Deploying Code Understanding console with OAuth protection..." && \
 	helm template agent-mesh-for-sw resources/helm \
 		--set namespace="$$KFP_NAMESPACE" \
 		--set requester="$$(oc whoami)" \
@@ -372,21 +402,44 @@ deploy-console-app: apply-console-src build-console-image
 		--set repoRef="$(GIT_REPO_BRANCH)" \
 		--set console.enabled=true \
 		-s templates/console-app.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
+	\
+	echo "==> Waiting for serving certificate to be provisioned..." && \
+	until oc get secret code-understanding-console-tls -n $$KFP_NAMESPACE >/dev/null 2>&1; do sleep 3; done && \
+	\
+	$(MAKE) add-console-user ARGS="--username=agent-mesh-user1" && \
+	\
+	echo "==> Waiting for console ImageStream tag to be available..." && \
+	until oc get imagestreamtag code-understanding-console:latest -n $$KFP_NAMESPACE \
+		-o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
+	\
 	oc rollout restart deployment/code-understanding-console -n $$KFP_NAMESPACE && \
 	oc rollout status deployment/code-understanding-console -n $$KFP_NAMESPACE --timeout=300s && \
 	ROUTE_HOST="$$(oc get route code-understanding-console -n $$KFP_NAMESPACE -o jsonpath='{.spec.host}')" && \
 	echo "" && \
 	echo "==> Open the console in your browser:" && \
 	echo "    https://$$ROUTE_HOST" && \
-	echo "" && \
-	echo "    Namespace access is enough; this is a Kubernetes Deployment, not an OpenShift console plugin." && \
-	echo "    Or run: make port-forward-console-app  then open http://localhost:8080" && \
+	echo "    Login: agent-mesh-user1 / <DEFAULT_CONSOLE_APP_USER_TOKEN>" && \
+	echo "    To grant access to additional users: make add-console-user ARGS=\"--username=<username>\"" && \
 	echo ""
+
+add-console-user:
+	@USERNAME=""; \
+	for arg in $(ARGS); do \
+		case $$arg in \
+			--username=*) USERNAME="$${arg#--username=}";; \
+		esac; \
+	done; \
+	[ -z "$$USERNAME" ] && { echo "Usage: make add-console-user ARGS=\"--username=<username>\"" >&2; exit 1; } || true && \
+	echo "==> Adding $$USERNAME to agent-mesh-users group..." && \
+	oc adm groups add-users agent-mesh-users $$USERNAME
 
 port-forward-console-app:
 	@set -a && . $(ENV_FILE) && set +a && \
-	echo "==> Forwarding http://localhost:8080 -> code-understanding-console:8080" && \
-	oc port-forward svc/code-understanding-console 8080:8080 -n $$KFP_NAMESPACE
+	POD="$$(oc get pod -n $$KFP_NAMESPACE -l app=code-understanding-console \
+		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null)" && \
+	[ -z "$$POD" ] && { echo "Error: no code-understanding-console pod found." >&2; exit 1; } || true && \
+	echo "==> Forwarding http://localhost:8080 -> $$POD:8080 (bypasses OAuth proxy)" && \
+	oc port-forward pod/$$POD 8080:8080 -n $$KFP_NAMESPACE
 
 PLUGIN_IMAGE ?= code-understanding-console-plugin:latest
 
