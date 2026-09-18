@@ -13,6 +13,15 @@ DEPLOY_EMBEDDING_MODEL ?= false
 CONTAINER_ENGINE      ?= $(if $(CI),docker,podman)
 REGISTRY              ?=
 VERSION               ?=
+KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-generation
+KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
+KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
+KFP_PIPELINE_TOOLS_IMAGE_NAME        ?= agent-mesh-for-sw-modernization-pipeline-tools
+
+export KFP_DATA_GENERATION_BASE_IMAGE_NAME \
+	KFP_INDEXING_BASE_IMAGE_NAME \
+	KFP_ANALYSIS_BASE_IMAGE_NAME \
+	KFP_PIPELINE_TOOLS_IMAGE_NAME
 
 ifeq ($(CONTAINER_ENGINE),docker)
 IMAGE_BUILD := docker buildx build --load
@@ -188,7 +197,7 @@ apply-secrets:
 build-images: build-all-images push-all-images
 
 build-all-images:
-	@set -a && . $(ENV_FILE) && set +a && \
+	@if [ -f "$(ENV_FILE)" ]; then set -a && . "$(ENV_FILE)" && set +a; fi && \
 	REGISTRY="$(REGISTRY)" && \
 	VERSION="$(VERSION)" && \
 	: "$${REGISTRY:=$$KFP_IMAGE_REGISTRY}" && \
@@ -210,7 +219,7 @@ build-all-images:
 	$(IMAGE_BUILD) -t "$$TOOLS_IMG" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools
 
 push-all-images:
-	@set -a && . $(ENV_FILE) && set +a && \
+	@if [ -f "$(ENV_FILE)" ]; then set -a && . "$(ENV_FILE)" && set +a; fi && \
 	REGISTRY="$(REGISTRY)" && \
 	VERSION="$(VERSION)" && \
 	: "$${REGISTRY:=$$KFP_IMAGE_REGISTRY}" && \
