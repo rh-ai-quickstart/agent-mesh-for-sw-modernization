@@ -8,6 +8,8 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+import posixpath
+import re
 import tarfile
 import tempfile
 from typing import Any
@@ -47,13 +49,51 @@ def bundle_sha256(bundle_path: Path) -> str:
     return digest.hexdigest()
 
 
+def _member_path(member_name: str) -> str:
+    """Normalize an archive member path, rejecting unsafe extraction targets."""
+    if (
+        not member_name
+        or "\\" in member_name
+        or member_name.startswith("/")
+        or re.match(r"^[A-Za-z]:", member_name)
+    ):
+        raise ValueError("Bundle contains an unsafe member path")
+
+    normalized = posixpath.normpath(member_name).removesuffix("/")
+    parts = normalized.split("/")
+    if normalized in {"", ".", ".."} or normalized.startswith("../") or any(
+        part in {"", ".", ".."} for part in parts
+    ):
+        raise ValueError("Bundle contains an unsafe member path")
+    return normalized
+
+
+def _validated_members(archive: tarfile.TarFile) -> list[tuple[str, tarfile.TarInfo]]:
+    """Return safe regular-file and directory members with unique paths."""
+    members = []
+    seen = set()
+    for member in archive.getmembers():
+        path = _member_path(member.name)
+        if path in seen:
+            raise ValueError("Bundle contains duplicate member paths")
+        if not (member.isfile() or member.isdir()):
+            raise ValueError("Bundle may contain only regular files and directories")
+        seen.add(path)
+        members.append((path, member))
+    return members
+
+
 def read_manifest(bundle_path: Path) -> dict[str, Any]:
     """Read the metadata that determines where the index is stored in MLflow."""
     try:
         with tarfile.open(bundle_path, mode="r:gz") as archive:
-            manifest_file = archive.extractfile("manifest.json")
-            if manifest_file is None:
+            members = dict(_validated_members(archive))
+            manifest_member = members.get("manifest.json")
+            if manifest_member is None or not manifest_member.isfile():
                 raise ValueError("Bundle is missing manifest.json")
+            manifest_file = archive.extractfile(manifest_member)
+            if manifest_file is None:
+                raise ValueError("Bundle manifest cannot be read")
             with manifest_file:
                 manifest = json.load(manifest_file)
     except (OSError, tarfile.TarError, json.JSONDecodeError) as exc:
@@ -91,9 +131,11 @@ def is_bundle_installed(
 
 
 def extract_bundle(bundle_path: Path, destination: Path) -> None:
-    """Extract the trusted, repository-managed bundle, excluding its manifest."""
+    """Safely extract bundle contents, excluding the upload manifest."""
     with tarfile.open(bundle_path, mode="r:gz") as archive:
-        members = [member for member in archive.getmembers() if member.name != "manifest.json"]
+        members = [
+            member for path, member in _validated_members(archive) if path != "manifest.json"
+        ]
         archive.extractall(destination, members=members)
 
 
