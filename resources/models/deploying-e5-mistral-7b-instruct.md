@@ -4,7 +4,6 @@
 #################################
 ```
 export HF_TOKEN=<your-huggingface-token>
-pip install vllm==0.19.0 mistral-common==1.9.1 tqdm==4.67.3 jupyter==1.1.1 hf_transfer==0.1.9 transformers==4.55.2
 nohup python -m vllm.entrypoints.openai.api_server \
     --model=intfloat/e5-mistral-7b-instruct \
     --runner pooling \
