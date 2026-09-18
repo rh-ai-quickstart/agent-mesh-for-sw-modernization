@@ -17,6 +17,7 @@ DEPLOY_EMBEDDING_MODEL ?= false
 	build-images \
 	upload-pipelines \
 	upload-mlflow-assets \
+	upload-prebuilt-index \
 	run-adhoc-query \
 	run-pipelines \
 	deploy-otel
@@ -70,6 +71,11 @@ install:
 	if [ "$$ASSET_LOADER" = "mlflow" ]; then \
 		echo "==> Preloading MLflow assets..." && \
 		$(MAKE) upload-mlflow-assets; \
+	fi
+	@set -a && . $(ENV_FILE) && set +a && \
+	if [ "$$ASSET_LOADER" = "mlflow" ] && [ "$$INSTALL_PREBUILT_INDEX" = "true" ]; then \
+		echo "==> Uploading prebuilt index..." && \
+		$(MAKE) upload-prebuilt-index; \
 	fi
 	$(MAKE) upload-pipelines
 	$(MAKE) deploy-notebooks
@@ -231,6 +237,34 @@ upload-mlflow-assets:
 		--set pipelineTools.image.tag="$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
 		--set mlflowGatewayHost="$(GATEWAY_HOST)" \
 		-s templates/upload-assets-job.yaml | oc apply -n $$KFP_NAMESPACE -f -
+
+upload-prebuilt-index:
+	@set -a && . $(ENV_FILE) && set +a && \
+	\
+	echo "==> Deleting existing prebuilt-index upload job..." && \
+	oc delete job upload-prebuilt-index -n $$KFP_NAMESPACE --ignore-not-found=true && \
+	\
+	echo "==> Submitting prebuilt-index upload job..." && \
+	helm template agent-mesh-for-sw resources/helm \
+		--set namespace="$$KFP_NAMESPACE" \
+		--set requester="$$(oc whoami)" \
+		--set repoUrl="$(GIT_REPO_URL)" \
+		--set repoRef="$(GIT_REPO_BRANCH)" \
+		--set pipelineTools.image.registry="$$KFP_IMAGE_REGISTRY" \
+		--set pipelineTools.image.name="$$KFP_PIPELINE_TOOLS_IMAGE_NAME" \
+		--set pipelineTools.image.tag="$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
+		--set mlflowGatewayHost="$(GATEWAY_HOST)" \
+		--set prebuiltIndex.enabled=true \
+		-s templates/upload-prebuilt-index-job.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
+	\
+	echo "==> Waiting for prebuilt-index upload to complete..." && \
+	oc wait --for=condition=complete job/upload-prebuilt-index -n $$KFP_NAMESPACE --timeout=120s; JOB_EXIT=$$?; \
+	if [ $$JOB_EXIT -eq 0 ]; then \
+		oc logs job/upload-prebuilt-index -n $$KFP_NAMESPACE | grep -E 'Uploaded prebuilt index bundle|already installed' || true; \
+	else \
+		echo "Prebuilt-index upload job failed; inspect it with: oc logs job/upload-prebuilt-index -n $$KFP_NAMESPACE"; \
+	fi; \
+	exit $$JOB_EXIT
 
 run-adhoc-query:
 	@[ -z "$(QUESTION_FILE)" ] && { echo "Error: QUESTION_FILE is required: generate it via wrappers/adhoc.sh." >&2; exit 1; } || true
