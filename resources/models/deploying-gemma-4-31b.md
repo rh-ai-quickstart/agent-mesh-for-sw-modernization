@@ -3,9 +3,9 @@
 # Sample vLLM Deployment on H200:
 #################################
 ```
-pip install vllm==0.19.0 tqdm==4.67.3 jupyter==1.1.1 hf_transfer==0.1.9 huggingface-hub "transformers<5.0.0,>=4.56.0"
+pip install vllm==0.19.0 tqdm==4.67.3 jupyter==1.1.1 hf_transfer==0.1.9
 pip install huggingface-hub==1.14.0 transformers==5.8.0
-wget https://huggingface.co/RedHatAI/gemma-4-31B-it-NVFP4/blob/main/chat_template.jinja
+wget -O chat_template.jinja https://huggingface.co/RedHatAI/gemma-4-31B-it-NVFP4/resolve/main/chat_template.jinja
 nohup python3 -m vllm.entrypoints.openai.api_server \
      --model RedHatAI/gemma-4-31B-it-NVFP4 \
      --quantization fp8 \

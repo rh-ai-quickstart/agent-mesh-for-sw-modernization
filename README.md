@@ -45,6 +45,7 @@ Understanding** and **Code Migration**. This repository demonstrates the **Code 
 - OpenShift CLI (`oc`)
 - Helm CLI (`helm`)
 - Make (`make`)
+- uv CLI (`uv`)
 - (**Optional**) Red Hat build of OpenTelemetry operator [Installation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/distributed_tracing/distributed-tracing-otel-install)
 - (**Optional**) Tempo Operator [Installation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/distributed_tracing/distributed-tracing-tempo-install)
 
