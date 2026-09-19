@@ -6,11 +6,13 @@ RUN python3 -m pip install --no-cache-dir "uv==${UV_VERSION}"
 
 WORKDIR /opt/app-root/src
 
-COPY pyproject.toml .
-COPY uv.lock .
+COPY ui/pyproject.toml .
+COPY ui/uv.lock .
 RUN uv sync --frozen --no-install-project --no-dev
 
-COPY . .
+COPY ui/ .
+COPY api/ /opt/app-root/api/
+COPY workflows/examples/code_understanding/ /opt/app-root/workflows/examples/code_understanding/
 
 USER 1001
 EXPOSE 8080
