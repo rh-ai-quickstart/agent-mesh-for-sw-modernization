@@ -8,6 +8,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+import logging
+logging.basicConfig(level=logging.INFO)
+import traceback
+
 from . import query_service
 
 router = APIRouter()
@@ -27,6 +31,8 @@ async def post_query(body: RunQueryRequest) -> dict[str, Any]:
     try:
         return await asyncio.to_thread(lambda: query_service.run_query(**body.model_dump()))
     except ValueError as exc:
+        logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
+        logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(exc)) from exc
