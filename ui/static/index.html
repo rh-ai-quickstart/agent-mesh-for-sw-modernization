@@ -1007,6 +1007,39 @@
       state.poll = setInterval(tick, 4000);
     }
 
+    async function pollV2(jobId) {
+      if (state.poll) clearInterval(state.poll);
+      const tick = async () => {
+        try {
+          const snap = await api(`/api/v2/pipelines/jobs/${jobId}`);
+          if (state.thinking) {
+            setThinking({
+              ...state.thinking,
+              status: `${snap.status} · ${jobId}`,
+            });
+          }
+          if (["succeeded", "skipped", "failed", "cancelled"].includes(snap.status)) {
+            clearInterval(state.poll);
+            state.poll = null;
+            setThinking(null);
+            if (snap.status === "succeeded" || snap.status === "skipped") {
+              banner("Pipeline completed successfully.");
+            } else {
+              banner(`Pipeline ${snap.status}`, true);
+            }
+            load();
+          }
+        } catch (e) {
+          clearInterval(state.poll);
+          state.poll = null;
+          setThinking(null);
+          banner(String(e.message || e), true);
+        }
+      };
+      tick();
+      state.poll = setInterval(tick, 4000);
+    }
+
     async function sendQuestion(text) {
       const question = (text || "").trim();
       if (!question || state.thinking) return;
@@ -1075,9 +1108,14 @@
       }
       setThinking({ kind: "pipeline", label: "Running pipeline", status: "Submitting indexing job…" });
       try {
-        const result = await api("/api/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos() }) });
+        /*
+        const result = await api("/api/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos() }) }); // v1
         setThinking({ kind: "pipeline", label: "Running pipeline", status: `Job ${result.job_name} started` });
         poll(result.job_name, "pipeline");
+         */
+        const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos()}) });
+        setThinking({ kind: "pipeline", label: "Running pipeline", status: `KFP run ${result.job_id} started` });
+        pollV2(result.job_id);
       } catch (e) {
         setThinking(null);
         banner(String(e.message || e), true);

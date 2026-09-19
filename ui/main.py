@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
+
+# Expose the project-root api/ package to the import system
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +52,11 @@ app.add_middleware(
     RequestBodyLimitMiddleware,
     max_body_size=index_storage.configured_max_index_bytes() + MULTIPART_OVERHEAD_BYTES,
 )
+
+from api.pipelines import router as _v2_router  # noqa: E402
+from api.queries import router as _v2_queries_router  # noqa: E402
+app.include_router(_v2_router, prefix="/api/v2")
+app.include_router(_v2_queries_router, prefix="/api/v2")
 
 
 class Repo(BaseModel):
