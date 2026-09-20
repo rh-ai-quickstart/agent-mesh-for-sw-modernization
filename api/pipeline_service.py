@@ -67,8 +67,19 @@ def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
 # Status
 # ---------------------------------------------------------------------------
 
+def list_pipeline_runs() -> list[dict[str, Any]]:
+    """Return submitted KFP runs newest-first with their last-known status."""
+    return [
+        {"name": meta["run_name"], "status": meta.get("status", "pending").capitalize()}
+        for meta in reversed(list(_JOBS.values()))
+    ]
+
+
 def get_run_status(job_id: str) -> dict[str, Any]:
     state = get_kfp_run_state(job_id)
+
+    if job_id in _JOBS:
+        _JOBS[job_id]["status"] = state.lower()
 
     evaluation_report: str | None = None
     analysis_report: str | None = None

@@ -39,10 +39,15 @@ async def post_pipeline_service(body: RunPipelinesRequest) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get("/pipelines/jobs/{job_id}")
-async def get_run_status(job_id: str) -> dict[str, Any]:
+@router.get("/pipelines/runs")
+async def list_pipeline_runs() -> dict[str, Any]:
+    return {"jobs": pipeline_service.list_pipeline_runs()}
+
+
+@router.get("/pipelines/runs/{run_id}")
+async def get_run_status(run_id: str) -> dict[str, Any]:
     try:
-        return await asyncio.to_thread(pipeline_service.get_run_status, job_id)
+        return await asyncio.to_thread(pipeline_service.get_run_status, run_id)
     except ValueError as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=404, detail=str(exc)) from exc
