@@ -44,13 +44,18 @@ def list_kfp_runs(page_size: int = 50) -> list[dict[str, Any]]:
     client = create_client()
     result = client.list_runs(page_size=page_size, sort_by="created_at desc")
     runs = getattr(result, "runs", None) or []
-    return [
-        {
+    out = []
+    for r in runs:
+        params = getattr(getattr(r, "runtime_config", None), "parameters", None) or {}
+        git_repo = params.get("git_repo") or ""
+        git_branch = params.get("git_branch") or ""
+        out.append({
             "run_id": getattr(r, "run_id", None) or getattr(r, "id", ""),
             "name": getattr(r, "display_name", None) or getattr(r, "name", ""),
             "status": _normalize_state(r).capitalize(),
             "start_time": _get_run_start_date_time(r),
             "git_slug": _get_git_slug(r),
-        }
-        for r in runs
-    ]
+            "git_repo": git_repo or None,
+            "git_branch": git_branch or None,
+        })
+    return out

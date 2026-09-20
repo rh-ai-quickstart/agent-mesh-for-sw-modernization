@@ -481,7 +481,7 @@
   <header class="cu-hero">
     <div class="cu-eyebrow"><span class="cu-mark"></span>Agent Mesh for Software Modernization</div>
     <h1>Code Understanding</h1>
-    <p>Knowledge graph-based analysis for legacy codebases. <br/>
+    <p>Knowledge graph-based analysis for legacy codebases.
         Select code repositories, generate analysis reports, and ask questions
         about the code.</p>
   </header>
@@ -522,9 +522,8 @@
       <section id="tab-repos" class="cu-card">
         <h2>Repositories</h2>
           <p class="cu-muted">
-              <span class="cu-tab-description">Select <strong>1</strong> repository
+              Select <strong>1</strong> repository
               for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.<br/>
-              </span>
             </p>
         <div class="cu-actions">
           <div class="cu-note hidden" id="selection-note">0 selected</div>
@@ -542,10 +541,8 @@
       <section id="tab-pipelines" class="cu-card hidden">
         <h2>Analysis</h2>
         <p class="cu-muted">
-            <span class="cu-tab-description">
             Generate a code analysis report for the selected repository or
             repositories.<br/>
-            </span>
             <strong>Note:</strong> <br/>
             &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong>
             process which involves the generation of a knowledge graph index,
@@ -564,10 +561,11 @@
       <section id="tab-chat" class="cu-card hidden">
         <h2>Chat</h2>
         <p class="cu-muted">
-        <span class="cu-tab-description">Ask questions about the indexed repositories below.<br/> <strong>NOTE:</strong> Only
-          indexed repositories are shown. If your repository (or group of repositories) is missing,
-          it means it hasn't been indexed yet.<br/> Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
-        </span>
+        Ask questions about the indexed repositories below.<br/> <strong>
+            NOTE:</strong> Submit queries about a repository (or group of
+            repositories). Only indexed repositories are shown. If your
+            repository (or group of repositories) is not shown in the list, it means it hasn't been
+            indexed yet.<br/> Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
         </p>
         <p id="chat-repo-row" class="hidden">
           <label class="cu-form-label" for="chat-repo">Select repository</label>
@@ -724,6 +722,24 @@
       } catch {
         return `${url}-${branch}`;
       }
+    }
+    function prettyRelativeDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+      const now = new Date();
+      const isToday = d.getFullYear() === now.getFullYear()
+        && d.getMonth() === now.getMonth()
+        && d.getDate() === now.getDate();
+      if (isToday) {
+        const diffMs = now - d;
+        const hours = Math.floor(diffMs / 3600000);
+        const mins = Math.floor(diffMs / 60000);
+        if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+        if (mins >= 1) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+        return "just now";
+      }
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     }
     function prettyDate(iso) {
       if (!iso) return "";
