@@ -82,6 +82,7 @@
     .cu-status.warn { border-left-color: var(--cu-gold); }
     .cu-status.checking { animation: cu-blink 1.2s ease-in-out infinite; }
     .cu-muted { color: var(--cu-gray); font-size: 0.875rem; }
+    .cu-tab-description { font-size: 1.1rem; }
     .cu-rail h2 {
       font-size: 0.8rem;
       font-weight: 700;
@@ -507,8 +508,11 @@
         <button type="button" data-tab="chat">Chat</button>
       </div>
       <section id="tab-repos" class="cu-card">
-        <p class="cu-muted">Select 1 repository for focused analysis,
-            or multiple for cross-repository comparative analysis.<br/>
+        <h2>Repositories</h2>
+          <p class="cu-muted">
+              <span class="cu-tab-description">Select <strong>1</strong> repository
+              for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.<br/>
+              </span>
             </p>
         <div class="cu-note hidden" id="selection-note">0 selected</div>
         <div class="cu-actions">
@@ -524,24 +528,30 @@
         </div>
       </section>
       <section id="tab-pipelines" class="cu-card hidden">
+        <h2>Analysis</h2>
         <p class="cu-muted">
+            <span class="cu-tab-description">
             Generate a code analysis report for the selected repository or
             repositories.<br/>
             <strong>Note:</strong> <br/>
             &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong>
             process which involves the generation of a knowledge graph index,
             and may take up to 30 minutes or more to complete.<br/>
-            &bullet;&nbsp;Any pre-existing index for this selection will be <strong>
-            overwritten.</strong><br/><br/>
+            &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
+            </span><br/><br/>
         </p>
         <div class="cu-note hidden" id="pipeline-selection"></div>
         <br/>
         <p><button type="button" class="cu-btn cu-btn-primary" id="run-pipeline">Run Code Understanding</button></p>
       </section>
       <section id="tab-chat" class="cu-card hidden">
-        <p class="cu-muted">Ask questions about the indexed repositories below.<br/> <strong>NOTE:</strong> Only
+        <h2>Chat</h2>
+        <p class="cu-muted">
+        <span class="cu-tab-description">Ask questions about the indexed repositories below.<br/> <strong>NOTE:</strong> Only
           indexed repositories are shown. If your repository (or group of repositories) is missing,
-          it means it hasn't been indexed yet.<br/> Fix this by running Code Understanding on the <strong>Analysis</strong> tab.</p>
+          it means it hasn't been indexed yet.<br/> Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
+        </span>
+        </p>
         <p id="chat-repo-row" class="hidden">
           <label class="cu-form-label" for="chat-repo">Select repository</label>
           <select class="cu-select" id="chat-repo"></select>
