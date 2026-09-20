@@ -41,7 +41,7 @@ async def post_pipeline_service(body: RunPipelinesRequest) -> dict[str, Any]:
 
 @router.get("/pipelines/runs")
 async def list_pipeline_runs() -> dict[str, Any]:
-    return {"jobs": pipeline_service.list_pipeline_runs()}
+    return {"runs": pipeline_service.list_pipeline_runs()}
 
 
 @router.get("/pipelines/runs/{run_id}")

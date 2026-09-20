@@ -475,6 +475,8 @@
   <div class="cu-shell">
     <aside class="cu-rail">
       <div id="status" class="cu-status warn checking">Checking cluster access…</div>
+      <h2>Recent Runs</h2>
+      <div id="runs" class="cu-rail-list"></div>
       <h2>Recent jobs</h2>
       <div id="jobs" class="cu-rail-list"></div>
       <h2>Indexed repositories</h2>
@@ -859,6 +861,18 @@
       }
     }
 
+    function runCard(run) {
+      const kind = (run.name || "").startsWith("multi_repo") ? "Multi-repo" : "Single-repo";
+      return `<article class="cu-job-card">
+        <span class="cu-job-dot ${esc(run.status)}"></span>
+        <div>
+          <div class="cu-job-kind">${esc(kind)}</div>
+          <div class="cu-job-name">${esc(run.name)}</div>
+        </div>
+        <span class="cu-chip ${run.status === "Succeeded" || run.status === "Skipped" ? "indexed" : ""}">${esc(run.status)}</span>
+      </article>`;
+    }
+
     function jobCard(job) {
       const kind = (job.name || "").startsWith("cu-query-") ? "Query" : "Pipeline";
       return `<article class="cu-job-card">
@@ -950,7 +964,7 @@
         ]); */
         const [status, catalog, indexes, v2runs] = await Promise.all([
           api("/api/status"), api("/api/catalog"), api("/api/indexes"),
-          api("/api/v2/pipelines/runs").catch(() => ({ jobs: [] })),
+          api("/api/v2/pipelines/runs").catch(() => ({ runs: [] })),
         ]);
         $("status").className = "cu-status" + (status.ok ? "" : " warn");
         $("status").innerHTML = `<strong>${status.ok ? "Connected" : "Not connected"}</strong><div></div>
@@ -965,10 +979,10 @@
           ? state.indexes.map(indexCard).join("")
           : `<p class="cu-muted">${esc(indexes.message || "No indexes yet.")}</p>`;
         bindDownloadButtons();
-        const allJobs = [...(v2runs.jobs || []), ...(jobs.jobs || [])];
-        $("jobs").innerHTML = allJobs.length
-          ? allJobs.map(jobCard).join("")
-          : `<p class="cu-muted">No jobs yet.</p>`;
+        const allRuns = [...(v2runs.runs || [])];
+        $("runs").innerHTML = allRuns.length
+          ? allRuns.map(runCard).join("")
+          : `<p class="cu-muted">No runs yet.</p>`;
         $("selection-note").classList.remove("hidden");
         $("pipeline-selection").classList.remove("hidden");
         $("chat-loading").classList.add("hidden");
@@ -1014,15 +1028,15 @@
       state.poll = setInterval(tick, 4000);
     }
 
-    async function pollV2(jobId) {
+    async function pollV2(runId) {
       if (state.poll) clearInterval(state.poll);
       const tick = async () => {
         try {
-          const snap = await api(`/api/v2/pipelines/jobs/${jobId}`);
+          const snap = await api(`/api/v2/pipelines/runs/${runId}`);
           if (state.thinking) {
             setThinking({
               ...state.thinking,
-              status: `${snap.status} · ${jobId}`,
+              status: `${snap.status} · ${runId}`,
             });
           }
           if (["succeeded", "skipped", "failed", "cancelled"].includes(snap.status)) {
