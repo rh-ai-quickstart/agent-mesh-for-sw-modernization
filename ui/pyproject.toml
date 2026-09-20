@@ -6,7 +6,10 @@ requires-python = ">=3.11,<4"
 dependencies = [
     "fastapi>=0.115.6",
     "uvicorn[standard]>=0.34.0",
+    "graphrag==2.6.0",
+    "jsonpath-ng>=1.7.0",
     "kfp>=2.0.0,<3.0.0",
+    "PyGithub>=2.0.0",
     "kubernetes>=8.0.0,<31",
     "mlflow>=2.0.0",
     "pydantic>=2.0.0",
