@@ -15,15 +15,24 @@ def _normalize_state(run_obj: Any) -> str:
     return state
 
 
+def _get_run_start_date_time(run_obj: Any) -> str | None:
+    start_raw = getattr(run_obj, "created_at", None) or getattr(run_obj, "scheduled_at", None)
+    if start_raw is None:
+        return None
+    return start_raw.isoformat() if hasattr(start_raw, "isoformat") else str(start_raw)
+
+
 def list_kfp_runs(page_size: int = 50) -> list[dict[str, Any]]:
-    """Return KFP runs newest-first as a list of {name, status} dicts."""
+    """Return KFP runs newest-first as a list of {run_id, name, status, start_time} dicts."""
     client = create_client()
     result = client.list_runs(page_size=page_size, sort_by="created_at desc")
     runs = getattr(result, "runs", None) or []
     return [
         {
+            "run_id": getattr(r, "run_id", None) or getattr(r, "id", ""),
             "name": getattr(r, "display_name", None) or getattr(r, "name", ""),
             "status": _normalize_state(r).capitalize(),
+            "start_time": _get_run_start_date_time(r),
         }
         for r in runs
     ]

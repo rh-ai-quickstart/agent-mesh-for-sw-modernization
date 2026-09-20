@@ -184,6 +184,15 @@
     .cu-job-name { font-size: 0.7rem; color: var(--cu-gray); word-break: break-all; }
     .cu-runs-toggle { display: flex; justify-content: center; padding: 0.25rem 0; background: none; border: none; cursor: pointer; color: var(--cu-gray); width: 100%; }
     .cu-runs-toggle:hover { color: var(--cu-text); }
+    .cu-run-card { display: flex; flex-direction: column; gap: 0.35rem; background: #fff; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.6rem 0.7rem; }
+    .cu-run-card-header { display: flex; align-items: center; gap: 0.5rem; }
+    .cu-run-card-meta { font-size: 0.68rem; color: var(--cu-gray); }
+    .cu-run-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.1rem; }
+    .cu-run-card-actions { display: flex; gap: 0.3rem; }
+    .cu-run-card-actions button { display: flex; align-items: center; background: none; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.2rem 0.4rem; cursor: pointer; color: var(--cu-gray); }
+    .cu-run-card-actions button:hover { color: var(--cu-text); border-color: var(--cu-text); }
+    .cu-report-viewer { margin-top: 1.5rem; border-top: 1px solid var(--cu-border); padding-top: 1rem; }
+    .cu-report-viewer h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; }
 
     .cu-tabs {
       display: flex;
@@ -337,8 +346,8 @@
       font-size: 0.9rem;
     }
     #selection-note, #pipeline-selection {
-      background: #e7f1fa;
-      border-left-color: #0066cc;
+      background: none;
+      border-left-color: var(--cu-red);
     }
 
     .cu-thinking {
@@ -545,6 +554,10 @@
         <div class="cu-note hidden" id="pipeline-selection"></div>
         <br/>
         <p><button type="button" class="cu-btn cu-btn-primary" id="run-pipeline">Run Code Understanding</button></p>
+        <div id="report-viewer" class="cu-report-viewer hidden">
+          <h3 id="report-viewer-title">Analysis Report</h3>
+          <div id="report-viewer-content" class="cu-md"></div>
+        </div>
       </section>
       <section id="tab-chat" class="cu-card hidden">
         <h2>Chat</h2>
@@ -873,16 +886,66 @@
       }
     }
 
+    const iconExpand = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>`;
+    const iconDownload = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
     function runCard(run) {
       const kind = (run.name || "").startsWith("multi_repo") ? "Multi-repo" : "Single-repo";
-      return `<article class="cu-job-card">
-        <span class="cu-job-dot ${esc(run.status)}"></span>
-        <div>
-          <div class="cu-job-kind">${esc(kind)}</div>
-          <div class="cu-job-name">${esc(run.name)}</div>
+      const succeeded = run.status === "Succeeded" || run.status === "Skipped";
+      const actions = succeeded
+        ? `<div class="cu-run-card-actions">
+            <button type="button" class="cu-run-expand" data-run-id="${esc(run.run_id)}" title="View analysis report">${iconExpand}</button>
+            <button type="button" class="cu-run-download" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" title="Download analysis report">${iconDownload}</button>
+          </div>`
+        : "";
+      return `<article class="cu-run-card">
+        <div class="cu-run-card-header">
+          <span class="cu-job-dot ${esc(run.status)}"></span>
+          <span class="cu-job-kind">${esc(kind)}</span>
         </div>
-        <span class="cu-chip ${run.status === "Succeeded" || run.status === "Skipped" ? "indexed" : ""}">${esc(run.status)}</span>
+        <div class="cu-job-name">${esc(run.name)}</div>
+        ${run.start_time ? `<div class="cu-run-card-meta">${esc(new Date(run.start_time).toLocaleString())}</div>` : ""}
+        <div class="cu-run-card-footer">
+          <span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span>
+          ${actions}
+        </div>
       </article>`;
+    }
+
+    function bindRunCards() {
+      $("runs").querySelectorAll(".cu-run-expand").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
+            const report = snap.analysis_report;
+            $("report-viewer-content").innerHTML = report
+              ? renderMarkdown(report)
+              : `<p class="cu-muted">No analysis report available.</p>`;
+            $("report-viewer").classList.remove("hidden");
+            showTab("pipelines");
+          } catch (e) {
+            banner(String(e.message || e), true);
+          }
+        });
+      });
+      $("runs").querySelectorAll(".cu-run-download").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
+            const report = snap.analysis_report;
+            if (!report) { banner("No analysis report available.", true); return; }
+            const blob = new Blob([report], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${btn.dataset.runName || btn.dataset.runId}_analysis_report.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            banner(String(e.message || e), true);
+          }
+        });
+      });
     }
 
     function jobCard(job) {
@@ -1005,6 +1068,7 @@
           if (allRuns.length > 3) {
             $("runs-toggle").onclick = () => renderRuns(!expanded);
           }
+          bindRunCards();
         };
         renderRuns(false);
         $("selection-note").classList.remove("hidden");
