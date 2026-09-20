@@ -176,7 +176,7 @@
     .cu-job-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--cu-gray); }
     .cu-job-dot.Succeeded { background: var(--cu-green); }
     .cu-job-dot.Failed { background: var(--cu-red); }
-    .cu-job-dot.Running, .cu-job-dot.Pending { background: var(--cu-gold); }
+    .cu-job-dot.Running, .cu-job-dot.Pending { background: var(--cu-gold); animation: cu-blink 1.2s ease-in-out infinite; }
     .cu-job-dot.Skipped { background: var(--cu-green); }
     .cu-job-dot.Cancelled { background: var(--cu-red); }
     .cu-job-kind { font-size: 0.78rem; font-weight: 600; }
@@ -466,7 +466,7 @@
 </head>
 <body>
   <header class="cu-hero">
-    <div class="cu-eyebrow"><span class="cu-mark"></span>Agent Mesh for Software Engineering</div>
+    <div class="cu-eyebrow"><span class="cu-mark"></span>Agent Mesh for Software Modernization</div>
     <h1>Code Understanding</h1>
     <p>Knowledge graph-based analysis for legacy codebases. <br/>
         Select code repositories, generate analysis reports, and ask questions
@@ -477,8 +477,8 @@
       <div id="status" class="cu-status warn checking">Checking cluster access…</div>
       <h2>Recent Runs</h2>
       <div id="runs" class="cu-rail-list"></div>
-      <h2>Recent jobs</h2>
-      <div id="jobs" class="cu-rail-list"></div>
+      <!-- <h2>Recent jobs</h2>
+      <div id="jobs" class="cu-rail-list"></div> -->
       <h2>Indexed repositories</h2>
       <div id="indexes" class="cu-rail-list"></div>
       <div class="cu-index-upload">
@@ -510,6 +510,7 @@
         <p class="cu-muted">Select 1 repository for focused analysis,
             or multiple for cross-repository comparative analysis.<br/>
             </p>
+        <div class="cu-note hidden" id="selection-note">0 selected</div>
         <div class="cu-actions">
           <button type="button" class="cu-btn cu-btn-secondary" id="select-all">Select all</button>
           <button type="button" class="cu-btn cu-btn-link" id="clear">Clear</button>
@@ -521,7 +522,6 @@
           <input class="cu-field" id="custom-branch" value="main" />
           <button type="button" class="cu-btn cu-btn-secondary" id="add-custom">Add repository</button>
         </div>
-        <div class="cu-note hidden" id="selection-note">0 selected</div>
       </section>
       <section id="tab-pipelines" class="cu-card hidden">
         <p class="cu-muted">

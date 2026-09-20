@@ -24,7 +24,7 @@ Contents
 <a id="overview"></a>
 ## 🧭 Overview
 
-This demonstrates the **Code Understanding** phase of the Agent Mesh for Software Engineering, a framework pattern 
+This demonstrates the **Code Understanding** phase of the Agent Mesh for Software Modernization, a framework pattern 
 for continuous legacy code which uses a federated, multi-harness, multi-agent 
 system (MAS) to support iterative agent-driven development for brownfield applications.
 
