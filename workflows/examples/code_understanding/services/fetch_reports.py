@@ -5,6 +5,9 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from typing import Any
+import logging
+logging.basicConfig(level=logging.INFO)
+import traceback
 
 
 def _read_dir_contents(path: str) -> str | None:
@@ -45,12 +48,17 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
                         asset_tags={**base_tags, "category": category},
                     )
                     return _read_dir_contents(tmpdir)
-                except Exception:
-                    return None
+                except Exception as e:
+                    logging.error(f"Error: Could not download {category} report"
+                                  f" from artifact '{artifact_path}', "
+                                  f"tags: {base_tags}, experiment: {loader.RESULT_ASSET_EXPERIMENT}")
+                    raise e
 
         return (
             _get(AssetLoader.RESULTS_PATH_PREFIX_EVAL, "indexing"),
             _get(AssetLoader.RESULTS_PATH_PREFIX_PIPELINES, "analysis"),
         )
     except Exception:
+        logging.error(f"Could not fetch reports for git_slug='{git_slug}', multi_repo='{multi_repo}':")
+        logging.error(traceback.format_exc())
         return None, None

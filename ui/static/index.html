@@ -349,6 +349,7 @@
       background: none;
       border-left-color: var(--cu-red);
     }
+    #selection-note { margin-top: 0; }
 
     .cu-thinking {
       display: flex;
@@ -525,8 +526,8 @@
               for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.<br/>
               </span>
             </p>
-        <div class="cu-note hidden" id="selection-note">0 selected</div>
         <div class="cu-actions">
+          <div class="cu-note hidden" id="selection-note">0 selected</div>
           <button type="button" class="cu-btn cu-btn-secondary" id="select-all">Select all</button>
           <button type="button" class="cu-btn cu-btn-link" id="clear">Clear</button>
           <!--<button type="button" class="cu-btn cu-btn-link" id="refresh">Refresh indexes</button>-->
@@ -544,12 +545,13 @@
             <span class="cu-tab-description">
             Generate a code analysis report for the selected repository or
             repositories.<br/>
+            </span>
             <strong>Note:</strong> <br/>
             &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong>
             process which involves the generation of a knowledge graph index,
             and may take up to 30 minutes or more to complete.<br/>
             &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
-            </span><br/><br/>
+            <br/><br/>
         </p>
         <div class="cu-note hidden" id="pipeline-selection"></div>
         <br/>
@@ -890,8 +892,11 @@
     const iconDownload = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
     function runCard(run) {
-      const kind = (run.name || "").startsWith("multi_repo") ? "Multi-repo" : "Single-repo";
       const succeeded = run.status === "Succeeded" || run.status === "Skipped";
+      const label = (run.name || "").startsWith("multi_repo") ? (run.git_slug || "Combined repos") : run.git_slug || "";
+      const startChip = run.start_time
+        ? `<span class="cu-chip">${esc(new Date(run.start_time).toLocaleString("en-US", { month: "2-digit", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }))}</span>`
+        : "";
       const actions = succeeded
         ? `<div class="cu-run-card-actions">
             <button type="button" class="cu-run-expand" data-run-id="${esc(run.run_id)}" title="View analysis report">${iconExpand}</button>
@@ -901,12 +906,12 @@
       return `<article class="cu-run-card">
         <div class="cu-run-card-header">
           <span class="cu-job-dot ${esc(run.status)}"></span>
-          <span class="cu-job-kind">${esc(kind)}</span>
+          <span class="cu-job-kind">${esc(label)}</span>
         </div>
         <div class="cu-job-name">${esc(run.name)}</div>
-        ${run.start_time ? `<div class="cu-run-card-meta">${esc(new Date(run.start_time).toLocaleString())}</div>` : ""}
         <div class="cu-run-card-footer">
           <span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span>
+          ${startChip}
           ${actions}
         </div>
       </article>`;

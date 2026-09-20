@@ -15,6 +15,23 @@ def _normalize_state(run_obj: Any) -> str:
     return state
 
 
+def _get_git_slug(run_obj: Any) -> str | None:
+    """Derive a git slug from the run's runtime_config parameters, if present.
+
+    Returns None for multi-repo runs, which do not include git_repo in their params.
+    """
+    try:
+        params = getattr(getattr(run_obj, "runtime_config", None), "parameters", None) or {}
+        git_repo = params.get("git_repo") or ""
+        git_branch = params.get("git_branch") or ""
+        if not git_repo:
+            return None
+        from pipelines.base.data_generation import generate_git_slug
+        return generate_git_slug(git_repo, git_branch)
+    except Exception:
+        return None
+
+
 def _get_run_start_date_time(run_obj: Any) -> str | None:
     start_raw = getattr(run_obj, "created_at", None) or getattr(run_obj, "scheduled_at", None)
     if start_raw is None:
@@ -33,6 +50,7 @@ def list_kfp_runs(page_size: int = 50) -> list[dict[str, Any]]:
             "name": getattr(r, "display_name", None) or getattr(r, "name", ""),
             "status": _normalize_state(r).capitalize(),
             "start_time": _get_run_start_date_time(r),
+            "git_slug": _get_git_slug(r),
         }
         for r in runs
     ]
