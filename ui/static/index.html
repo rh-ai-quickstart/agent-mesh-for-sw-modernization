@@ -544,16 +544,15 @@
         </div>
       </section>
       <section id="tab-pipelines" class="cu-card hidden">
-        <h2>Analysis<span class="cu-help" id="help-pipelines">
+        <h2>Analysis</h2>
+        <p class="cu-muted">Generate a code analysis report for the selected repository or repositories.<span class="cu-help" id="help-pipelines">
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-pipelines-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <div class="cu-help-popover" role="tooltip">
-            Run code analysis for the repositories.<br/>
             <strong>Note:</strong><br/>
             &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong> process which involves the generation of a knowledge graph index, and may take up to 30 minutes or more to complete.<br/>
             &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
           </div>
-        </span></h2>
-        <p class="cu-muted">Generate a code analysis report for the selected repository or repositories.</p>
+        </span></p>
         <div class="cu-note hidden" id="pipeline-selection"></div>
         <br/>
         <p><button type="button" class="cu-btn cu-btn-primary" id="run-pipeline">Run Code Understanding</button></p>
@@ -563,16 +562,13 @@
         </div>
       </section>
       <section id="tab-chat" class="cu-card hidden">
-        <h2>Chat<span class="cu-help" id="help-chat">
+        <h2>Chat</h2>
+        <p class="cu-muted">Ask questions about the indexed repositories below.<span class="cu-help" id="help-chat">
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-chat-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <div class="cu-help-popover" role="tooltip">
-              Submit questions about the indexed repositories.<br/>
-            <strong>Note:</strong> Only indexed repositories are shown.
-              If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet.
-              Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
+            <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
           </div>
-        </span></h2>
-        <p class="cu-muted">Ask questions about the indexed repositories below.</p>
+        </span></p>
         <p id="chat-repo-row" class="hidden">
           <label class="cu-form-label" for="chat-repo">Select repository</label>
           <select class="cu-select" id="chat-repo"></select>
