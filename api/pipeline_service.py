@@ -20,6 +20,7 @@ if _CU_ROOT not in sys.path:
 from services.trigger_run import trigger_run as _trigger_run
 from services.fetch_reports import fetch_reports as _fetch_reports
 from services.get_run_status import get_kfp_run_state
+from services.list_runs import list_kfp_runs
 
 # In-memory store: kfp_run_id -> submission metadata (git_slug, multi_repo, …)
 _JOBS: dict[str, dict[str, Any]] = {}
@@ -68,11 +69,8 @@ def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def list_pipeline_runs() -> list[dict[str, Any]]:
-    """Return submitted KFP runs newest-first with their last-known status."""
-    return [
-        {"name": meta["run_name"], "status": meta.get("status", "pending").capitalize()}
-        for meta in reversed(list(_JOBS.values()))
-    ]
+    """Return all KFP runs newest-first with their current status."""
+    return list_kfp_runs()
 
 
 def get_run_status(job_id: str) -> dict[str, Any]:

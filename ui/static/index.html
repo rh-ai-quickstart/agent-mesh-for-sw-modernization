@@ -182,6 +182,8 @@
     .cu-job-dot.Cancelled { background: var(--cu-red); }
     .cu-job-kind { font-size: 0.78rem; font-weight: 600; }
     .cu-job-name { font-size: 0.7rem; color: var(--cu-gray); word-break: break-all; }
+    .cu-runs-toggle { display: flex; justify-content: center; padding: 0.25rem 0; background: none; border: none; cursor: pointer; color: var(--cu-gray); width: 100%; }
+    .cu-runs-toggle:hover { color: var(--cu-text); }
 
     .cu-tabs {
       display: flex;
@@ -990,9 +992,21 @@
           : `<p class="cu-muted">${esc(indexes.message || "No indexes yet.")}</p>`;
         bindDownloadButtons();
         const allRuns = [...(v2runs.runs || [])];
-        $("runs").innerHTML = allRuns.length
-          ? allRuns.map(runCard).join("")
-          : `<p class="cu-muted">No runs yet.</p>`;
+        const chevronDown = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const chevronUp = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const renderRuns = (expanded) => {
+          const shown = expanded ? allRuns : allRuns.slice(0, 3);
+          const toggle = allRuns.length > 3
+            ? `<button type="button" class="cu-runs-toggle" id="runs-toggle">${expanded ? chevronUp : chevronDown}</button>`
+            : "";
+          $("runs").innerHTML = shown.length
+            ? shown.map(runCard).join("") + toggle
+            : `<p class="cu-muted">No runs yet.</p>`;
+          if (allRuns.length > 3) {
+            $("runs-toggle").onclick = () => renderRuns(!expanded);
+          }
+        };
+        renderRuns(false);
         $("selection-note").classList.remove("hidden");
         $("pipeline-selection").classList.remove("hidden");
         $("chat-loading").classList.add("hidden");
@@ -1049,6 +1063,7 @@
               status: `${snap.status} · ${runId}`,
             });
           }
+          load();
           if (["succeeded", "skipped", "failed", "cancelled"].includes(snap.status)) {
             clearInterval(state.poll);
             state.poll = null;
@@ -1058,7 +1073,6 @@
             } else {
               banner(`Pipeline ${snap.status}`, true);
             }
-            load();
           }
         } catch (e) {
           clearInterval(state.poll);
