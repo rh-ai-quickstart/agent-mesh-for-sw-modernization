@@ -15,6 +15,7 @@ if _PROJECT_ROOT not in sys.path:
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -41,6 +42,7 @@ class FrameAncestorsMiddleware(BaseHTTPMiddleware):
 
 
 app = FastAPI(title="Code Understanding console", docs_url=None, redoc_url=None)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.add_middleware(FrameAncestorsMiddleware)
 app.add_middleware(
     CORSMiddleware,
