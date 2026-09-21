@@ -182,8 +182,12 @@
     .cu-run-card-actions button { display: flex; align-items: center; background: none; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.2rem 0.4rem; cursor: pointer; color: var(--cu-gray); }
     .cu-run-card-actions button:hover { color: var(--cu-text); border-color: var(--cu-text); }
     .cu-report-viewer { margin-top: 1.5rem; border-top: 1px solid var(--cu-border); padding-top: 1rem; }
-    .cu-report-viewer h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .cu-report-viewer h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
     .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
+    .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
+    .cu-report-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.4rem 0.85rem; font-size: 0.85rem; font-weight: 600; color: var(--cu-charcoal); cursor: pointer; }
+    .cu-report-tab:hover { color: var(--cu-red); }
+    .cu-report-tab.active { border-bottom-color: var(--cu-red); color: var(--cu-red); }
 
     .cu-tabs {
       display: flex;
@@ -562,7 +566,11 @@
           <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Analysis</button>
         </div>
         <div id="report-viewer" class="cu-report-viewer hidden">
-          <h3 id="report-viewer-title" class="hidden"></h3>
+          <h3 id="report-viewer-title"></h3>
+          <div class="cu-report-tabs">
+            <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
+            <button type="button" class="cu-report-tab" data-report="evaluation">Evaluation</button>
+          </div>
           <div class="cu-report-viewer-body">
             <div id="report-viewer-content" class="cu-md"></div>
           </div>
@@ -990,18 +998,26 @@
         btn.addEventListener("click", async () => {
           try {
             const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
-            const report = snap.analysis_report;
-            const title = $("report-viewer-title");
-            if (report) {
-              title.textContent = `Analysis Report for ${btn.dataset.runName}`;
-              title.classList.remove("hidden");
-            } else {
-              title.classList.add("hidden");
+            $("report-viewer-title").textContent = btn.dataset.runName;
+
+            const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
+
+            function showReport(type) {
+              $("report-viewer").querySelectorAll(".cu-report-tab").forEach((t) => {
+                t.classList.toggle("active", t.dataset.report === type);
+              });
+              const content = reports[type];
+              $("report-viewer-content").innerHTML = content
+                ? renderMarkdown(content)
+                : `<p class="cu-muted">No ${type} report available.</p>`;
+              runMermaid($("report-viewer-content"));
             }
-            $("report-viewer-content").innerHTML = report
-              ? renderMarkdown(report)
-              : `<p class="cu-muted">No analysis report available.</p>`;
-            runMermaid($("report-viewer-content"));
+
+            $("report-viewer").querySelectorAll(".cu-report-tab").forEach((tab) => {
+              tab.onclick = () => showReport(tab.dataset.report);
+            });
+
+            showReport("analysis");
             $("report-viewer").classList.remove("hidden");
             showTab("pipelines");
           } catch (e) {
