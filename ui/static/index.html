@@ -854,7 +854,7 @@
     }
 
     function bindDownloadButtons() {
-      $("indexes").querySelectorAll("[data-index-download]").forEach((button) => {
+      $("indexes")?.querySelectorAll("[data-index-download]").forEach((button) => {
         button.addEventListener("click", () => downloadIndex(button.dataset.indexDownload, button));
       });
     }
@@ -1148,10 +1148,12 @@
         if (!state.selected.size && state.defaultKey) state.selected.add(state.defaultKey);
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
-        $("indexes").innerHTML = state.indexes.length
-          ? state.indexes.map(indexCard).join("")
-          : `<p class="cu-muted">${esc(indexes.message || "No indexes yet.")}</p>`;
-        bindDownloadButtons();
+        if ($("indexes")) {
+          $("indexes").innerHTML = state.indexes.length
+            ? state.indexes.map(indexCard).join("")
+            : `<p class="cu-muted">${esc(indexes.message || "No indexes yet.")}</p>`;
+          bindDownloadButtons();
+        }
         const allRuns = [...(v2runs.runs || [])];
         const chevronDown = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         const chevronUp = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
