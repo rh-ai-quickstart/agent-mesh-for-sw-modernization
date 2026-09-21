@@ -43,9 +43,10 @@ def set_active_namespace(ns: str) -> None:
 def available_namespaces() -> list[str]:
     """Return namespaces the current identity has access to.
 
-    Tries a standard Kubernetes namespace listing first. Falls back to the
-    OpenShift Projects API (returns only projects the caller has access to
-    without requiring elevated permissions), then to the current namespace only.
+    Tries the OpenShift Projects API first — it returns only the projects the
+    caller can access without requiring any elevated permissions. Falls back to
+    a standard Kubernetes namespace listing (requires cluster-wide list
+    permission), then to the current namespace only.
     """
     try:
         try:
@@ -53,30 +54,30 @@ def available_namespaces() -> list[str]:
         except config.ConfigException:
             config.load_kube_config()
 
-        # Vanilla Kubernetes: list all namespaces (requires cluster-wide list permission)
+        # OpenShift: returns only projects the caller has access to
         try:
-            items = client.CoreV1Api().list_namespace().items
-            names = sorted(ns.metadata.name for ns in items if ns.metadata.name)
+            result = client.CustomObjectsApi().list_cluster_custom_object(
+                group="project.openshift.io",
+                version="v1",
+                plural="projects",
+            )
+            names = sorted(
+                item["metadata"]["name"]
+                for item in result.get("items", [])
+                if item.get("metadata", {}).get("name")
+            )
             if names:
-                logging.info(f"Available namespaces from Kubernetes API: {names}")
+                logging.info(f"Available namespaces from OpenShift Projects "
+                             f"API: {', '.join(names)}")
                 return names
         except Exception as e:
             logging.debug(traceback.format_exc(), exc_info=e)
             pass
 
-        # OpenShift fallback: returns only projects the caller has access to
-        result = client.CustomObjectsApi().list_cluster_custom_object(
-            group="project.openshift.io",
-            version="v1",
-            plural="projects",
-        )
-        names = sorted(
-            item["metadata"]["name"]
-            for item in result.get("items", [])
-            if item.get("metadata", {}).get("name")
-        )
-        logging.info(f"Available namespaces from OpenShift Projects "
-                     f"API: {', '.join(names)}")
+        # Vanilla Kubernetes fallback (requires cluster-wide list permission)
+        items = client.CoreV1Api().list_namespace().items
+        names = sorted(ns.metadata.name for ns in items if ns.metadata.name)
+        logging.info(f"Available namespaces from Kubernetes API: {names}")
         return names
 
     except Exception as e:
