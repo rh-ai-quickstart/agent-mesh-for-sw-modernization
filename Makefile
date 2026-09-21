@@ -1,3 +1,8 @@
+# ============================================================================
+# Configuration
+# ============================================================================
+
+.DEFAULT_GOAL := install
 
 ENV_FILE            	?= ./.env
 GIT_REPO_URL        	:= $(shell git remote get-url origin 2>/dev/null | sed 's|^git@\([^:]*\):\(.*\)$$|https://\1/\2|')
@@ -17,11 +22,16 @@ KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-gene
 KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_PIPELINE_TOOLS_IMAGE_NAME        ?= agent-mesh-for-sw-modernization-pipeline-tools
+PLUGIN_IMAGE                         ?= code-understanding-console-plugin:latest
 
 export KFP_DATA_GENERATION_BASE_IMAGE_NAME \
 	KFP_INDEXING_BASE_IMAGE_NAME \
 	KFP_ANALYSIS_BASE_IMAGE_NAME \
 	KFP_PIPELINE_TOOLS_IMAGE_NAME
+
+# ============================================================================
+# Container engine
+# ============================================================================
 
 ifeq ($(CONTAINER_ENGINE),docker)
 IMAGE_BUILD := docker buildx build --load
@@ -33,7 +43,12 @@ else
 $(error Unsupported CONTAINER_ENGINE '$(CONTAINER_ENGINE)'; use docker or podman)
 endif
 
+# ============================================================================
+# Help
+# ============================================================================
+
 .PHONY: \
+	help \
 	install \
 	deploy-embedding-model \
 	deploy-notebooks \
@@ -46,7 +61,76 @@ endif
 	upload-prebuilt-index \
 	run-adhoc-query \
 	run-pipelines \
-	deploy-otel
+	deploy-otel \
+	apply-console-src \
+	build-console-image \
+	run-console-app \
+	deploy-console-app \
+	port-forward-console-app \
+	apply-plugin-src \
+	build-console-plugin \
+	build-console-plugin-image \
+	build-plugin-api-image \
+	deploy-console-plugin \
+	enable-console-plugin
+
+help:
+	@echo "Agent Mesh for Software Modernization"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make <target> [VARIABLE=value ...]"
+	@echo ""
+	@echo "Deployment:"
+	@echo "  install                     Install the complete application stack"
+	@echo "  deploy-embedding-model      Deploy the e5-mistral embedding model"
+	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
+	@echo "  apply-secrets               Create or update application secrets"
+	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
+	@echo ""
+	@echo "Container images:"
+	@echo "  build-images                Build and push all application images"
+	@echo "  build-all-images            Build all application images"
+	@echo "  push-all-images             Push all application images"
+	@echo ""
+	@echo "Pipelines and assets:"
+	@echo "  upload-pipelines            Upload the Kubeflow pipelines"
+	@echo "  upload-mlflow-assets        Upload MLflow-hosted application assets"
+	@echo "  upload-prebuilt-index       Upload the prebuilt code index"
+	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
+	@echo "  run-pipelines               Submit the configured pipeline run"
+	@echo ""
+	@echo "Console application:"
+	@echo "  apply-console-src           Publish console job scripts"
+	@echo "  build-console-image         Build the console application image on the cluster"
+	@echo "  run-console-app             Run the console application locally"
+	@echo "  deploy-console-app          Build and deploy the console application"
+	@echo "  port-forward-console-app    Forward the deployed console to localhost:8080"
+	@echo ""
+	@echo "OpenShift console plugin:"
+	@echo "  apply-plugin-src            Publish console-plugin job scripts"
+	@echo "  build-console-plugin        Build the console-plugin frontend"
+	@echo "  build-console-plugin-image  Build and push the console-plugin image"
+	@echo "  build-plugin-api-image      Build the plugin API image on the cluster"
+	@echo "  deploy-console-plugin       Build and deploy the plugin and API"
+	@echo "  enable-console-plugin       Enable the plugin in the OpenShift console"
+	@echo ""
+	@echo "Common variables:"
+	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
+	@echo "  CONTAINER_ENGINE            Image tool: podman locally, docker in CI"
+	@echo "  REGISTRY                    Override the image registry"
+	@echo "  VERSION                     Override the image tag"
+	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
+	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
+	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
+	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
+	@echo "  ARGS                        Arguments passed to run-pipelines"
+	@echo "  QUESTION_FILE               Required input file for run-adhoc-query"
+	@echo ""
+	@echo "Most deployment settings are loaded from ENV_FILE. See .env.template."
+
+# ============================================================================
+# Installation and deployment
+# ============================================================================
 
 install:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -200,6 +284,10 @@ apply-secrets:
 			-p "{\"stringData\":{\"MLFLOW_TRACKING_URI\":\"https://$(GATEWAY_HOST)/mlflow\"}}"; \
 	fi
 
+# ============================================================================
+# Container images
+# ============================================================================
+
 build-images: build-all-images push-all-images
 
 build-all-images:
@@ -245,6 +333,10 @@ push-all-images:
 	fi && \
 	echo "==> Pushing pipeline-tools image: $$TOOLS_IMG" && \
 	$(IMAGE_PUSH) "$$TOOLS_IMG"
+
+# ============================================================================
+# Pipelines and assets
+# ============================================================================
 
 upload-pipelines:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -371,6 +463,10 @@ run-pipelines:
 	echo "==> Streaming pipeline run results..." && \
 	oc logs -f job/run-pipelines -n $$KFP_NAMESPACE
 
+# ============================================================================
+# Observability
+# ============================================================================
+
 deploy-otel:
 	@set -a && . $(ENV_FILE) && set +a && \
 	\
@@ -416,6 +512,10 @@ deploy-otel:
 		--set otel.enabled=true \
 		--set otel.name=$$OTEL_SERVICE_NAME \
 		-s templates/opentelemetry.yaml | oc apply -f -
+
+# ============================================================================
+# Console application
+# ============================================================================
 
 apply-console-src:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -470,7 +570,9 @@ port-forward-console-app:
 	echo "==> Forwarding http://localhost:8080 -> code-understanding-console:8080" && \
 	oc port-forward svc/code-understanding-console 8080:8080 -n $$KFP_NAMESPACE
 
-PLUGIN_IMAGE ?= code-understanding-console-plugin:latest
+# ============================================================================
+# OpenShift console plugin
+# ============================================================================
 
 apply-plugin-src:
 	@set -a && . $(ENV_FILE) && set +a && \
