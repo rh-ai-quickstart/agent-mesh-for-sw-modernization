@@ -8,11 +8,11 @@ from .mlflow_asset_loader import MlFlowAssetLoader
 class DefaultAssetLoader(AssetLoader):
     """Delegates to LocalAssetLoader or MlFlowAssetLoader based on the ASSET_LOADER env var."""
 
-    def __init__(self):
+    def __init__(self, namespace: str = None):
 
         if os.getenv("ASSET_LOADER") == "mlflow":
 
-            self._loader = MlFlowAssetLoader()
+            self._loader = MlFlowAssetLoader(namespace=namespace)
 
         else:
 

@@ -7,7 +7,7 @@ import os
 import subprocess
 import time
 import uuid
-from collections.abc import Iterator
+# from collections.abc import Iterator  # only used by wait_for_job (commented out)
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,8 +27,58 @@ SECRET_NAME = "code-understanding-env"
 GIT_SECRET_NAME = "git-credentials"
 ADHOC_MARKER = "ADHOC RESULTS"
 
+_active_namespace: str | None = None
+
+
+def set_active_namespace(ns: str) -> None:
+    """Override the active namespace for all subsequent cluster operations."""
+    global _active_namespace
+    _active_namespace = ns.strip() if ns else None
+
+
+def available_namespaces() -> list[str]:
+    """Return namespaces the current identity has access to.
+
+    Tries the OpenShift Projects API first — it returns only the projects the
+    caller can access without requiring any elevated permissions. Falls back to
+    a standard Kubernetes namespace listing (requires cluster-wide list
+    permission), then to the current namespace only.
+    """
+    try:
+        try:
+            config.load_incluster_config()
+        except config.ConfigException:
+            config.load_kube_config()
+
+        # OpenShift: returns only projects the caller has access to
+        try:
+            result = client.CustomObjectsApi().list_cluster_custom_object(
+                group="project.openshift.io",
+                version="v1",
+                plural="projects",
+            )
+            names = sorted(
+                item["metadata"]["name"]
+                for item in result.get("items", [])
+                if item.get("metadata", {}).get("name")
+            )
+            if names:
+                return names
+        except Exception:
+            pass
+
+        # Vanilla Kubernetes fallback (requires cluster-wide list permission)
+        items = client.CoreV1Api().list_namespace().items
+        return sorted(ns.metadata.name for ns in items if ns.metadata.name)
+
+    except Exception:
+        ns = current_namespace()
+        return [ns] if ns else []
+
 
 def current_namespace() -> str:
+    if _active_namespace:
+        return _active_namespace
     env_ns = os.getenv("KFP_NAMESPACE", "").strip()
     if env_ns:
         return env_ns
@@ -426,40 +476,44 @@ def fetch_job_logs(core: client.CoreV1Api, ns: str, pod_name: str) -> str:
     return best
 
 
-def wait_for_job(job_name: str, timeout_s: int = 1800, poll_s: float = 3.0) -> Iterator[dict[str, Any]]:
-    batch, core, ns = k8s_clients()
-    deadline = time.time() + timeout_s
-    last_log = ""
-    while time.time() < deadline:
-        job = batch.read_namespaced_job(job_name, ns)
-        succeeded = bool(job.status.succeeded)
-        failed = bool(job.status.failed)
-        logs = last_log
-        pod = job_pod_name(core, ns, job_name)
-        if pod:
-            try:
-                logs = _as_text(core.read_namespaced_pod_log(pod, ns, tail_lines=200))
-            except ApiException:
-                logs = last_log
-        last_log = logs or last_log
-        done = succeeded or failed
-        if done:
-            for _ in range(3):
-                time.sleep(2)
-                if pod:
-                    logs = fetch_job_logs(core, ns, pod)
-                    if logs:
-                        last_log = logs
-                        break
-        yield {"done": done, "succeeded": succeeded, "logs": last_log}
-        if done:
-            return
-        time.sleep(poll_s)
-    yield {
-        "done": True,
-        "succeeded": False,
-        "logs": last_log + "\nTimed out waiting for job.\n",
-    }
+# def wait_for_job(job_name: str, timeout_s: int = 1800, poll_s: float = 3.0) -> Iterator[dict[str, Any]]:
+#     """Blocking generator that polls a job until completion or timeout.
+#     No longer called — superseded by the v2 pipeline polling in api/pipelines.py
+#     and the client-side pollV2 / pollQuery loops in index.html.
+#     """
+#     batch, core, ns = k8s_clients()
+#     deadline = time.time() + timeout_s
+#     last_log = ""
+#     while time.time() < deadline:
+#         job = batch.read_namespaced_job(job_name, ns)
+#         succeeded = bool(job.status.succeeded)
+#         failed = bool(job.status.failed)
+#         logs = last_log
+#         pod = job_pod_name(core, ns, job_name)
+#         if pod:
+#             try:
+#                 logs = _as_text(core.read_namespaced_pod_log(pod, ns, tail_lines=200))
+#             except ApiException:
+#                 logs = last_log
+#         last_log = logs or last_log
+#         done = succeeded or failed
+#         if done:
+#             for _ in range(3):
+#                 time.sleep(2)
+#                 if pod:
+#                     logs = fetch_job_logs(core, ns, pod)
+#                     if logs:
+#                         last_log = logs
+#                         break
+#         yield {"done": done, "succeeded": succeeded, "logs": last_log}
+#         if done:
+#             return
+#         time.sleep(poll_s)
+#     yield {
+#         "done": True,
+#         "succeeded": False,
+#         "logs": last_log + "\nTimed out waiting for job.\n",
+#     }
 
 
 def _decode_hex_escapes_as_utf8(text: str) -> str:

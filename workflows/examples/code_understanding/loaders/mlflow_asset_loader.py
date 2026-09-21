@@ -16,7 +16,12 @@ class MlFlowAssetLoader(AssetLoader):
     RESULT_ASSET_EXPERIMENT = f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}/code-refactoring/assets/results"
     _RUN_NAME = "code-understanding"
 
-    def __init__(self):
+    def __init__(self, namespace: str = None):
+
+        ns = namespace or os.environ.get("MLFLOW_NAMESPACE", os.environ.get("KFP_NAMESPACE", "demo"))
+        self.STATIC_ASSET_EXPERIMENT = f"{ns}/code-refactoring/assets/static"
+        self.RESULT_DIRECTORY_ASSET_EXPERIMENT = f"{ns}/code-refactoring/assets/result-directories"
+        self.RESULT_ASSET_EXPERIMENT = f"{ns}/code-refactoring/assets/results"
 
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 

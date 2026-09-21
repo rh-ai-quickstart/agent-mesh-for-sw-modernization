@@ -77,6 +77,10 @@ class QueryRequest(BaseModel):
     use_global: bool | None = None
 
 
+class NamespaceRequest(BaseModel):
+    namespace: str
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
@@ -93,6 +97,26 @@ def health() -> dict[str, str]:
 @app.get("/api/status")
 def status() -> dict[str, Any]:
     return cluster.cluster_status()
+
+
+@app.get("/api/namespaces")
+def get_namespaces() -> dict[str, Any]:
+    return {
+        "namespaces": cluster.available_namespaces(),
+        "current": cluster.current_namespace(),
+    }
+
+
+@app.post("/api/namespace")
+def set_namespace(body: NamespaceRequest) -> dict[str, str]:
+    ns = (body.namespace or "").strip()
+    if not ns:
+        raise HTTPException(400, "namespace must not be empty.")
+    available = cluster.available_namespaces()
+    if len(available) > 1 and ns not in available:
+        raise HTTPException(400, f"Namespace {ns!r} is not in the available list.")
+    cluster.set_active_namespace(ns)
+    return {"namespace": ns}
 
 
 @app.get("/api/catalog")
