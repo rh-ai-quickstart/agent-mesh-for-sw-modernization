@@ -480,7 +480,9 @@
       .cu-chips { grid-column: 2; justify-content: flex-start; margin-top: 0.25rem; }
     }
   </style>
+  <link rel="stylesheet" href="/static/vendor/gridjs.min.css"/>
   <script src="/static/vendor/mermaid.min.js"></script>
+  <script src="/static/vendor/gridjs.umd.js"></script>
 </head>
 <body>
   <div class="cu-shell">
@@ -651,7 +653,8 @@
       text = text.replace(/```([\w+-]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
         const content = code.replace(/\n$/, "");
         if (lang.toLowerCase() === "mermaid") {
-          fences.push(`<pre class="mermaid">${esc(content)}</pre>`);
+          const sanitized = content.split("\n").map(l => /^\s*%(?!%)/.test(l) ? l.replace(/^(\s*)%/, "$1%%") : l).join("\n");
+          fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
         } else {
           fences.push(`<pre><code>${esc(content)}</code></pre>`);
         }
@@ -737,51 +740,36 @@
       return `<div class="cu-md">${html.join("")}</div>`;
     }
 
-    function renderCsv(src) {
-      function parseCsv(text) {
-        const rows = [];
-        let row = [], field = "", inQuotes = false;
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          if (inQuotes) {
-            if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
-            else if (ch === '"') { inQuotes = false; }
-            else { field += ch; }
+    function parseCsv(text) {
+      const rows = [];
+      let row = [], field = "", inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { field += ch; }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+          } else if (ch === ',') {
+            row.push(field.trim()); field = "";
+          } else if (ch === '\r' && text[i + 1] === '\n') {
+            row.push(field.trim()); field = "";
+            if (row.some(f => f !== "")) rows.push(row);
+            row = []; i++;
+          } else if (ch === '\n') {
+            row.push(field.trim()); field = "";
+            if (row.some(f => f !== "")) rows.push(row);
+            row = [];
           } else {
-            if (ch === '"') {
-              inQuotes = true;
-            } else if (ch === ',') {
-              row.push(field.trim()); field = "";
-            } else if (ch === '\r' && text[i + 1] === '\n') {
-              row.push(field.trim()); field = "";
-              if (row.some(f => f !== "")) rows.push(row);
-              row = []; i++;
-            } else if (ch === '\n') {
-              row.push(field.trim()); field = "";
-              if (row.some(f => f !== "")) rows.push(row);
-              row = [];
-            } else {
-              field += ch;
-            }
+            field += ch;
           }
         }
-        row.push(field.trim());
-        if (row.some(f => f !== "")) rows.push(row);
-        return rows;
       }
-      const rows = parseCsv(src.trim());
-      if (!rows.length) return `<p class="cu-muted">Empty evaluation report.</p>`;
-      const headers = rows[0];
-      let tbl = `<table class="cu-md-table"><thead><tr>`;
-      headers.forEach(h => { tbl += `<th>${esc(h)}</th>`; });
-      tbl += `</tr></thead><tbody>`;
-      rows.slice(1).forEach(row => {
-        tbl += `<tr>`;
-        row.forEach(cell => { tbl += `<td>${esc(cell)}</td>`; });
-        tbl += `</tr>`;
-      });
-      tbl += `</tbody></table>`;
-      return `<div class="cu-md">${tbl}</div>`;
+      row.push(field.trim());
+      if (row.some(f => f !== "")) rows.push(row);
+      return rows;
     }
 
     const banner = (msg, danger) => {
@@ -1062,9 +1050,26 @@
               });
               const content = reports[type];
               if (type === "evaluation") {
-                $("report-viewer-content").innerHTML = content
-                  ? renderCsv(content)
-                  : `<p class="cu-muted">No evaluation report available.</p>`;
+                $("report-viewer-content").innerHTML = "";
+                if (!content) {
+                  $("report-viewer-content").innerHTML = `<p class="cu-muted">No evaluation report available.</p>`;
+                } else {
+                  const csvRows = parseCsv(content);
+                  if (csvRows.length < 2) {
+                    $("report-viewer-content").innerHTML = `<p class="cu-muted">No evaluation data.</p>`;
+                  } else {
+                    const gridContainer = document.createElement("div");
+                    $("report-viewer-content").appendChild(gridContainer);
+                    new gridjs.Grid({
+                      columns: csvRows[0],
+                      data: csvRows.slice(1),
+                      sort: true,
+                      search: true,
+                      pagination: { limit: 20 },
+                      style: { table: { fontSize: "0.875rem" } },
+                    }).render(gridContainer);
+                  }
+                }
               } else {
                 $("report-viewer-content").innerHTML = content
                   ? renderMarkdown(content)
