@@ -17,9 +17,18 @@ _CU_ROOT = str(
 if _CU_ROOT not in sys.path:
     sys.path.insert(0, _CU_ROOT)
 
-# graphrag_utils patches ssl.create_default_context at import time when this is set,
-# which is required when the embeddings endpoint uses a self-signed certificate.
+# Self-signed certificate bypass.
+# GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY: patches ssl.create_default_context at import
+#   time in graphrag_utils.py (covers stdlib/urllib3 paths).
+# SSL_VERIFY: litellm 1.x reads this via get_ssl_verify() and passes verify=False
+#   directly to httpx.Client (covers the litellm/openai embedding path).
 os.environ.setdefault("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "true")
+os.environ.setdefault("SSL_VERIFY", "false")
+
+# graspologic -> hyppo -> numba: Numba cannot resolve a cache path when site-packages
+# is accessed through the lib64 -> lib symlink on RHEL/OpenShift containers.
+# Redirect the cache to a writable temp directory before numba is imported.
+os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
 
 from services.run_adhoc_query import run_adhoc_query as _run_adhoc_query
 
