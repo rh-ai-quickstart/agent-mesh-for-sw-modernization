@@ -26,9 +26,17 @@ Requirements:
    CORRECT: 18 packages ≤ 20, but 18 + 5 modules = 23 > 20 → include only package entities
    WRONG: 5 packages + 8 modules + 6 classes = 19 ≤ 20 → include only package and module entities
 3. Include only import and dependency relationships
-4. Limit to the most architecturally significant components (maximum 20 nodes)
-5. Use short, readable node labels derived from the component names
-6. Output the Mermaid code block only — no explanation or preamble
+4. Exclude ALL standard library and built-in language components. Do not include any node whose fully-qualified name belongs to the language runtime or standard library.
+   Examples of names to EXCLUDE (not exhaustive):
+   - Java: `java.*`, `javax.*`, `sun.*`, `com.sun.*` (e.g. `java.util.Collections`, `java.util.ArrayList`, `java.io.File`)
+   - Python: `os`, `sys`, `re`, `json`, `collections`, `pathlib`, `typing`, `io`, `logging`, `math`, `itertools`, `functools`, `abc`
+   - JavaScript/TypeScript: `fs`, `path`, `http`, `https`, `crypto`, `events`, `stream`, `util`, `url`, built-in globals
+   - C#/.NET: `System.*`, `Microsoft.CSharp.*`, `System.Collections.*`, `System.Linq`, `System.IO`
+   - C++: `std::*`, `<algorithm>`, `<vector>`, `<string>`, `<map>`, `<iostream>`
+   - Go: `fmt`, `os`, `io`, `net`, `strings`, `strconv`, `sync`, `context`, `errors`
+5. Limit to the most architecturally significant components (maximum 20 nodes)
+6. Use short, readable node labels derived from the component names
+7. Output the Mermaid code block only — no explanation or preamble
    WRONG: Here is the dependency diagram:
           ```mermaid
           graph TD
