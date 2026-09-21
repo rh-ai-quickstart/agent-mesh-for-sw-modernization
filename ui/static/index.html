@@ -186,16 +186,14 @@
     .cu-help-btn { background: none; border: none; cursor: pointer; color: var(--cu-gray); padding: 0; line-height: 1; display: inline-flex; }
     .cu-help-btn:hover { color: var(--cu-text); }
     .cu-help-popover { display: none; position: absolute; left: 1.4rem; top: 50%; transform: translateY(-50%); z-index: 100; background: #fff; border: 1px solid var(--cu-border); border-radius: 6px; padding: 0.75rem 1rem; width: 22rem; font-size: 0.82rem; line-height: 1.5; color: var(--cu-text); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+    .cu-help:hover .cu-help-popover,
     .cu-help:focus-within .cu-help-popover,
-    .cu-help-btn:focus + .cu-help-popover,
     .cu-help.open .cu-help-popover { display: block; }
     .cu-runs-toggle { display: flex; justify-content: center; padding: 0.25rem 0; background: none; border: none; cursor: pointer; color: var(--cu-gray); width: 100%; }
     .cu-runs-toggle:hover { color: var(--cu-text); }
-    .cu-run-card { display: flex; flex-direction: column; gap: 0.35rem; background: #fff; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.6rem 0.7rem; }
-    .cu-run-card-header { display: flex; align-items: center; gap: 0.5rem; }
-    .cu-run-card-meta { font-size: 0.68rem; color: var(--cu-gray); }
-    .cu-run-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.1rem; }
-    .cu-run-card-actions { display: flex; gap: 0.3rem; }
+    .cu-run-card { display: grid; grid-template-columns: 0.55rem minmax(0,1fr) auto; gap: 0.55rem; align-items: center; background: #fff; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.55rem 0.7rem; }
+    .cu-run-card > div { min-width: 0; }
+    .cu-run-card-actions { display: flex; gap: 0.3rem; align-self: center; }
     .cu-run-card-actions button { display: flex; align-items: center; background: none; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.2rem 0.4rem; cursor: pointer; color: var(--cu-gray); }
     .cu-run-card-actions button:hover { color: var(--cu-text); border-color: var(--cu-text); }
     .cu-report-viewer { margin-top: 1.5rem; border-top: 1px solid var(--cu-border); padding-top: 1rem; }
@@ -911,9 +909,16 @@
 
     function runCard(run) {
       const succeeded = run.status === "Succeeded" || run.status === "Skipped";
-      const label = (run.name || "").startsWith("multi_repo") ? (run.git_slug || "Combined repos") : run.git_slug || "";
+      const isMulti = (run.name || "").startsWith("multi_repo");
+      const title = isMulti
+        ? "Combined repos"
+        : run.git_repo ? shortName(run.git_repo).replace(/\.git$/, "") : (run.git_slug || run.name);
+      const owner = !isMulti && run.git_repo
+        ? (run.git_repo.replace(/^https?:\/\//, "").split("/")[1] || "")
+        : "";
+      const branch = !isMulti && run.git_branch ? run.git_branch : "";
       const startChip = run.start_time
-        ? `<span class="cu-chip">${esc(new Date(run.start_time).toLocaleString("en-US", { month: "2-digit", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }))}</span>`
+        ? `<span class="cu-chip">${esc(prettyRelativeDate(run.start_time))}</span>`
         : "";
       const actions = succeeded
         ? `<div class="cu-run-card-actions">
@@ -922,16 +927,17 @@
           </div>`
         : "";
       return `<article class="cu-run-card">
-        <div class="cu-run-card-header">
-          <span class="cu-job-dot ${esc(run.status)}"></span>
-          <span class="cu-job-kind">${esc(label)}</span>
+        <span class="cu-job-dot ${esc(run.status)}"></span>
+        <div>
+          <div class="cu-index-title">${esc(title)}</div>
+          <div class="cu-index-meta">
+            ${owner ? `<span class="cu-index-owner">${esc(owner)}</span>` : ""}
+            ${branch ? `<span class="cu-chip">${esc(branch)}</span>` : ""}
+            <span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span>
+            ${startChip}
+          </div>
         </div>
-        <div class="cu-job-name">${esc(run.name)}</div>
-        <div class="cu-run-card-footer">
-          <span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span>
-          ${startChip}
-          ${actions}
-        </div>
+        ${actions}
       </article>`;
     }
 
