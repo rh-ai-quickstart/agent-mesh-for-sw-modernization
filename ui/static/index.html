@@ -575,7 +575,7 @@
           <div id="report-viewer-subtitle"></div>
           <div class="cu-report-tabs">
             <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
-            <button type="button" class="cu-report-tab" data-report="evaluation">Evaluation</button>
+            <button type="button" class="cu-report-tab" data-report="evaluation">Analysis Evaluation</button>
           </div>
           <div class="cu-report-viewer-body">
             <div id="report-viewer-content" class="cu-md"></div>
@@ -617,6 +617,7 @@
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
+      animateLatest: false,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -776,6 +777,26 @@
       return rows;
     }
 
+    let _typewriterTimer = null;
+
+    function typewriter(el, fullText, onDone) {
+      if (_typewriterTimer) { clearInterval(_typewriterTimer); _typewriterTimer = null; }
+      const tokens = fullText.split(/(\s+)/);
+      const chunkSize = Math.max(1, Math.ceil(tokens.length / 80));
+      let idx = 0;
+      _typewriterTimer = setInterval(() => {
+        idx = Math.min(idx + chunkSize, tokens.length);
+        el.innerHTML = renderMarkdown(tokens.slice(0, idx).join(""));
+        $("chat-log").scrollTop = $("chat-log").scrollHeight;
+        if (idx >= tokens.length) {
+          clearInterval(_typewriterTimer);
+          _typewriterTimer = null;
+          runMermaid(el);
+          if (onDone) onDone();
+        }
+      }, 30);
+    }
+
     const banner = (msg, danger) => {
       const target = $("banner");
       target.setAttribute("role", danger ? "alert" : "status");
@@ -862,7 +883,7 @@
         return `<article class="cu-index-card multi">
           <span class="cu-index-dot"></span>
           <div>
-            <div class="cu-index-title">Combined multi-repo index</div>
+            <div class="cu-index-title">Combined repos</div>
             <div class="cu-index-meta">
               <span class="cu-chip indexed">ready</span>
               ${item.uploaded ? '<span class="cu-chip uploaded">uploaded</span>' : ""}
@@ -1039,12 +1060,12 @@
         btn.addEventListener("click", async () => {
           try {
             const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
-            $("report-viewer-title").textContent = btn.dataset.runName;
             const gitRepo = btn.dataset.gitRepo;
             const gitBranch = btn.dataset.gitBranch;
-            $("report-viewer-subtitle").textContent = gitRepo
+            $("report-viewer-title").textContent = gitRepo
               ? `${shortName(gitRepo).replace(/\.git$/, "")} @ ${gitBranch}`
               : "Combined repos";
+            $("report-viewer-subtitle").textContent = btn.dataset.runName;
 
             const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
 
@@ -1206,10 +1227,22 @@
         $("chat-log").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => sendQuestion(b.dataset.q)));
         return;
       }
-      const messages = state.chat.map((m) => m.role === "assistant"
-        ? `<div class="cu-bubble assistant">${renderMarkdown(m.content)}</div>`
-        : `<div class="cu-bubble user">${esc(m.content)}</div>`
-      );
+      const animate = state.animateLatest;
+      state.animateLatest = false;
+      let lastAssistantIdx = -1;
+      if (animate) {
+        for (let i = state.chat.length - 1; i >= 0; i--) {
+          if (state.chat[i].role === "assistant") { lastAssistantIdx = i; break; }
+        }
+      }
+      const messages = state.chat.map((m, idx) => {
+        if (idx === lastAssistantIdx) {
+          return `<div class="cu-bubble assistant" id="cu-animating-bubble"></div>`;
+        }
+        return m.role === "assistant"
+          ? `<div class="cu-bubble assistant">${renderMarkdown(m.content)}</div>`
+          : `<div class="cu-bubble user">${esc(m.content)}</div>`;
+      });
       if (state.thinking && state.thinking.kind === "query") {
         messages.push(`<div class="cu-bubble assistant thinking-msg">
           <span class="cu-spinner" aria-hidden="true"></span>
@@ -1219,6 +1252,10 @@
       $("chat-log").innerHTML = messages.join("");
       runMermaid($("chat-log"));
       $("chat-log").scrollTop = $("chat-log").scrollHeight;
+      if (lastAssistantIdx >= 0) {
+        const el = document.getElementById("cu-animating-bubble");
+        if (el) typewriter(el, state.chat[lastAssistantIdx].content, () => el.removeAttribute("id"));
+      }
     }
 
     async function load() {
@@ -1307,6 +1344,42 @@
       state.poll = setInterval(tick, 4000);
     }
 
+    function pollQuery(queryId) {
+      const POLL_INTERVAL_MS = 3000;
+      const MAX_POLLS = 200; // 10 minutes
+      let polls = 0;
+      const interval = setInterval(async () => {
+        polls += 1;
+        if (polls > MAX_POLLS) {
+          clearInterval(interval);
+          setThinking(null);
+          renderChat();
+          banner("Query timed out. The analysis is taking longer than expected.", true);
+          return;
+        }
+        try {
+          const snap = await api(`/api/v2/queries/${queryId}`);
+          if (snap.status === "succeeded") {
+            clearInterval(interval);
+            state.chat.push({ role: "assistant", content: snap.result || "" });
+            setThinking(null);
+            state.animateLatest = true;
+            renderChat();
+          } else if (snap.status === "failed") {
+            clearInterval(interval);
+            setThinking(null);
+            renderChat();
+            banner(snap.error || "Query failed.", true);
+          }
+        } catch (e) {
+          clearInterval(interval);
+          setThinking(null);
+          renderChat();
+          banner(String(e.message || e), true);
+        }
+      }, POLL_INTERVAL_MS);
+    }
+
     async function pollV2(runId) {
       if (state.poll) clearInterval(state.poll);
       const tick = async () => {
@@ -1319,12 +1392,14 @@
             });
           }
           load();
-          if (["succeeded", "skipped", "failed", "cancelled"].includes(snap.status)) {
+          if (["succeeded", "skipped", "failed", "cancelled", "running"].includes(snap.status)) {
             clearInterval(state.poll);
             state.poll = null;
             setThinking(null);
             if (snap.status === "succeeded" || snap.status === "skipped") {
               banner("Pipeline completed successfully.");
+            } else if (snap.status === "running") {
+              banner(`Pipeline running.`);
             } else {
               banner(`Pipeline ${snap.status}`, true);
             }
@@ -1352,21 +1427,20 @@
       state.chat.push({ role: "user", content: question });
       $("question").value = "";
       showTab("chat");
-      setThinking({ kind: "query", label: "Thinking", status: "Submitting your question…" });
+      setThinking({ kind: "query", label: "Thinking", status: "Analyzing indexed code…" });
       renderChat();
       try {
-        const result = await api("/api/query", {
+        const result = await api("/api/v2/queries", {
           method: "POST",
           body: JSON.stringify({
             question,
             git_repo: option.git_repo || "",
             git_branch: option.git_branch || "main",
             use_global: option.use_global || false,
+            multi_repo: option.multi_repo || false,
           }),
         });
-        setThinking({ kind: "query", label: "Thinking", status: `Job ${result.job_name} started` });
-        renderChat();
-        poll(result.job_name, "query");
+        pollQuery(result.query_id);
       } catch (e) {
         setThinking(null);
         renderChat();

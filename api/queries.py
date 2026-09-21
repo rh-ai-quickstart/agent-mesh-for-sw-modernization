@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -29,10 +28,21 @@ class RunQueryRequest(BaseModel):
 @router.post("/queries")
 async def post_query(body: RunQueryRequest) -> dict[str, Any]:
     try:
-        return await asyncio.to_thread(lambda: query_service.run_query(**body.model_dump()))
+        return query_service.submit_query(**body.model_dump())
     except ValueError as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/queries/{query_id}")
+async def get_query_status(query_id: str) -> dict[str, Any]:
+    try:
+        return query_service.get_query_status(query_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(exc)) from exc
