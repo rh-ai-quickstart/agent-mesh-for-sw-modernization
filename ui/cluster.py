@@ -12,6 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import logging
+logging.basicConfig(level=logging.INFO)
+import traceback
+
 from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
 
@@ -63,16 +67,24 @@ def available_namespaces() -> list[str]:
                 if item.get("metadata", {}).get("name")
             )
             if names:
+                logging.info(f"Available namespaces from Openshift Projects "
+                             f"API: {', '.join(names)}")
                 return names
-        except Exception:
+        except Exception as e:
+            logging.debug(traceback.format_exc(), exc_info=e)
             pass
 
         # Vanilla Kubernetes fallback (requires cluster-wide list permission)
         items = client.CoreV1Api().list_namespace().items
-        return sorted(ns.metadata.name for ns in items if ns.metadata.name)
+        names = sorted(ns.metadata.name for ns in items if ns.metadata.name)
+        logging.info(f"Available namespaces from Kubernetes API: {names}")
+        return names
 
-    except Exception:
+    except Exception as e:
+        logging.debug(traceback.format_exc(), exc_info=e)
         ns = current_namespace()
+        logging.info(f"Available namespaces: Fallback to current namespace:"
+                     f" {ns}")
         return [ns] if ns else []
 
 

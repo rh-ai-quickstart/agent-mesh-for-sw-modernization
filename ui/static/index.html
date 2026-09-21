@@ -1313,7 +1313,7 @@
           <div class="cu-muted">Namespace: <b>${esc(status.namespace || "")}</b></div>`;
         const nsList = nsData.namespaces || [];
         const nsCurrent = nsData.current || status.namespace || "";
-        if (nsList.length > 1) {
+        if (nsList.length > 0) {
           $("ns-select").innerHTML = nsList.map((ns) =>
             `<option value="${esc(ns)}"${ns === nsCurrent ? " selected" : ""}>${esc(ns)}</option>`
           ).join("");
