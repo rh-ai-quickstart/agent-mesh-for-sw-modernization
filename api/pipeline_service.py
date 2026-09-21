@@ -20,10 +20,7 @@ if _CU_ROOT not in sys.path:
 from services.trigger_run import trigger_run as _trigger_run
 from services.fetch_reports import fetch_reports as _fetch_reports
 from services.get_run_status import get_kfp_run_state
-from services.list_runs import list_kfp_runs
-
-# In-memory store: kfp_run_id -> submission metadata (git_slug, multi_repo, …)
-_JOBS: dict[str, dict[str, Any]] = {}
+from services.list_runs import list_kfp_runs, get_run_git_metadata
 
 
 # ---------------------------------------------------------------------------
@@ -33,8 +30,6 @@ _JOBS: dict[str, dict[str, Any]] = {}
 def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
     if not repos:
         raise ValueError("Select at least one repository.")
-
-    from pipelines.base.data_generation import generate_git_slug
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
@@ -52,15 +47,6 @@ def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
     }
 
     run = _trigger_run(pipeline_name, run_name, params)
-
-    _JOBS[run.run_id] = {
-        "run_name": run_name,
-        "pipeline_name": pipeline_name,
-        "mode": mode,
-        "git_slug": generate_git_slug(git_repo, git_branch) if single else None,
-        "multi_repo": not single,
-        "submitted_at": datetime.now(timezone.utc).isoformat(),
-    }
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}
 
 
@@ -76,16 +62,11 @@ def list_pipeline_runs() -> list[dict[str, Any]]:
 def get_run_status(job_id: str) -> dict[str, Any]:
     state = get_kfp_run_state(job_id)
 
-    if job_id in _JOBS:
-        _JOBS[job_id]["status"] = state.lower()
-
     evaluation_report: str | None = None
     analysis_report: str | None = None
     if state in {"SUCCEEDED", "SKIPPED"}:
-        job_meta = _JOBS.get(job_id, {})
-        evaluation_report, analysis_report = _fetch_reports(
-            job_meta.get("git_slug"), bool(job_meta.get("multi_repo", False))
-        )
+        git_slug, multi_repo = get_run_git_metadata(job_id)
+        evaluation_report, analysis_report = _fetch_reports(git_slug, multi_repo)
 
     return {
         "status": state.lower(),

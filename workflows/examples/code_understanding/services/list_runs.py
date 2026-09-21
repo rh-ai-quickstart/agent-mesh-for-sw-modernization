@@ -39,6 +39,20 @@ def _get_run_start_date_time(run_obj: Any) -> str | None:
     return start_raw.isoformat() if hasattr(start_raw, "isoformat") else str(start_raw)
 
 
+def get_run_git_metadata(run_id: str) -> tuple[str | None, bool]:
+    """Return (git_slug, multi_repo) for a KFP run by fetching its params directly."""
+    client = create_client()
+    try:
+        run_detail = client.get_run(run_id=run_id)
+    except Exception:
+        return None, False
+    run_obj = getattr(run_detail, "run", run_detail)
+    params = getattr(getattr(run_obj, "runtime_config", None), "parameters", None) or {}
+    git_slug = _get_git_slug(run_obj)
+    multi_repo = not bool(params.get("git_repo"))
+    return git_slug, multi_repo
+
+
 def list_kfp_runs(page_size: int = 50) -> list[dict[str, Any]]:
     """Return KFP runs newest-first as a list of {run_id, name, status, start_time} dicts."""
     client = create_client()
