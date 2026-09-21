@@ -186,6 +186,9 @@
     #report-viewer-subtitle { font-size: 0.8rem; color: var(--cu-gray); margin-bottom: 0.6rem; }
     .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
     .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
+    .cu-bubble-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; padding-top: 0.35rem; border-top: 1px solid #f0f0f0; }
+    .cu-bubble-dl-btn { background: none; border: none; padding: 0.15rem 0.2rem; color: #c8cacc; display: inline-flex; align-items: center; border-radius: 3px; line-height: 0; cursor: pointer; }
+    .cu-bubble-dl-btn:hover { color: var(--cu-gray); background: #f0f0f0; }
     .cu-report-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.4rem 0.85rem; font-size: 0.85rem; font-weight: 600; color: var(--cu-charcoal); cursor: pointer; }
     .cu-report-tab:hover { color: var(--cu-red); }
     .cu-report-tab.active { border-bottom-color: var(--cu-red); color: var(--cu-red); }
@@ -1069,6 +1072,23 @@
 
             const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
 
+            function appendReportDl(rawContent, filename) {
+              const mime = filename.endsWith(".csv") ? "text/csv" : "text/markdown";
+              const footer = document.createElement("div");
+              footer.className = "cu-bubble-footer";
+              footer.innerHTML = `<button class="cu-bubble-dl-btn" title="Download report" aria-label="Download report">${iconDownload}</button>`;
+              footer.querySelector("button").onclick = () => {
+                const blob = new Blob([rawContent], { type: mime });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+              };
+              $("report-viewer-content").appendChild(footer);
+            }
+
             function showReport(type) {
               $("report-viewer").querySelectorAll(".cu-report-tab").forEach((t) => {
                 t.classList.toggle("active", t.dataset.report === type);
@@ -1115,6 +1135,7 @@
                       pagination: { limit: 20 },
                       style: { table: { fontSize: "0.875rem" } },
                     }).render(gridContainer);
+                    appendReportDl(content, `${btn.dataset.runName || "report"}_evaluation_report.csv`);
                   }
                 }
               } else {
@@ -1122,6 +1143,7 @@
                   ? renderMarkdown(content)
                   : `<p class="cu-muted">No analysis report available.</p>`;
                 runMermaid($("report-viewer-content"));
+                if (content) appendReportDl(content, `${btn.dataset.runName || "report"}_analysis_report.md`);
               }
             }
 
@@ -1235,12 +1257,14 @@
           if (state.chat[i].role === "assistant") { lastAssistantIdx = i; break; }
         }
       }
+      const dlFooter = (idx) =>
+        `<div class="cu-bubble-footer"><button class="cu-bubble-dl-btn" data-chat-dl="${idx}" title="Download response" aria-label="Download response">${iconDownload}</button></div>`;
       const messages = state.chat.map((m, idx) => {
         if (idx === lastAssistantIdx) {
           return `<div class="cu-bubble assistant" id="cu-animating-bubble"></div>`;
         }
         return m.role === "assistant"
-          ? `<div class="cu-bubble assistant">${renderMarkdown(m.content)}</div>`
+          ? `<div class="cu-bubble assistant">${renderMarkdown(m.content)}${dlFooter(idx)}</div>`
           : `<div class="cu-bubble user">${esc(m.content)}</div>`;
       });
       if (state.thinking && state.thinking.kind === "query") {
@@ -1254,7 +1278,13 @@
       $("chat-log").scrollTop = $("chat-log").scrollHeight;
       if (lastAssistantIdx >= 0) {
         const el = document.getElementById("cu-animating-bubble");
-        if (el) typewriter(el, state.chat[lastAssistantIdx].content, () => el.removeAttribute("id"));
+        if (el) typewriter(el, state.chat[lastAssistantIdx].content, () => {
+          el.removeAttribute("id");
+          const footer = document.createElement("div");
+          footer.className = "cu-bubble-footer";
+          footer.innerHTML = `<button class="cu-bubble-dl-btn" data-chat-dl="${lastAssistantIdx}" title="Download response" aria-label="Download response">${iconDownload}</button>`;
+          el.appendChild(footer);
+        });
       }
     }
 
@@ -1505,6 +1535,19 @@
         banner("");
         delete $("banner").dataset.reason;
       }
+    });
+    $("chat-log").addEventListener("click", (e) => {
+      const btn = e.target.closest(".cu-bubble-dl-btn");
+      if (!btn || btn.dataset.chatDl === undefined) return;
+      const msg = state.chat[Number(btn.dataset.chatDl)];
+      if (!msg) return;
+      const blob = new Blob([msg.content], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chat_response_${Number(btn.dataset.chatDl) + 1}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
     });
     $("send").onclick = () => sendQuestion($("question").value);
     $("question").addEventListener("keydown", (event) => {
