@@ -182,7 +182,8 @@
     .cu-run-card-actions button { display: flex; align-items: center; background: none; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.2rem 0.4rem; cursor: pointer; color: var(--cu-gray); }
     .cu-run-card-actions button:hover { color: var(--cu-text); border-color: var(--cu-text); }
     .cu-report-viewer { margin-top: 1.5rem; border-top: 1px solid var(--cu-border); padding-top: 1rem; }
-    .cu-report-viewer h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .cu-report-viewer h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.15rem; }
+    #report-viewer-subtitle { font-size: 0.8rem; color: var(--cu-gray); margin-bottom: 0.6rem; }
     .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
     .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
     .cu-report-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.4rem 0.85rem; font-size: 0.85rem; font-weight: 600; color: var(--cu-charcoal); cursor: pointer; }
@@ -567,6 +568,7 @@
         </div>
         <div id="report-viewer" class="cu-report-viewer hidden">
           <h3 id="report-viewer-title"></h3>
+          <div id="report-viewer-subtitle"></div>
           <div class="cu-report-tabs">
             <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
             <button type="button" class="cu-report-tab" data-report="evaluation">Evaluation</button>
@@ -733,6 +735,40 @@
         html.push(`<p>${inlineMd(para.join(" "))}</p>`);
       }
       return `<div class="cu-md">${html.join("")}</div>`;
+    }
+
+    function renderCsv(src) {
+      function parseRow(line) {
+        const fields = [];
+        let field = "", inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') {
+            if (inQuotes && line[j + 1] === '"') { field += '"'; j++; }
+            else { inQuotes = !inQuotes; }
+          } else if (ch === "," && !inQuotes) {
+            fields.push(field.trim());
+            field = "";
+          } else {
+            field += ch;
+          }
+        }
+        fields.push(field.trim());
+        return fields;
+      }
+      const rows = src.trim().split("\n").filter(l => l.trim()).map(parseRow);
+      if (!rows.length) return `<p class="cu-muted">Empty evaluation report.</p>`;
+      const headers = rows[0];
+      let tbl = `<table class="cu-md-table"><thead><tr>`;
+      headers.forEach(h => { tbl += `<th>${esc(h)}</th>`; });
+      tbl += `</tr></thead><tbody>`;
+      rows.slice(1).forEach(row => {
+        tbl += `<tr>`;
+        row.forEach(cell => { tbl += `<td>${esc(cell)}</td>`; });
+        tbl += `</tr>`;
+      });
+      tbl += `</tbody></table>`;
+      return `<div class="cu-md">${tbl}</div>`;
     }
 
     const banner = (msg, danger) => {
@@ -975,7 +1011,7 @@
         : "";
       const actions = succeeded
         ? `<div class="cu-run-card-actions">
-            <button type="button" class="cu-run-expand" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" title="View analysis report">${iconExpand}</button>
+            <button type="button" class="cu-run-expand" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" title="View analysis report">${iconExpand}</button>
             <button type="button" class="cu-run-download" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" title="Download analysis report">${iconDownload}</button>
           </div>`
         : "";
@@ -999,6 +1035,11 @@
           try {
             const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
             $("report-viewer-title").textContent = btn.dataset.runName;
+            const gitRepo = btn.dataset.gitRepo;
+            const gitBranch = btn.dataset.gitBranch;
+            $("report-viewer-subtitle").textContent = gitRepo
+              ? `${shortName(gitRepo).replace(/\.git$/, "")} @ ${gitBranch}`
+              : "Combined repos";
 
             const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
 
@@ -1007,10 +1048,16 @@
                 t.classList.toggle("active", t.dataset.report === type);
               });
               const content = reports[type];
-              $("report-viewer-content").innerHTML = content
-                ? renderMarkdown(content)
-                : `<p class="cu-muted">No ${type} report available.</p>`;
-              runMermaid($("report-viewer-content"));
+              if (type === "evaluation") {
+                $("report-viewer-content").innerHTML = content
+                  ? renderCsv(content)
+                  : `<p class="cu-muted">No evaluation report available.</p>`;
+              } else {
+                $("report-viewer-content").innerHTML = content
+                  ? renderMarkdown(content)
+                  : `<p class="cu-muted">No analysis report available.</p>`;
+                runMermaid($("report-viewer-content"));
+              }
             }
 
             $("report-viewer").querySelectorAll(".cu-report-tab").forEach((tab) => {
