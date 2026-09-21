@@ -653,7 +653,9 @@
       text = text.replace(/```([\w+-]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
         const content = code.replace(/\n$/, "");
         if (lang.toLowerCase() === "mermaid") {
-          const sanitized = content.split("\n").map(l => /^\s*%(?!%)/.test(l) ? l.replace(/^(\s*)%/, "$1%%") : l).join("\n");
+          const sanitized = content
+            .split("\n").map(l => /^\s*%(?!%)/.test(l) ? l.replace(/^(\s*)%/, "$1%%") : l).join("\n")
+            .replace(/\[([^\]"]+)\]/g, (m, label) => /[()]/.test(label) ? `["${label}"]` : m);
           fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
         } else {
           fences.push(`<pre><code>${esc(content)}</code></pre>`);
@@ -1061,7 +1063,14 @@
                     const gridContainer = document.createElement("div");
                     $("report-viewer-content").appendChild(gridContainer);
                     new gridjs.Grid({
-                      columns: csvRows[0],
+                      columns: csvRows[0].map((h, colIdx) => {
+                        const maxLen = csvRows.reduce((max, row) => Math.max(max, (row[colIdx] || "").length), 0);
+                        return {
+                          name: h,
+                          resizable: true,
+                          width: `${Math.max(80, Math.min(400, maxLen * 8))}px`,
+                        };
+                      }),
                       data: csvRows.slice(1),
                       sort: true,
                       search: true,
