@@ -18,6 +18,7 @@ DEPLOY_EMBEDDING_MODEL ?= false
 CONTAINER_ENGINE      ?= $(if $(CI),docker,podman)
 REGISTRY              ?=
 VERSION               ?=
+# Image names used by the build/push targets invoked by the CI Docker workflow.
 KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-generation
 KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
@@ -81,10 +82,12 @@ help:
 	@echo "Usage:"
 	@echo "  make <target> [VARIABLE=value ...]"
 	@echo ""
-	@echo "Core tasks:"
-	@echo "  install                     Install the complete application stack"
-	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
+	@echo "User tasks:"
 	@echo "  run-pipelines               Submit the configured pipeline run"
+	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
+	@echo ""
+	@echo "Administrator tasks:"
+	@echo "  install                     Install the complete application stack"
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
 	@echo ""
 	@echo "Run 'make help-all' to list all administrative and development tasks."
@@ -96,8 +99,8 @@ help-all:
 	@echo "  make <target> [VARIABLE=value ...]"
 	@echo ""
 	@echo "Help:"
-	@echo "  help                        Show core tasks"
-	@echo "  help-all                    Show all tasks and common variables"
+	@echo "  help                        Show user and administrator tasks"
+	@echo "  help-all                    Show all tasks and common overrides"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  install                     Install the complete application stack"
@@ -133,11 +136,13 @@ help-all:
 	@echo "  deploy-console-plugin       Build and deploy the plugin and API"
 	@echo "  enable-console-plugin       Enable the plugin in the OpenShift console"
 	@echo ""
-	@echo "Common variables:"
-	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
+	@echo "Container image build overrides (used by CI):"
 	@echo "  CONTAINER_ENGINE            Image tool: podman locally, docker in CI"
 	@echo "  REGISTRY                    Override the image registry"
 	@echo "  VERSION                     Override the image tag"
+	@echo ""
+	@echo "Common runtime overrides (not exhaustive):"
+	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
@@ -145,7 +150,7 @@ help-all:
 	@echo "  ARGS                        Arguments passed to run-pipelines"
 	@echo "  QUESTION_FILE               Required input file for run-adhoc-query"
 	@echo ""
-	@echo "Most deployment settings are loaded from ENV_FILE. See .env.template."
+	@echo "See .env.template for additional deployment, pipeline, and image configuration."
 
 # ============================================================================
 # Installation and deployment
