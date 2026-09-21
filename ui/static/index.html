@@ -187,7 +187,7 @@
     .cu-help-btn:hover { color: var(--cu-text); }
     .cu-help-popover { display: none; position: absolute; left: 1.4rem; top: 50%; transform: translateY(-50%); z-index: 100; background: #fff; border: 1px solid var(--cu-border); border-radius: 6px; padding: 0.75rem 1rem; width: 22rem; font-size: 0.82rem; line-height: 1.5; color: var(--cu-text); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
     .cu-help:focus-within .cu-help-popover,
-    .cu-help.open .cu-help-popover { display: block; }
+    .cu-help.open .cu-help-popover { display: inline-block; }
     .cu-runs-toggle { display: flex; justify-content: center; padding: 0.25rem 0; background: none; border: none; cursor: pointer; color: var(--cu-gray); width: 100%; }
     .cu-runs-toggle:hover { color: var(--cu-text); }
     .cu-run-card { display: grid; grid-template-columns: 0.55rem minmax(0,1fr) auto; gap: 0.55rem; align-items: center; background: #fff; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.55rem 0.7rem; }
@@ -544,11 +544,11 @@
         <h2>Analysis</h2>
         <p class="cu-muted">Generate a code analysis report for the selected repository or repositories.<span class="cu-help" id="help-pipelines">
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-pipelines-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
-          <div class="cu-help-popover" role="tooltip">
+          <span class="cu-help-popover" role="tooltip">
             <strong>Note:</strong><br/>
             &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong> process which involves the generation of a knowledge graph index, and may take up to 30 minutes or more to complete.<br/>
             &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
-          </div>
+          </span>
         </span></p>
         <div class="cu-note hidden" id="pipeline-selection"></div>
         <br/>
@@ -562,9 +562,9 @@
         <h2>Chat</h2>
         <p class="cu-muted">Ask questions about the indexed repositories below.<span class="cu-help" id="help-chat">
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-chat-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
-          <div class="cu-help-popover" role="tooltip">
+          <span class="cu-help-popover" role="tooltip">
             <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
-          </div>
+          </span>
         </span></p>
         <p id="chat-repo-row" class="hidden">
           <label class="cu-form-label" for="chat-repo">Select repository</label>

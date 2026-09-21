@@ -47,7 +47,11 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
                         experiment_name=loader.RESULT_ASSET_EXPERIMENT,
                         asset_tags={**base_tags, "category": category},
                     )
-                    return _read_dir_contents(tmpdir)
+                    content = _read_dir_contents(tmpdir)
+                    logging.info(f"Downloaded {category} report from "
+                                 f"artifact '{artifact_path}', git_slug='{git_slug}', multi_repo='{multi_repo}'")
+                    logging.info(f"Contents: {content}")
+                    return content
                 except Exception as e:
                     logging.error(f"Error: Could not download {category} report"
                                   f" from artifact '{artifact_path}', "
