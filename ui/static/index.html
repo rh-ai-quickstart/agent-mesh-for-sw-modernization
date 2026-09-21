@@ -30,39 +30,11 @@
     button { cursor: pointer; }
     h1, h2, h3 { margin: 0; font-weight: 500; }
 
-    .cu-hero {
-      padding: 1.5rem 1.75rem 1.35rem;
-      color: #fff;
-      background:
-        linear-gradient(115deg, rgba(238, 0, 0, 0.28), transparent 48%),
-        var(--cu-charcoal);
-      border-top: 4px solid var(--cu-red);
-    }
-    .cu-eyebrow {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #d2d2d2;
-      margin-bottom: 0.65rem;
-    }
-    .cu-mark {
-      width: 0.6rem;
-      height: 0.6rem;
-      background: var(--cu-red);
-      transform: rotate(45deg);
-      flex: none;
-    }
-    .cu-hero h1 { font-size: 1.75rem; margin-bottom: 0.4rem; }
-    .cu-hero p { margin: 0; max-width: 46rem; color: #d2d2d2; font-size: 0.95rem; }
 
     .cu-shell {
       display: grid;
       grid-template-columns: 20.5rem minmax(0, 1fr);
-      min-height: calc(100vh - 8.5rem);
+      min-height: 100vh;
       background: var(--cu-bg);
     }
     .cu-rail {
@@ -92,6 +64,20 @@
       margin: 1.15rem 0 0.55rem;
     }
     .cu-rail-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .cu-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 1.1rem 0.5rem 1.25rem;
+      border-bottom: 1px solid var(--cu-border);
+      margin-bottom: 0.5rem;
+      gap: 0.35rem;
+    }
+    .cu-brand-icon { margin-bottom: 0.35rem; flex-shrink: 0; }
+    .cu-brand-eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cu-gray); line-height: 1.3; }
+    .cu-brand-title { font-size: 1.05rem; font-weight: 700; color: var(--cu-text); line-height: 1.2; }
+    .cu-brand-sub { font-size: 0.75rem; color: var(--cu-gray); line-height: 1.4; }
 
     .cu-index-card {
       display: grid;
@@ -476,6 +462,9 @@
     .cu-md-table th { background: #f0f4f8; font-weight: 600; }
     .cu-md-table tr:nth-child(even) td { background: #f9fbfd; }
     .cu-md pre.mermaid { background: transparent; color: inherit; padding: 0; }
+    .cu-pipeline-row { display: flex; align-items: flex-start; gap: 0.75rem; margin-top: 0.5rem; }
+    .cu-pipeline-row .cu-note { margin: 0; flex: 1; }
+    .cu-pipeline-row .cu-btn { flex-shrink: 0; }
     .hidden { display: none !important; }
     .cu-form-label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
 
@@ -488,13 +477,24 @@
   <script src="/static/vendor/mermaid.min.js"></script>
 </head>
 <body>
-  <header class="cu-hero">
-    <div class="cu-eyebrow"><span class="cu-mark"></span>Agent Mesh for Software Modernization</div>
-    <h1>Code Understanding</h1>
-    <p>Knowledge graph-based analysis for legacy codebases</p>
-  </header>
   <div class="cu-shell">
     <aside class="cu-rail">
+      <div class="cu-brand">
+        <svg class="cu-brand-icon" width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="3" y="27" width="7" height="12" rx="1.5" fill="#ee0000" opacity="0.7"/>
+          <rect x="13" y="20" width="7" height="19" rx="1.5" fill="#ee0000" opacity="0.85"/>
+          <rect x="23" y="13" width="7" height="26" rx="1.5" fill="#ee0000"/>
+          <rect x="33" y="18" width="6" height="21" rx="1.5" fill="#ee0000" opacity="0.6"/>
+          <polyline points="6.5,25 16.5,17 26.5,11 36,16" stroke="#ee0000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="6.5" cy="25" r="2.5" fill="#ee0000"/>
+          <circle cx="16.5" cy="17" r="2.5" fill="#ee0000"/>
+          <circle cx="26.5" cy="11" r="2.5" fill="#ee0000"/>
+          <circle cx="36" cy="16" r="2.5" fill="#ee0000"/>
+        </svg>
+        <span class="cu-brand-eyebrow">Agent Mesh for Software Modernization</span>
+        <span class="cu-brand-title">Code Understanding</span>
+        <span class="cu-brand-sub">Knowledge graph-based analysis for legacy codebases</span>
+      </div>
       <div id="status" class="cu-status warn checking">Checking cluster access…</div>
       <h2>Recent Runs</h2>
       <div id="runs" class="cu-rail-list"></div>
@@ -556,9 +556,10 @@
             &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
           </span>
         </span></p>
-        <div class="cu-note hidden" id="pipeline-selection"></div>
-        <br/>
-        <p><button type="button" class="cu-btn cu-btn-primary" id="run-pipeline">Run Code Understanding</button></p>
+        <div class="cu-pipeline-row">
+          <div class="cu-note hidden" id="pipeline-selection"></div>
+          <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Analysis</button>
+        </div>
         <div id="report-viewer" class="cu-report-viewer hidden">
           <h3 id="report-viewer-title">Analysis Report</h3>
           <div id="report-viewer-content" class="cu-md"></div>
