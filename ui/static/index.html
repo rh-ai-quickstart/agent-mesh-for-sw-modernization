@@ -469,6 +469,7 @@
     .cu-md-table tr:nth-child(even) td { background: #f9fbfd; }
     .cu-md pre.mermaid { background: transparent; color: inherit; padding: 0; }
     .gridjs-td { vertical-align: top; }
+    .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
     .cu-pipeline-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
     .cu-pipeline-row .cu-note { margin: 0; flex: 1; }
     .cu-pipeline-row .cu-btn { flex-shrink: 0; }
@@ -1069,7 +1070,22 @@
                         return {
                           name: h,
                           resizable: true,
-                          width: `${Math.max(80, Math.min(400, maxLen * 8))}px`,
+                          width: `${Math.max(80, Math.min(800, maxLen * 8))}px`,
+                          formatter: (cell) => {
+                            const str = cell == null ? "" : String(cell);
+                            if (str.length <= 1200) return str;
+                            return gridjs.html(
+                              `<span>` +
+                              `${esc(str.slice(0, 1200))}` +
+                              `<span class="cu-cell-rest" style="display:none">${esc(str.slice(1200))}</span>` +
+                              `<a href="#" class="cu-cell-toggle" onclick="` +
+                                `var r=this.previousElementSibling;` +
+                                `if(r.style.display==='none'){r.style.display='inline';this.textContent='Less';}` +
+                                `else{r.style.display='none';this.textContent='More';}` +
+                                `return false">More</a>` +
+                              `</span>`
+                            );
+                          },
                         };
                       }),
                       data: csvRows.slice(1),
