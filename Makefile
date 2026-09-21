@@ -49,6 +49,7 @@ endif
 
 .PHONY: \
 	help \
+	help-all \
 	install \
 	deploy-embedding-model \
 	deploy-notebooks \
@@ -79,6 +80,24 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make <target> [VARIABLE=value ...]"
+	@echo ""
+	@echo "Core tasks:"
+	@echo "  install                     Install the complete application stack"
+	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
+	@echo "  run-pipelines               Submit the configured pipeline run"
+	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
+	@echo ""
+	@echo "Run 'make help-all' to list all administrative and development tasks."
+
+help-all:
+	@echo "Agent Mesh for Software Modernization"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make <target> [VARIABLE=value ...]"
+	@echo ""
+	@echo "Help:"
+	@echo "  help                        Show core tasks"
+	@echo "  help-all                    Show all tasks and common variables"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  install                     Install the complete application stack"
