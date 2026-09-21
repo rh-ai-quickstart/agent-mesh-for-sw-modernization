@@ -186,7 +186,6 @@
     .cu-help-btn { background: none; border: none; cursor: pointer; color: var(--cu-gray); padding: 0; line-height: 1; display: inline-flex; }
     .cu-help-btn:hover { color: var(--cu-text); }
     .cu-help-popover { display: none; position: absolute; left: 1.4rem; top: 50%; transform: translateY(-50%); z-index: 100; background: #fff; border: 1px solid var(--cu-border); border-radius: 6px; padding: 0.75rem 1rem; width: 22rem; font-size: 0.82rem; line-height: 1.5; color: var(--cu-text); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
-    .cu-help:hover .cu-help-popover,
     .cu-help:focus-within .cu-help-popover,
     .cu-help.open .cu-help-popover { display: block; }
     .cu-runs-toggle { display: flex; justify-content: center; padding: 0.25rem 0; background: none; border: none; cursor: pointer; color: var(--cu-gray); width: 100%; }
@@ -1272,11 +1271,18 @@
         sendQuestion($("question").value);
       }
     });
-    // Help popovers: toggle open class on click, close when clicking outside
-    document.querySelectorAll(".cu-help-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
+    // Help popovers: show on hover or click, close on mouse-leave or outside click
+    document.querySelectorAll(".cu-help").forEach((wrap) => {
+      let leaveTimer;
+      wrap.addEventListener("mouseenter", () => {
+        clearTimeout(leaveTimer);
+        wrap.classList.add("open");
+      });
+      wrap.addEventListener("mouseleave", () => {
+        leaveTimer = setTimeout(() => wrap.classList.remove("open"), 120);
+      });
+      wrap.querySelector(".cu-help-btn").addEventListener("click", (e) => {
         e.stopPropagation();
-        const wrap = btn.closest(".cu-help");
         const isOpen = wrap.classList.contains("open");
         document.querySelectorAll(".cu-help.open").forEach((el) => el.classList.remove("open"));
         if (!isOpen) wrap.classList.add("open");
