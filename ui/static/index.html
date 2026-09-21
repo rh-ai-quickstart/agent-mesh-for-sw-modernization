@@ -738,25 +738,38 @@
     }
 
     function renderCsv(src) {
-      function parseRow(line) {
-        const fields = [];
-        let field = "", inQuotes = false;
-        for (let j = 0; j < line.length; j++) {
-          const ch = line[j];
-          if (ch === '"') {
-            if (inQuotes && line[j + 1] === '"') { field += '"'; j++; }
-            else { inQuotes = !inQuotes; }
-          } else if (ch === "," && !inQuotes) {
-            fields.push(field.trim());
-            field = "";
+      function parseCsv(text) {
+        const rows = [];
+        let row = [], field = "", inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (inQuotes) {
+            if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+            else if (ch === '"') { inQuotes = false; }
+            else { field += ch; }
           } else {
-            field += ch;
+            if (ch === '"') {
+              inQuotes = true;
+            } else if (ch === ',') {
+              row.push(field.trim()); field = "";
+            } else if (ch === '\r' && text[i + 1] === '\n') {
+              row.push(field.trim()); field = "";
+              if (row.some(f => f !== "")) rows.push(row);
+              row = []; i++;
+            } else if (ch === '\n') {
+              row.push(field.trim()); field = "";
+              if (row.some(f => f !== "")) rows.push(row);
+              row = [];
+            } else {
+              field += ch;
+            }
           }
         }
-        fields.push(field.trim());
-        return fields;
+        row.push(field.trim());
+        if (row.some(f => f !== "")) rows.push(row);
+        return rows;
       }
-      const rows = src.trim().split("\n").filter(l => l.trim()).map(parseRow);
+      const rows = parseCsv(src.trim());
       if (!rows.length) return `<p class="cu-muted">Empty evaluation report.</p>`;
       const headers = rows[0];
       let tbl = `<table class="cu-md-table"><thead><tr>`;
