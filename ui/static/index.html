@@ -1309,8 +1309,7 @@
         ]);
         $("status").className = "cu-status" + (status.ok ? "" : " warn");
         $("status").innerHTML = `<strong>${status.ok ? "Connected" : "Not connected"}</strong><div></div>
-          <div>${status.ok ? "" : esc(status.message || "")}</div>
-          <div class="cu-muted">Namespace: <b>${esc(status.namespace || "")}</b></div>`;
+          <div>${status.ok ? "" : esc(status.message || "")}</div>`;
         const nsList = nsData.namespaces || [];
         const nsCurrent = nsData.current || status.namespace || "";
         if (nsList.length > 0) {
