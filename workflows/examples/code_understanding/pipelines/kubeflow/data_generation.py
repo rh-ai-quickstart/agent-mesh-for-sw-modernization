@@ -91,22 +91,14 @@ def generate_code_and_meta_op(git_repo: str, git_branch: str,
 
 @inject_secret_as_env(secret_name="code-understanding-env")
 @dsl.component(base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def get_repo_list_op() -> list:
-    """Downloads and returns the repo list from the asset loader."""
+def get_repo_list_op(kfp_run_id: str) -> list:
+    """Downloads and returns the repo list uploaded for this KFP run."""
 
-    from loaders.default_asset_loader import DefaultAssetLoader
     from utils.kubeflow_utils import setup_logging
+    from services.get_repo_list import get_multi_repo_list
 
-    import os
-    import json
-    
     setup_logging()
-    import logging
-    logging.info(os.getenv("GIT_REPO_LIST_CONTENTS"))
-
-    return json.loads(os.getenv("GIT_REPO_LIST_CONTENTS"))
-
-    #return DefaultAssetLoader().download("repos/repo_list.json")
+    return get_multi_repo_list(kfp_run_id)
 
 
 ##############################################################################
@@ -139,7 +131,7 @@ def _run_pipeline(
 def _run_pipeline_multi_repo():
     """Generates code metadata for all repositories in the asset-loader repo list."""
 
-    repo_list_task = get_repo_list_op()
+    repo_list_task = get_repo_list_op(kfp_run_id=dsl.PIPELINE_RUN_ID_PLACEHOLDER)
 
     with dsl.ParallelFor(items=repo_list_task.output,
                          parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))) as repo:

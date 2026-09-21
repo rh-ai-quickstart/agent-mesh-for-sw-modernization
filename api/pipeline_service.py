@@ -46,7 +46,7 @@ def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
     }
 
-    run = _trigger_run(pipeline_name, run_name, params)
+    run = _trigger_run(pipeline_name, run_name, params, repos=None if single else repos)
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import uuid
@@ -15,6 +16,10 @@ _CU_ROOT = str(
 )
 if _CU_ROOT not in sys.path:
     sys.path.insert(0, _CU_ROOT)
+
+# graphrag_utils patches ssl.create_default_context at import time when this is set,
+# which is required when the embeddings endpoint uses a self-signed certificate.
+os.environ.setdefault("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "true")
 
 from services.run_adhoc_query import run_adhoc_query as _run_adhoc_query
 

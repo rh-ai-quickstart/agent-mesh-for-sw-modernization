@@ -1246,7 +1246,7 @@
       if (state.thinking && state.thinking.kind === "query") {
         messages.push(`<div class="cu-bubble assistant thinking-msg">
           <span class="cu-spinner" aria-hidden="true"></span>
-          Analyzing indexed code${state.thinking.status ? " · " + esc(state.thinking.status) : ""}
+          Running query${state.thinking.status ? " · " + esc(state.thinking.status) : ""}
         </div>`);
       }
       $("chat-log").innerHTML = messages.join("");
@@ -1423,6 +1423,7 @@
         $("banner").dataset.reason = "no-chat-repo";
         return;
       }
+      banner("");
       const option = state.queryable.find((o) => o.key === $("chat-repo").value) || {};
       state.chat.push({ role: "user", content: question });
       $("question").value = "";
@@ -1480,6 +1481,10 @@
         $("banner").dataset.reason = "no-selection";
         return;
       }
+      $("report-viewer").classList.add("hidden");
+      $("report-viewer-title").textContent = "";
+      $("report-viewer-subtitle").textContent = "";
+      $("report-viewer-content").innerHTML = "";
       setThinking({ kind: "pipeline", label: "Running pipeline", status: "Submitting indexing job…" });
       try {
         /*
