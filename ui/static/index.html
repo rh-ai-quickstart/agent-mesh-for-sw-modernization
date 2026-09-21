@@ -479,8 +479,7 @@
     .hidden { display: none !important; }
     .cu-form-label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
 
-    .cu-ns-row { margin-top: 0.75rem; }
-    .cu-ns-label { display: block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cu-gray); margin-bottom: 0.3rem; }
+    .cu-ns-row { margin-bottom: 0.75rem; }
 
     @media (max-width: 900px) {
       .cu-shell, .cu-custom, .cu-composer { grid-template-columns: 1fr; }
@@ -511,11 +510,12 @@
         <span class="cu-brand-title">Code Understanding</span>
         <span class="cu-brand-sub">Knowledge graph-based analysis for legacy codebases</span>
       </div>
-      <div id="status" class="cu-status warn checking">Checking cluster access…</div>
       <div id="ns-row" class="cu-ns-row hidden">
-        <label class="cu-ns-label" for="ns-select">Namespace</label>
-        <select class="cu-select" id="ns-select" style="font-size:0.875rem;min-height:2rem;"></select>
+        <input class="cu-field" id="ns-select" list="ns-list" autocomplete="off"
+               placeholder="Namespace" style="font-size:0.875rem;min-height:2rem;width:100%;">
+        <datalist id="ns-list"></datalist>
       </div>
+      <div id="status" class="cu-status warn checking">Checking cluster access…</div>
       <h2>Recent Runs</h2>
       <div id="runs" class="cu-rail-list"></div>
       <!-- <h2>Recent jobs</h2>
@@ -1314,9 +1314,8 @@
         const nsList = nsData.namespaces || [];
         const nsCurrent = nsData.current || status.namespace || "";
         if (nsList.length > 0) {
-          $("ns-select").innerHTML = nsList.map((ns) =>
-            `<option value="${esc(ns)}"${ns === nsCurrent ? " selected" : ""}>${esc(ns)}</option>`
-          ).join("");
+          $("ns-list").innerHTML = nsList.map((ns) => `<option value="${esc(ns)}"></option>`).join("");
+          $("ns-select").value = nsCurrent;
           $("ns-row").classList.remove("hidden");
         } else {
           $("ns-row").classList.add("hidden");
@@ -1557,16 +1556,19 @@
         delete $("banner").dataset.reason;
       }
     });
-    $("ns-select").addEventListener("change", async () => {
-      const ns = $("ns-select").value;
+    async function commitNamespace() {
+      const ns = $("ns-select").value.trim();
+      if (!ns) return;
       try {
         await api("/api/namespace", { method: "POST", body: JSON.stringify({ namespace: ns }) });
         load();
       } catch (e) {
         banner(String(e.message || e), true);
-        load(); // revert displayed selection to server state
+        load(); // revert displayed value to server state
       }
-    });
+    }
+    $("ns-select").addEventListener("change", commitNamespace);
+    $("ns-select").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); commitNamespace(); } });
     $("chat-log").addEventListener("click", (e) => {
       const btn = e.target.closest(".cu-bubble-dl-btn");
       if (!btn || btn.dataset.chatDl === undefined) return;
