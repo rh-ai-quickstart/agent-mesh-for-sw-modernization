@@ -1313,7 +1313,7 @@
           api("/api/namespaces").catch(() => ({ namespaces: [], current: "" })),
         ]);
         $("status").className = "cu-status" + (status.ok ? "" : " warn");
-        $("status").innerHTML = `<strong>${status.ok ? "Connected" : "Not connected"}</strong><div></div>
+        $("status").innerHTML = `<div style="font-size:0.75rem">${status.ok ? "Connected" : "Not connected"}</div><div></div>
           <div>${status.ok ? "" : esc(status.message || "")}</div>`;
         const nsList = nsData.namespaces || [];
         const nsCurrent = nsData.current || status.namespace || "";
