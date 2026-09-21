@@ -52,14 +52,15 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
                                  f"artifact '{artifact_path}', git_slug='{git_slug}', multi_repo='{multi_repo}'")
                     logging.debug(f"Contents: {content}")
                     return content
-                except Exception as e:
+                except Exception:
                     logging.error(f"Error: Could not download {category} report"
                                   f" from artifact '{artifact_path}', "
                                   f"tags: {base_tags}, experiment: {loader.RESULT_ASSET_EXPERIMENT}")
-                    raise e
+                    logging.error(traceback.format_exc())
+                    return None
 
         return (
-            _get(AssetLoader.RESULTS_PATH_PREFIX_EVAL, "indexing"),
+            _get(AssetLoader.RESULTS_PATH_PREFIX_EVAL, "evaluation"),
             _get(AssetLoader.RESULTS_PATH_PREFIX_PIPELINES, "analysis"),
         )
     except Exception:
