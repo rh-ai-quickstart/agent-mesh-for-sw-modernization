@@ -480,9 +480,9 @@
     .cu-form-label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
 
     .cu-ns-row { margin-bottom: 0.75rem; }
-    .cu-ns-combo { position: relative; display: block; }
-    .cu-ns-combo input { border-radius: 1rem; padding-right: 2rem; width: 100%; box-sizing: border-box; }
-    .cu-ns-combo .cu-ns-arrow { position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); pointer-events: none; color: #6a6e73; display: flex; align-items: center; }
+    .cu-ns-combo { display: block; }
+    .cu-ns-combo input { border-radius: 1rem; width: 100%; box-sizing: border-box; }
+    .cu-ns-combo input::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
 
     @media (max-width: 900px) {
       .cu-shell, .cu-custom, .cu-composer { grid-template-columns: 1fr; }
@@ -517,9 +517,6 @@
         <div class="cu-ns-combo">
           <input class="cu-field" id="ns-select" list="ns-list" autocomplete="off"
                  placeholder="Namespace" style="font-size:0.875rem;min-height:2rem;">
-          <span class="cu-ns-arrow" aria-hidden="true">
-            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
-          </span>
           <datalist id="ns-list"></datalist>
         </div>
       </div>
