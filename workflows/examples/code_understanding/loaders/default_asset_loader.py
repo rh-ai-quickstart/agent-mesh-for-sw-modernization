@@ -45,6 +45,11 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.log_results(results_path, artifact_path, tags, content)
 
+    def log_static_asset(self, results_path: str, artifact_path: str = None, tags: dict = None,
+                  content: str = None):
+
+        return self._loader.log_static_asset(results_path, artifact_path, tags, content)
+
     def upload_all_assets(self, assets_dir: str):
 
         return self._loader.upload_all_assets(assets_dir)

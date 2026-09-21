@@ -84,6 +84,11 @@ class LocalAssetLoader(AssetLoader):
             with open(results_path, "w") as f:
                 f.write(content)
 
+    def log_static_asset(self, results_path: str, artifact_path: str = None, tags: dict = None,
+                  content: str = None):
+        """Delegates to log_results; no experiment distinction for local storage."""
+        self.log_results(results_path, artifact_path, tags, content)
+
     def upload_all_assets(self, assets_dir: str):
         """No-op. Local assets are already on disk and require no upload step."""
         pass

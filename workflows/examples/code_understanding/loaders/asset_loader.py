@@ -77,6 +77,22 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
+    def log_static_asset(self, results_path: str, artifact_path: str = None, tags: dict = None,
+                  content: str = None):
+        """Logs an artifact to the static asset store (same experiment as ``download``).
+
+        Identical signature to ``log_results`` but writes to the static asset
+        experiment so that ``download`` can retrieve it without specifying an
+        explicit experiment name.
+
+        Args:
+            results_path: Local path to the file or directory to log.
+            artifact_path: Optional subdirectory within the run's artifact store to organize results under.
+            tags: Optional key-value tags to attach to the run.
+            content: Optional string content to write to results_path before logging.
+        """
+
+    @abstractmethod
     def upload_all_assets(self, assets_dir: str):
         """Uploads all assets from a directory to the loader's backing store in a single operation.
 
