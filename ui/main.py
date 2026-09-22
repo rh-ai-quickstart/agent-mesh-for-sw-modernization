@@ -62,22 +62,6 @@ app.include_router(_v2_router, prefix="/api/v2")
 app.include_router(_v2_queries_router, prefix="/api/v2")
 
 
-class Repo(BaseModel):
-    git_repo: str
-    git_branch: str = "main"
-
-
-class PipelineRequest(BaseModel):
-    repos: list[Repo] = Field(default_factory=list)
-
-
-class QueryRequest(BaseModel):
-    question: str
-    git_repo: str = ""
-    git_branch: str = "main"
-    use_global: bool | None = None
-
-
 class NamespaceRequest(BaseModel):
     namespace: str
 
@@ -229,44 +213,62 @@ def upload_index(
                 index_storage.cleanup_index_workspace(workspace)
 
 
-@app.get("/api/jobs")
-def get_jobs(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
-    try:
-        return {"jobs": cluster.list_recent_jobs(runtime_ns=cu_namespace)}
-    except Exception as exc:
-        raise HTTPException(503, str(exc)) from exc
+# ── Dead code – superseded by api/pipelines.py and api/queries.py ─────────────
+
+# class Repo(BaseModel):
+#     git_repo: str
+#     git_branch: str = "main"
+#
+#
+# class PipelineRequest(BaseModel):
+#     repos: list[Repo] = Field(default_factory=list)
+#
+#
+# class QueryRequest(BaseModel):
+#     question: str
+#     git_repo: str = ""
+#     git_branch: str = "main"
+#     use_global: bool | None = None
 
 
-@app.get("/api/jobs/{job_name}")
-def get_job(job_name: str, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
-    try:
-        return cluster.job_snapshot(job_name, runtime_ns=cu_namespace)
-    except Exception as exc:
-        raise HTTPException(404, str(exc)) from exc
-
-
-@app.post("/api/pipelines")
-def start_pipeline(body: PipelineRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
-    repos = [item.model_dump() for item in body.repos]
-    try:
-        return cluster.submit_pipeline_run(repos, runtime_ns=cu_namespace)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(500, str(exc)) from exc
-
-
-@app.post("/api/query")
-def start_query(body: QueryRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
-    try:
-        return cluster.submit_adhoc_query(
-            body.question,
-            git_repo=body.git_repo,
-            git_branch=body.git_branch,
-            use_global=body.use_global,
-            runtime_ns=cu_namespace,
-        )
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(500, str(exc)) from exc
+# @app.get("/api/jobs")
+# def get_jobs(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+#     try:
+#         return {"jobs": cluster.list_recent_jobs(runtime_ns=cu_namespace)}
+#     except Exception as exc:
+#         raise HTTPException(503, str(exc)) from exc
+#
+#
+# @app.get("/api/jobs/{job_name}")
+# def get_job(job_name: str, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+#     try:
+#         return cluster.job_snapshot(job_name, runtime_ns=cu_namespace)
+#     except Exception as exc:
+#         raise HTTPException(404, str(exc)) from exc
+#
+#
+# @app.post("/api/pipelines")
+# def start_pipeline(body: PipelineRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
+#     repos = [item.model_dump() for item in body.repos]
+#     try:
+#         return cluster.submit_pipeline_run(repos, runtime_ns=cu_namespace)
+#     except ValueError as exc:
+#         raise HTTPException(400, str(exc)) from exc
+#     except Exception as exc:
+#         raise HTTPException(500, str(exc)) from exc
+#
+#
+# @app.post("/api/query")
+# def start_query(body: QueryRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
+#     try:
+#         return cluster.submit_adhoc_query(
+#             body.question,
+#             git_repo=body.git_repo,
+#             git_branch=body.git_branch,
+#             use_global=body.use_global,
+#             runtime_ns=cu_namespace,
+#         )
+#     except ValueError as exc:
+#         raise HTTPException(400, str(exc)) from exc
+#     except Exception as exc:
+#         raise HTTPException(500, str(exc)) from exc
