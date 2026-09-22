@@ -1,3 +1,8 @@
+# ============================================================================
+# Configuration
+# ============================================================================
+
+.DEFAULT_GOAL := install
 
 ENV_FILE            	?= ./.env
 GIT_REPO_URL        	:= $(shell git remote get-url origin 2>/dev/null | sed 's|^git@\([^:]*\):\(.*\)$$|https://\1/\2|')
@@ -8,19 +13,148 @@ PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
 DEPLOY_EMBEDDING_MODEL ?= false
+# Local development uses Podman by default. GitHub Actions sets CI=true and
+# provides Docker Buildx; callers can override this with CONTAINER_ENGINE.
+CONTAINER_ENGINE      ?= $(if $(CI),docker,podman)
+REGISTRY              ?=
+VERSION               ?=
+# Image names used by the build/push targets invoked by the CI Docker workflow.
+KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-generation
+KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
+KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
+KFP_PIPELINE_TOOLS_IMAGE_NAME        ?= agent-mesh-for-sw-modernization-pipeline-tools
+PLUGIN_IMAGE                         ?= code-understanding-console-plugin:latest
+
+export KFP_DATA_GENERATION_BASE_IMAGE_NAME \
+	KFP_INDEXING_BASE_IMAGE_NAME \
+	KFP_ANALYSIS_BASE_IMAGE_NAME \
+	KFP_PIPELINE_TOOLS_IMAGE_NAME
+
+# ============================================================================
+# Container engine
+# ============================================================================
+
+ifeq ($(CONTAINER_ENGINE),docker)
+IMAGE_BUILD := docker buildx build --load
+IMAGE_PUSH  := docker push
+else ifeq ($(CONTAINER_ENGINE),podman)
+IMAGE_BUILD := podman build
+IMAGE_PUSH  := podman push
+else
+$(error Unsupported CONTAINER_ENGINE '$(CONTAINER_ENGINE)'; use docker or podman)
+endif
+
+# ============================================================================
+# Help
+# ============================================================================
 
 .PHONY: \
+	help \
+	help-all \
 	install \
 	deploy-embedding-model \
 	deploy-notebooks \
 	apply-secrets \
 	build-images \
+	build-all-images \
+	push-all-images \
 	upload-pipelines \
 	upload-mlflow-assets \
 	upload-prebuilt-index \
 	run-adhoc-query \
 	run-pipelines \
-	deploy-otel
+	deploy-otel \
+	apply-console-src \
+	build-console-image \
+	run-console-app \
+	deploy-console-app \
+	port-forward-console-app \
+	apply-plugin-src \
+	build-console-plugin \
+	build-console-plugin-image \
+	build-plugin-api-image \
+	deploy-console-plugin \
+	enable-console-plugin
+
+help:
+	@echo "Agent Mesh for Software Modernization"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make <target> [VARIABLE=value ...]"
+	@echo ""
+	@echo "User tasks:"
+	@echo "  run-pipelines               Submit the configured pipeline run"
+	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
+	@echo ""
+	@echo "Administrator tasks:"
+	@echo "  install                     Install the complete application stack"
+	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
+	@echo ""
+	@echo "Run 'make help-all' to list all administrative and development tasks."
+
+help-all:
+	@echo "Agent Mesh for Software Modernization"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make <target> [VARIABLE=value ...]"
+	@echo ""
+	@echo "Help:"
+	@echo "  help                        Show user and administrator tasks"
+	@echo "  help-all                    Show all tasks and common overrides"
+	@echo ""
+	@echo "Deployment:"
+	@echo "  install                     Install the complete application stack"
+	@echo "  deploy-embedding-model      Deploy the e5-mistral embedding model"
+	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
+	@echo "  apply-secrets               Create or update application secrets"
+	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
+	@echo ""
+	@echo "Container images:"
+	@echo "  build-images                Build and push all application images"
+	@echo "  build-all-images            Build all application images"
+	@echo "  push-all-images             Push all application images"
+	@echo ""
+	@echo "Pipelines and assets:"
+	@echo "  upload-pipelines            Upload the Kubeflow pipelines"
+	@echo "  upload-mlflow-assets        Upload MLflow-hosted application assets"
+	@echo "  upload-prebuilt-index       Upload the prebuilt code index"
+	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
+	@echo "  run-pipelines               Submit the configured pipeline run"
+	@echo ""
+	@echo "Console application:"
+	@echo "  apply-console-src           Publish console job scripts"
+	@echo "  build-console-image         Build the console application image on the cluster"
+	@echo "  run-console-app             Run the console application locally"
+	@echo "  deploy-console-app          Build and deploy the console application"
+	@echo "  port-forward-console-app    Forward the deployed console to localhost:8080"
+	@echo ""
+	@echo "OpenShift console plugin:"
+	@echo "  apply-plugin-src            Publish console-plugin job scripts"
+	@echo "  build-console-plugin        Build the console-plugin frontend"
+	@echo "  build-console-plugin-image  Build and push the console-plugin image"
+	@echo "  build-plugin-api-image      Build the plugin API image on the cluster"
+	@echo "  deploy-console-plugin       Build and deploy the plugin and API"
+	@echo "  enable-console-plugin       Enable the plugin in the OpenShift console"
+	@echo ""
+	@echo "Container image build overrides (used by CI):"
+	@echo "  CONTAINER_ENGINE            Image tool: podman locally, docker in CI"
+	@echo "  REGISTRY                    Override the image registry"
+	@echo "  VERSION                     Override the image tag"
+	@echo ""
+	@echo "Common runtime overrides (not exhaustive):"
+	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
+	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
+	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
+	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
+	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
+	@echo "  ARGS                        Arguments passed to run-pipelines"
+	@echo "  QUESTION_FILE               Required input file for run-adhoc-query"
+	@echo ""
+	@echo "See .env.template for additional deployment, pipeline, and image configuration."
+
+# ============================================================================
+# Installation and deployment
+# ============================================================================
 
 install:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -174,32 +308,59 @@ apply-secrets:
 			-p "{\"stringData\":{\"MLFLOW_TRACKING_URI\":\"https://$(GATEWAY_HOST)/mlflow\"}}"; \
 	fi
 
-build-images:
-	@set -a && . $(ENV_FILE) && set +a && \
-	DATAGEN_IMG="$$KFP_IMAGE_REGISTRY/$$KFP_DATA_GENERATION_BASE_IMAGE_NAME:$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" && \
-	INDEX_IMG="$$KFP_IMAGE_REGISTRY/$$KFP_INDEXING_BASE_IMAGE_NAME:$$KFP_INDEXING_BASE_IMAGE_TAG" && \
-	ANALYSIS_IMG="$$KFP_IMAGE_REGISTRY/$$KFP_ANALYSIS_BASE_IMAGE_NAME:$$KFP_ANALYSIS_BASE_IMAGE_TAG" && \
-	TOOLS_IMG="$$KFP_IMAGE_REGISTRY/$$KFP_PIPELINE_TOOLS_IMAGE_NAME:$$KFP_PIPELINE_TOOLS_IMAGE_TAG" && \
-	\
-	echo "==> Building data generation image..." && \
-	podman build -t "$$DATAGEN_IMG" resources/images/data-generation && \
-	echo "==> Pushing data generation image..." && \
-	podman push "$$DATAGEN_IMG" && \
-	\
-	echo "==> Building indexing image..." && \
-	podman build -t "$$INDEX_IMG" resources/images/data-indexing && \
-	echo "==> Pushing indexing image..." && \
-	podman push "$$INDEX_IMG" && \
-	\
-	echo "==> Building analysis image..." && \
-	podman build -t "$$ANALYSIS_IMG" resources/images/data-indexing && \
-	echo "==> Pushing analysis image..." && \
-	podman push "$$ANALYSIS_IMG" && \
-	\
-	echo "==> Building pipeline-tools image..." && \
-	podman build -t "$$TOOLS_IMG"  resources/images/pipeline-tools && \
-	echo "==> Pushing pipeline-tools image..." && \
-	podman push "$$TOOLS_IMG"
+# ============================================================================
+# Container images
+# ============================================================================
+
+build-images: build-all-images push-all-images
+
+build-all-images:
+	@if [ -f "$(ENV_FILE)" ]; then set -a && . "$(ENV_FILE)" && set +a; fi && \
+	REGISTRY="$(REGISTRY)" && \
+	VERSION="$(VERSION)" && \
+	: "$${REGISTRY:=$$KFP_IMAGE_REGISTRY}" && \
+	DATAGEN_IMG="$$REGISTRY/$$KFP_DATA_GENERATION_BASE_IMAGE_NAME:$${VERSION:-$$KFP_DATA_GENERATION_BASE_IMAGE_TAG}" && \
+	INDEX_IMG="$$REGISTRY/$$KFP_INDEXING_BASE_IMAGE_NAME:$${VERSION:-$$KFP_INDEXING_BASE_IMAGE_TAG}" && \
+	ANALYSIS_IMG="$$REGISTRY/$$KFP_ANALYSIS_BASE_IMAGE_NAME:$${VERSION:-$$KFP_ANALYSIS_BASE_IMAGE_TAG}" && \
+	TOOLS_IMG="$$REGISTRY/$$KFP_PIPELINE_TOOLS_IMAGE_NAME:$${VERSION:-$$KFP_PIPELINE_TOOLS_IMAGE_TAG}" && \
+	echo "==> Building data generation image: $$DATAGEN_IMG" && \
+	$(IMAGE_BUILD) -t "$$DATAGEN_IMG" -f resources/images/data-generation/Containerfile resources/images/data-generation && \
+	echo "==> Building indexing image: $$INDEX_IMG" && \
+	$(IMAGE_BUILD) -t "$$INDEX_IMG" -f resources/images/data-indexing/Containerfile resources/images/data-indexing && \
+	if [ "$$ANALYSIS_IMG" = "$$INDEX_IMG" ]; then \
+		echo "==> Skipping analysis image build; it uses the indexing image."; \
+	else \
+		echo "==> Building analysis image: $$ANALYSIS_IMG" && \
+		$(IMAGE_BUILD) -t "$$ANALYSIS_IMG" -f resources/images/data-indexing/Containerfile resources/images/data-indexing; \
+	fi && \
+	echo "==> Building pipeline-tools image: $$TOOLS_IMG" && \
+	$(IMAGE_BUILD) -t "$$TOOLS_IMG" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools
+
+push-all-images:
+	@if [ -f "$(ENV_FILE)" ]; then set -a && . "$(ENV_FILE)" && set +a; fi && \
+	REGISTRY="$(REGISTRY)" && \
+	VERSION="$(VERSION)" && \
+	: "$${REGISTRY:=$$KFP_IMAGE_REGISTRY}" && \
+	DATAGEN_IMG="$$REGISTRY/$$KFP_DATA_GENERATION_BASE_IMAGE_NAME:$${VERSION:-$$KFP_DATA_GENERATION_BASE_IMAGE_TAG}" && \
+	INDEX_IMG="$$REGISTRY/$$KFP_INDEXING_BASE_IMAGE_NAME:$${VERSION:-$$KFP_INDEXING_BASE_IMAGE_TAG}" && \
+	ANALYSIS_IMG="$$REGISTRY/$$KFP_ANALYSIS_BASE_IMAGE_NAME:$${VERSION:-$$KFP_ANALYSIS_BASE_IMAGE_TAG}" && \
+	TOOLS_IMG="$$REGISTRY/$$KFP_PIPELINE_TOOLS_IMAGE_NAME:$${VERSION:-$$KFP_PIPELINE_TOOLS_IMAGE_TAG}" && \
+	echo "==> Pushing data generation image: $$DATAGEN_IMG" && \
+	$(IMAGE_PUSH) "$$DATAGEN_IMG" && \
+	echo "==> Pushing indexing image: $$INDEX_IMG" && \
+	$(IMAGE_PUSH) "$$INDEX_IMG" && \
+	if [ "$$ANALYSIS_IMG" = "$$INDEX_IMG" ]; then \
+		echo "==> Skipping analysis image push; it uses the indexing image."; \
+	else \
+		echo "==> Pushing analysis image: $$ANALYSIS_IMG" && \
+		$(IMAGE_PUSH) "$$ANALYSIS_IMG"; \
+	fi && \
+	echo "==> Pushing pipeline-tools image: $$TOOLS_IMG" && \
+	$(IMAGE_PUSH) "$$TOOLS_IMG"
+
+# ============================================================================
+# Pipelines and assets
+# ============================================================================
 
 upload-pipelines:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -326,6 +487,10 @@ run-pipelines:
 	echo "==> Streaming pipeline run results..." && \
 	oc logs -f job/run-pipelines -n $$KFP_NAMESPACE
 
+# ============================================================================
+# Observability
+# ============================================================================
+
 deploy-otel:
 	@set -a && . $(ENV_FILE) && set +a && \
 	\
@@ -371,6 +536,10 @@ deploy-otel:
 		--set otel.enabled=true \
 		--set otel.name=$$OTEL_SERVICE_NAME \
 		-s templates/opentelemetry.yaml | oc apply -f -
+
+# ============================================================================
+# Console application
+# ============================================================================
 
 apply-console-src:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -425,7 +594,9 @@ port-forward-console-app:
 	echo "==> Forwarding http://localhost:8080 -> code-understanding-console:8080" && \
 	oc port-forward svc/code-understanding-console 8080:8080 -n $$KFP_NAMESPACE
 
-PLUGIN_IMAGE ?= code-understanding-console-plugin:latest
+# ============================================================================
+# OpenShift console plugin
+# ============================================================================
 
 apply-plugin-src:
 	@set -a && . $(ENV_FILE) && set +a && \
