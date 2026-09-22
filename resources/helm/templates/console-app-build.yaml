@@ -1,4 +1,4 @@
-{{- if .Values.console.enabled }}
+{{- if .Values.console.buildEnabled }}
 ---
 apiVersion: image.openshift.io/v1
 kind: ImageStream

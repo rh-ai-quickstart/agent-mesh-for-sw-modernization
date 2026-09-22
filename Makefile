@@ -174,6 +174,7 @@ install:
 	helm upgrade --install agent-mesh-for-sw resources/helm \
 		--no-hooks \
 		--create-namespace \
+		--reuse-values \
 		--set namespace="$$KFP_NAMESPACE" \
 		--set requester="$$(oc whoami)" \
 		--set repoUrl="$(GIT_REPO_URL)" \
@@ -194,8 +195,7 @@ install:
 		--set pipelineTools.image.name="$$KFP_PIPELINE_TOOLS_IMAGE_NAME" \
 		--set pipelineTools.image.tag="$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
 		--set clusterDomain="$(CLUSTER_DOMAIN)" \
-		--set mlflowGatewayHost="$(GATEWAY_HOST)" \
-		--set console.enabled=false
+		--set mlflowGatewayHost="$(GATEWAY_HOST)"
 	@if [ "$(DEPLOY_EMBEDDING_MODEL)" = "true" ]; then \
 		$(MAKE) deploy-embedding-model; \
 	fi
@@ -224,9 +224,6 @@ deploy-embedding-model:
 
 deploy-notebooks:
 	@set -a && . $(ENV_FILE) && set +a && \
-	if oc get notebook data-generation graphrag-indexing -n $$KFP_NAMESPACE 2>/dev/null | grep -q notebook; then \
-		echo "==> Notebooks already exist, skipping deployment."; \
-	else \
 		echo "==> Waiting for data-generation ImageStream to import..." && \
 		until oc get imagestreamtag custom-data-generation:$$KFP_DATA_GENERATION_BASE_IMAGE_TAG -n redhat-ods-applications -o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
 		DATAGEN_IMAGE="$$(oc get imagestream custom-data-generation -n redhat-ods-applications -o jsonpath='{.status.dockerImageRepository}'):$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" && \
@@ -247,7 +244,10 @@ deploy-notebooks:
 			-o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; do sleep 5; done && \
 		\
 		echo "==> Deploying notebooks..." && \
-		helm template agent-mesh-for-sw resources/helm \
+		helm upgrade agent-mesh-for-sw resources/helm \
+			--namespace "$$KFP_NAMESPACE" \
+			--reuse-values \
+			--no-hooks \
 			--set namespace="$$KFP_NAMESPACE" \
 			--set requester="$$(oc whoami)" \
 			--set repoUrl="$(GIT_REPO_URL)" \
@@ -264,9 +264,7 @@ deploy-notebooks:
 			--set analysis.image.name="$$KFP_ANALYSIS_BASE_IMAGE_NAME" \
 			--set analysis.image.tag="$$KFP_ANALYSIS_BASE_IMAGE_TAG" \
 			--set analysis.image.digestRef="$$ANALYSIS_IMAGE" \
-			--set deployNotebooks=true \
-			-s templates/workbench-notebooks.yaml | oc apply -f -; \
-	fi
+			--set deployNotebooks=true
 
 apply-secrets:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -544,19 +542,25 @@ deploy-otel:
 apply-console-src:
 	@set -a && . $(ENV_FILE) && set +a && \
 	echo "==> Publishing job scripts ConfigMap..." && \
-	oc create configmap code-understanding-job-scripts \
-		--from-file=run_pipelines.sh=workflows/examples/code_understanding/scripts/run_pipelines.sh \
-		--from-file=mlflow_asset_loader.py=workflows/examples/code_understanding/loaders/mlflow_asset_loader.py \
-		--from-file=default_asset_loader.py=workflows/examples/code_understanding/loaders/default_asset_loader.py \
-		-n $$KFP_NAMESPACE --dry-run=client -o yaml | oc apply -f -
+	helm upgrade agent-mesh-for-sw resources/helm \
+		--namespace "$$KFP_NAMESPACE" \
+		--reuse-values \
+		--no-hooks \
+		--set namespace="$$KFP_NAMESPACE" \
+		--set console.jobScripts.enabled=true \
+		--set-file console.jobScripts.runPipelines=workflows/examples/code_understanding/scripts/run_pipelines.sh \
+		--set-file console.jobScripts.mlflowAssetLoader=workflows/examples/code_understanding/loaders/mlflow_asset_loader.py \
+		--set-file console.jobScripts.defaultAssetLoader=workflows/examples/code_understanding/loaders/default_asset_loader.py
 
 build-console-image:
 	@set -a && . $(ENV_FILE) && set +a && \
 	echo "==> Building Code Understanding console image on-cluster..." && \
-	helm template agent-mesh-for-sw resources/helm \
+	helm upgrade agent-mesh-for-sw resources/helm \
+	  --namespace "$$KFP_NAMESPACE" \
+	  --reuse-values \
+	  --no-hooks \
 	  --set namespace="$$KFP_NAMESPACE" \
-	  --set console.enabled=true \
-	  -s templates/console-app-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
+	  --set console.buildEnabled=true && \
 	oc start-build code-understanding-console --from-dir=ui --follow -n $$KFP_NAMESPACE
 
 run-console-app:
@@ -568,13 +572,16 @@ run-console-app:
 deploy-console-app: apply-console-src build-console-image
 	@set -a && . $(ENV_FILE) && set +a && \
 	echo "==> Deploying Code Understanding console..." && \
-	helm template agent-mesh-for-sw resources/helm \
+	helm upgrade agent-mesh-for-sw resources/helm \
+		--namespace "$$KFP_NAMESPACE" \
+		--reuse-values \
+		--no-hooks \
 		--set namespace="$$KFP_NAMESPACE" \
 		--set requester="$$(oc whoami)" \
 		--set repoUrl="$(GIT_REPO_URL)" \
 		--set repoRef="$(GIT_REPO_BRANCH)" \
-		--set console.enabled=true \
-		-s templates/console-app.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
+		--set console.buildEnabled=true \
+		--set console.enabled=true && \
 	echo "==> Waiting for console ImageStreamTag to be available..." && \
 	until oc get imagestreamtag code-understanding-console:latest -n $$KFP_NAMESPACE \
 		-o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \

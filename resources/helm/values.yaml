@@ -85,10 +85,16 @@ indexWorkspace:
     limit: 12Gi
 
 console:
-  enabled: true
+  enabled: false
+  buildEnabled: false
   replicas: 1
   image: ""
   imagePullPolicy: Always
+  jobScripts:
+    enabled: false
+    runPipelines: ""
+    mlflowAssetLoader: ""
+    defaultAssetLoader: ""
 
 consolePlugin:
   enabled: false
