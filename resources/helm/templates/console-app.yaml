@@ -1,33 +1,5 @@
 {{- if .Values.console.enabled }}
 ---
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: code-understanding-console
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: code-understanding-console
----
-apiVersion: build.openshift.io/v1
-kind: BuildConfig
-metadata:
-  name: code-understanding-console
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: code-understanding-console
-spec:
-  output:
-    to:
-      kind: ImageStreamTag
-      name: code-understanding-console:latest
-  source:
-    type: Binary
-  strategy:
-    type: Docker
-    dockerStrategy:
-      dockerfilePath: Dockerfile
-  triggers: []
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,8 +20,8 @@ spec:
       serviceAccountName: pipeline-upload-job
       containers:
         - name: console
-          image: "{{ if .Values.console.image }}{{ .Values.console.image }}{{ else }}image-registry.openshift-image-registry.svc:5000/{{ .Values.namespace }}/code-understanding-console:latest{{ end }}"
-          imagePullPolicy: {{ .Values.console.imagePullPolicy | default "Always" }}
+          image: {{ required "console.image is required when console.enabled=true" .Values.console.image | quote }}
+          imagePullPolicy: {{ .Values.console.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8080

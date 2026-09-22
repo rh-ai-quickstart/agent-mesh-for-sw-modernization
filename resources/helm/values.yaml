@@ -85,16 +85,16 @@ indexWorkspace:
     limit: 12Gi
 
 console:
-  enabled: true
+  enabled: false
   replicas: 1
   image: ""
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
 
 consolePlugin:
   enabled: false
   replicas: 1
   image: ""
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
   apiImage: ""
   apiRouteHost: ""
   applicationMenuSection: OpenShift Self Managed Services

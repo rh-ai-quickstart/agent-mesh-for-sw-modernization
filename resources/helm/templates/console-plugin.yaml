@@ -1,61 +1,5 @@
 {{- if .Values.consolePlugin.enabled }}
 ---
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: code-understanding-console-plugin
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: code-understanding-console-plugin
----
-apiVersion: build.openshift.io/v1
-kind: BuildConfig
-metadata:
-  name: code-understanding-console-plugin
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: code-understanding-console-plugin
-spec:
-  output:
-    to:
-      kind: ImageStreamTag
-      name: code-understanding-console-plugin:latest
-  source:
-    type: Binary
-  strategy:
-    type: Docker
-    dockerStrategy:
-      dockerfilePath: Dockerfile
-  triggers: []
----
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: code-understanding-plugin-api
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: code-understanding-plugin-api
----
-apiVersion: build.openshift.io/v1
-kind: BuildConfig
-metadata:
-  name: code-understanding-plugin-api
-  namespace: {{ .Values.namespace }}
-  labels:
-    app: code-understanding-plugin-api
-spec:
-  output:
-    to:
-      kind: ImageStreamTag
-      name: code-understanding-plugin-api:latest
-  source:
-    type: Binary
-  strategy:
-    type: Docker
-    dockerStrategy:
-      dockerfilePath: Dockerfile.plugin
-  triggers: []
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -118,7 +62,7 @@ spec:
     spec:
       containers:
         - name: plugin
-          image: "{{ if .Values.consolePlugin.image }}{{ .Values.consolePlugin.image }}{{ else }}image-registry.openshift-image-registry.svc:5000/{{ .Values.namespace }}/code-understanding-console-plugin:latest{{ end }}"
+          image: {{ required "consolePlugin.image is required when consolePlugin.enabled=true" .Values.consolePlugin.image | quote }}
           imagePullPolicy: {{ .Values.consolePlugin.imagePullPolicy }}
           ports:
             - name: https
@@ -185,8 +129,22 @@ spec:
       serviceAccountName: pipeline-upload-job
       containers:
         - name: api
-          image: "{{ if .Values.consolePlugin.apiImage }}{{ .Values.consolePlugin.apiImage }}{{ else }}image-registry.openshift-image-registry.svc:5000/{{ .Values.namespace }}/code-understanding-plugin-api:latest{{ end }}"
-          imagePullPolicy: Always
+          image: {{ required "consolePlugin.apiImage is required when consolePlugin.enabled=true" .Values.consolePlugin.apiImage | quote }}
+          imagePullPolicy: {{ .Values.consolePlugin.imagePullPolicy }}
+          command:
+            - /opt/app-root/src/.venv/bin/python
+          args:
+            - -m
+            - uvicorn
+            - main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8443"
+            - --ssl-certfile
+            - /var/serving-cert/tls.crt
+            - --ssl-keyfile
+            - /var/serving-cert/tls.key
           ports:
             - name: https
               containerPort: 8443

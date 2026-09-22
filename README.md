@@ -176,7 +176,7 @@ make port-forward-console-app
 The Code Understanding Console Plugin is an OpenShift web-console dynamic 
 plugin backed by a FastAPI service. 
 
-Build and deploy the console plugin:
+Deploy the console plugin:
 
 ```
 make deploy-console-plugin
