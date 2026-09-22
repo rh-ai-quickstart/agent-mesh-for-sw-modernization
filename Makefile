@@ -526,14 +526,17 @@ deploy-otel:
 	oc delete job create-tempo-bucket -n $$OTEL_NAMESPACE --ignore-not-found=true && \
 	\
 	echo "==> Deploying TempoStack and OpenTelemetry Collector..." && \
-	helm template agent-mesh-for-sw resources/helm \
+	helm upgrade agent-mesh-for-sw resources/helm \
+		--namespace "$$KFP_NAMESPACE" \
+		--reuse-values \
+		--no-hooks \
+		--set namespace="$$KFP_NAMESPACE" \
 		--set otel.namespace=$$OTEL_NAMESPACE \
 		--set minio.endpoint=http://minio-service.$$KFP_NAMESPACE.svc.cluster.local:9000 \
 		--set minio.rootUser=$$AWS_ACCESS_KEY_ID \
 		--set minio.rootPassword=$$AWS_SECRET_ACCESS_KEY \
 		--set otel.enabled=true \
-		--set otel.name=$$OTEL_SERVICE_NAME \
-		-s templates/opentelemetry.yaml | oc apply -f -
+		--set otel.name=$$OTEL_SERVICE_NAME
 
 # ============================================================================
 # Console application

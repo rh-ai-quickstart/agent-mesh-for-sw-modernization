@@ -73,6 +73,9 @@ runPipelines:
   graphragSourcePath: "graph_rag_app/source"
 
 otel:
+  enabled: false
+  namespace: ""
+  name: ""
   createBucket: false
   tempo:
     bucket: tempo
