@@ -639,7 +639,8 @@ build-plugin-api-image:
 	  --set namespace="$$KFP_NAMESPACE" \
 	  --set consolePlugin.enabled=true \
 	  -s templates/console-plugin-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
-	oc start-build code-understanding-plugin-api --from-dir=ui --follow -n $$KFP_NAMESPACE
+	oc start-build code-understanding-plugin-api --from-dir=. --follow -n
+	$$KFP_NAMESPACE
 
 deploy-console-plugin: apply-plugin-src build-console-plugin-image build-plugin-api-image
 	@set -a && . $(ENV_FILE) && set +a && \
