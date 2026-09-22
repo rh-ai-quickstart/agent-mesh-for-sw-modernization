@@ -10,6 +10,7 @@ Contents
   - [Preparing the Environment](#preparing-the-environment)
   - [(Optional) Building the Container Images](#optional-building-the-container-images)
   - [Installing via Makefile](#installing-via-makefile)
+  - [Uninstalling](#uninstalling)
 - [Running the Code Understanding Workflow](#running-the-code-understanding-workflow)
 - [Running Adhoc Queries](#running-adhoc-queries)
 - [Integrating with other tools](#integrating-with-other-tools)
@@ -76,6 +77,31 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
 1. Run the Makefile: `make install`
 (**NOTE**: To deploy the local `e5-mistral` embedding model as part of installation, run:
    `make install DEPLOY_EMBEDDING_MODEL=true`)
+
+The main `agent-mesh-for-sw` Helm release owns the pipeline infrastructure,
+notebooks, standalone console application, and any Tempo/OpenTelemetry resources
+created by `make install`. Pipeline uploads, pipeline runs, and ad-hoc queries
+remain separately invokable operations.
+
+### Uninstalling
+
+Run:
+
+```sh
+make uninstall
+```
+
+Uninstall stops project upload/run/query Jobs, removes the optional
+`e5-mistral` release, uninstalls `agent-mesh-for-sw`, cleans resources from
+legacy installations, and deletes the application's PVC-backed data. The
+application and OpenTelemetry namespaces are preserved.
+
+The uninstall target does not remove externally stored MLflow data, externally
+pushed container images, or the optional cluster-wide OpenShift console plugin.
+
+Installations created before the Helm ownership refactor should be removed with
+`make uninstall` and then reinstalled. Existing manually applied notebooks,
+console resources, and telemetry resources are not adopted automatically.
 
 ## Running the Code Understanding Workflow
 1. To run the **Code Understanding** pipeline for a single repository, run:
