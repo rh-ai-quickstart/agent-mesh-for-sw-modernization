@@ -14,8 +14,6 @@ kind: DataSciencePipelinesApplication
 metadata:
   name: dspa
   namespace: {{ .Values.namespace }}
-  annotations:
-    helm.sh/resource-policy: keep
 spec:
   apiServer:
     deploy: true
@@ -54,4 +52,3 @@ spec:
   scheduledWorkflow:
     cronScheduleTimezone: UTC
     deploy: true
-

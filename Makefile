@@ -52,6 +52,7 @@ endif
 	help \
 	help-all \
 	install \
+	uninstall \
 	deploy-embedding-model \
 	deploy-notebooks \
 	apply-secrets \
@@ -88,6 +89,7 @@ help:
 	@echo ""
 	@echo "Administrator tasks:"
 	@echo "  install                     Install the complete application stack"
+	@echo "  uninstall                   Remove the application stack and PVC-backed data"
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
 	@echo ""
 	@echo "Run 'make help-all' to list all administrative and development tasks."
@@ -104,6 +106,7 @@ help-all:
 	@echo ""
 	@echo "Deployment:"
 	@echo "  install                     Install the complete application stack"
+	@echo "  uninstall                   Remove the application stack and PVC-backed data"
 	@echo "  deploy-embedding-model      Deploy the e5-mistral embedding model"
 	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
 	@echo "  apply-secrets               Create or update application secrets"
@@ -155,6 +158,9 @@ help-all:
 # ============================================================================
 # Installation and deployment
 # ============================================================================
+
+uninstall:
+	@sh scripts/uninstall.sh "$(ENV_FILE)"
 
 install:
 	@set -a && . $(ENV_FILE) && set +a && \
