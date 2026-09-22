@@ -628,7 +628,11 @@
     function runMermaid(container) {
       if (typeof mermaid === "undefined") return;
       const nodes = Array.from(container.querySelectorAll("pre.mermaid")).filter(n => !n.dataset.processed);
-      if (nodes.length) mermaid.run({ nodes });
+      if (!nodes.length) return;
+      try {
+        const result = mermaid.run({ nodes });
+        if (result && typeof result.then === "function") result.catch(() => {});
+      } catch (e) { /* diagram render error – raw text remains visible */ }
     }
 
     const state = {
@@ -674,7 +678,11 @@
         const content = code.replace(/\n$/, "");
         if (lang.toLowerCase() === "mermaid") {
           const sanitized = content
-            .split("\n").map(l => /^\s*%(?!%)/.test(l) ? l.replace(/^(\s*)%/, "$1%%") : l).join("\n")
+            .split("\n").map(l => {
+              if (/^\s*%(?!%)/.test(l)) return l.replace(/^(\s*)%/, "$1%%"); // lone % → %%
+              if (!/^\s*%%/.test(l)) return l.replace(/\s*%%.*$/, "");       // strip inline %% comments
+              return l;
+            }).join("\n")
             .replace(/\[([^\]"]+)\]/g, (m, label) => /[()]/.test(label) ? `["${label}"]` : m);
           fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
         } else {
