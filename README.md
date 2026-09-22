@@ -92,16 +92,14 @@ make uninstall
 ```
 
 Uninstall stops project upload/run/query Jobs, removes the optional
-`e5-mistral` release, uninstalls `agent-mesh-for-sw`, cleans resources from
-legacy installations, and deletes the application's PVC-backed data. The
-application and OpenTelemetry namespaces are preserved.
+`e5-mistral` release, uninstalls `agent-mesh-for-sw`, removes manually created
+secrets and operator-generated storage, and deletes the application's
+PVC-backed data. The application and OpenTelemetry namespaces are preserved.
+OpenTelemetry variables are not required when telemetry was not deployed.
 
-The uninstall target does not remove externally stored MLflow data, externally
+The uninstall target supports deployments created with the current Helm
+ownership model. It does not remove externally stored MLflow data, externally
 pushed container images, or the optional cluster-wide OpenShift console plugin.
-
-Installations created before the Helm ownership refactor should be removed with
-`make uninstall` and then reinstalled. Existing manually applied notebooks,
-console resources, and telemetry resources are not adopted automatically.
 
 ## Running the Code Understanding Workflow
 1. To run the **Code Understanding** pipeline for a single repository, run:

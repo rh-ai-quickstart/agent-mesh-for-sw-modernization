@@ -159,9 +159,6 @@ help-all:
 # Installation and deployment
 # ============================================================================
 
-uninstall:
-	@sh scripts/uninstall.sh "$(ENV_FILE)"
-
 install:
 	@set -a && . $(ENV_FILE) && set +a && \
 	\
@@ -220,6 +217,46 @@ install:
 	$(MAKE) upload-pipelines
 	$(MAKE) deploy-notebooks
 	$(MAKE) deploy-console-app
+
+uninstall:
+	@set -eu; \
+	set -a; . "$(ENV_FILE)"; set +a; \
+	: "$${KFP_NAMESPACE:?KFP_NAMESPACE must be set in $(ENV_FILE)}"; \
+	case "$$KFP_NAMESPACE" in default|kube-*|openshift-*|redhat-ods-applications) \
+		echo "Error: refusing to uninstall from protected namespace: $$KFP_NAMESPACE" >&2; exit 1;; \
+	esac; \
+	echo "==> Uninstalling Agent Mesh from $$KFP_NAMESPACE"; \
+	echo "==> Stopping upload, pipeline, and ad-hoc Jobs..."; \
+	for resource in $$(oc get job,configmap -n "$$KFP_NAMESPACE" -o name 2>/dev/null || true); do \
+		case "$$resource" in \
+			job.batch/upload-*|job.batch/run-pipelines|job.batch/run-adhoc-query-*|job.batch/cu-pipeline-*|job.batch/cu-query-*|configmap/adhoc-query-*|configmap/cu-repos-*) \
+				oc delete "$$resource" -n "$$KFP_NAMESPACE" --ignore-not-found;; \
+		esac; \
+	done; \
+	echo "==> Removing Helm releases..."; \
+	helm uninstall e5-mistral -n "$$KFP_NAMESPACE" \
+		--ignore-not-found --cascade foreground --wait --timeout 2m; \
+	helm uninstall agent-mesh-for-sw -n "$$KFP_NAMESPACE" \
+		--ignore-not-found --cascade foreground --wait --timeout 2m; \
+	echo "==> Removing non-Helm resources..."; \
+	oc delete secret git-credentials code-understanding-env \
+		-n "$$KFP_NAMESPACE" --ignore-not-found; \
+	oc delete pvc mariadb-dspa -n "$$KFP_NAMESPACE" \
+		--ignore-not-found --wait=true --timeout=300s; \
+	if [ -n "$${OTEL_NAMESPACE:-}" ]; then \
+		oc delete job -n "$$OTEL_NAMESPACE" \
+			-l "app.kubernetes.io/part-of=agent-mesh-for-sw,agent-mesh.redhat.com/owner-namespace=$$KFP_NAMESPACE" \
+			--ignore-not-found; \
+		if [ -n "$${OTEL_SERVICE_NAME:-}" ]; then \
+			for pvc in $$(oc get pvc -n "$$OTEL_NAMESPACE" -o name 2>/dev/null || true); do \
+				case "$${pvc#*/}" in data-tempo-"$$OTEL_SERVICE_NAME"-ingester-*) \
+					oc delete "$$pvc" -n "$$OTEL_NAMESPACE" --ignore-not-found \
+						--wait=true --timeout=300s;; \
+				esac; \
+			done; \
+		fi; \
+	fi; \
+	echo "==> Agent Mesh uninstall complete. Namespace $$KFP_NAMESPACE was preserved."
 
 deploy-embedding-model:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -522,6 +559,7 @@ deploy-otel:
 	echo "==> Creating Tempo S3 bucket..." && \
 	oc delete job create-tempo-bucket -n $$OTEL_NAMESPACE --ignore-not-found=true && \
 	helm template agent-mesh-for-sw resources/helm \
+		--set namespace=$$KFP_NAMESPACE \
 		--set otel.namespace=$$OTEL_NAMESPACE \
 		--set otel.createBucket=true \
 		--set minio.endpoint=http://minio-service.$$KFP_NAMESPACE.svc.cluster.local:9000 \

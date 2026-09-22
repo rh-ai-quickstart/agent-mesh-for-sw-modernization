@@ -4,6 +4,10 @@ kind: Job
 metadata:
   name: create-tempo-bucket
   namespace: {{ .Values.otel.namespace }}
+  labels:
+    app.kubernetes.io/part-of: agent-mesh-for-sw
+    app.kubernetes.io/component: telemetry-bootstrap
+    agent-mesh.redhat.com/owner-namespace: {{ .Values.namespace | quote }}
 spec:
   template:
     spec:
