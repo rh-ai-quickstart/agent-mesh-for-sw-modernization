@@ -12,7 +12,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +31,7 @@ import uploads
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 MULTIPART_OVERHEAD_BYTES = 64 * 1024
+NAMESPACE_COOKIE = "cu_namespace"
 
 
 class FrameAncestorsMiddleware(BaseHTTPMiddleware):
@@ -87,35 +88,35 @@ def index() -> FileResponse:
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    status = cluster.cluster_status()
+def health(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
+    status = cluster.cluster_status(ns=cu_namespace)
     if not status.get("ok"):
         raise HTTPException(503, status.get("message") or "cluster unavailable")
     return {"status": "ok", "namespace": status["namespace"]}
 
 
 @app.get("/api/status")
-def status() -> dict[str, Any]:
-    return cluster.cluster_status()
+def status(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+    return cluster.cluster_status(ns=cu_namespace)
 
 
 @app.get("/api/namespaces")
-def get_namespaces() -> dict[str, Any]:
+def get_namespaces(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
     return {
         "namespaces": cluster.available_namespaces(),
-        "current": cluster.current_namespace(),
+        "current": cluster.current_namespace(cu_namespace),
     }
 
 
 @app.post("/api/namespace")
-def set_namespace(body: NamespaceRequest) -> dict[str, str]:
+def set_namespace(body: NamespaceRequest, response: Response) -> dict[str, str]:
     ns = (body.namespace or "").strip()
     if not ns:
         raise HTTPException(400, "namespace must not be empty.")
     available = cluster.available_namespaces()
     if len(available) > 1 and ns not in available:
         raise HTTPException(400, f"Namespace {ns!r} is not in the available list.")
-    cluster.set_active_namespace(ns)
+    response.set_cookie(key=NAMESPACE_COOKIE, value=ns, httponly=False, samesite="lax")
     return {"namespace": ns}
 
 
@@ -229,26 +230,26 @@ def upload_index(
 
 
 @app.get("/api/jobs")
-def get_jobs() -> dict[str, Any]:
+def get_jobs(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
     try:
-        return {"jobs": cluster.list_recent_jobs()}
+        return {"jobs": cluster.list_recent_jobs(runtime_ns=cu_namespace)}
     except Exception as exc:
         raise HTTPException(503, str(exc)) from exc
 
 
 @app.get("/api/jobs/{job_name}")
-def get_job(job_name: str) -> dict[str, Any]:
+def get_job(job_name: str, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
     try:
-        return cluster.job_snapshot(job_name)
+        return cluster.job_snapshot(job_name, runtime_ns=cu_namespace)
     except Exception as exc:
         raise HTTPException(404, str(exc)) from exc
 
 
 @app.post("/api/pipelines")
-def start_pipeline(body: PipelineRequest) -> dict[str, str]:
+def start_pipeline(body: PipelineRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
     repos = [item.model_dump() for item in body.repos]
     try:
-        return cluster.submit_pipeline_run(repos)
+        return cluster.submit_pipeline_run(repos, runtime_ns=cu_namespace)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
@@ -256,13 +257,14 @@ def start_pipeline(body: PipelineRequest) -> dict[str, str]:
 
 
 @app.post("/api/query")
-def start_query(body: QueryRequest) -> dict[str, str]:
+def start_query(body: QueryRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
     try:
         return cluster.submit_adhoc_query(
             body.question,
             git_repo=body.git_repo,
             git_branch=body.git_branch,
             use_global=body.use_global,
+            runtime_ns=cu_namespace,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

@@ -31,14 +31,6 @@ SECRET_NAME = "code-understanding-env"
 GIT_SECRET_NAME = "git-credentials"
 ADHOC_MARKER = "ADHOC RESULTS"
 
-_active_namespace: str | None = None
-
-
-def set_active_namespace(ns: str) -> None:
-    """Override the active namespace for all subsequent cluster operations."""
-    global _active_namespace
-    _active_namespace = ns.strip() if ns else None
-
 
 def available_namespaces() -> list[str]:
     """Return namespaces the current identity has access to.
@@ -88,9 +80,9 @@ def available_namespaces() -> list[str]:
         return [ns] if ns else []
 
 
-def current_namespace() -> str:
-    if _active_namespace:
-        return _active_namespace
+def current_namespace(ns: str | None = None) -> str:
+    if ns:
+        return ns.strip()
     env_ns = os.getenv("KFP_NAMESPACE", "").strip()
     if env_ns:
         return env_ns
@@ -145,32 +137,32 @@ def analysis_image() -> str:
     return f"{registry}/{name}:{tag}"
 
 
-def k8s_clients() -> tuple[client.BatchV1Api, client.CoreV1Api, str]:
+def k8s_clients(ns: str | None = None) -> tuple[client.BatchV1Api, client.CoreV1Api, str]:
     try:
         config.load_incluster_config()
     except config.ConfigException:
         config.load_kube_config()
-    ns = current_namespace()
-    if not ns:
+    resolved = current_namespace(ns)
+    if not resolved:
         raise RuntimeError("KFP_NAMESPACE is not set and no in-cluster namespace was found.")
-    return client.BatchV1Api(), client.CoreV1Api(), ns
+    return client.BatchV1Api(), client.CoreV1Api(), resolved
 
 
-def cluster_status() -> dict[str, Any]:
+def cluster_status(ns: str | None = None) -> dict[str, Any]:
     try:
-        _, core, ns = k8s_clients()
-        core.read_namespace(ns)
+        _, core, resolved = k8s_clients(ns)
+        core.read_namespace(resolved)
         return {
             "ok": True,
-            "namespace": ns,
+            "namespace": resolved,
             "repo_url": workflow_repo_url(),
             "repo_ref": workflow_repo_ref(),
-            "message": f"Connected to namespace {ns}",
+            "message": f"Connected to namespace {resolved}",
         }
     except Exception as exc:
         return {
             "ok": False,
-            "namespace": current_namespace(),
+            "namespace": current_namespace(ns),
             "repo_url": workflow_repo_url(),
             "repo_ref": workflow_repo_ref(),
             "message": str(exc),
@@ -263,11 +255,11 @@ def pod_template(
     )
 
 
-def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, str]:
+def submit_pipeline_run(repos: list[dict[str, str]], runtime_ns: str | None = None) -> dict[str, str]:
     if not repos:
         raise ValueError("Select at least one repository.")
 
-    batch, core, ns = k8s_clients()
+    batch, core, ns = k8s_clients(runtime_ns)
     job_id = new_job_id()
 
     kfp_host = os.getenv(
@@ -351,12 +343,13 @@ def submit_adhoc_query(
     git_branch: str = "main",
     use_global: bool | None = None,
     retry_count: int = 3,
+    runtime_ns: str | None = None,
 ) -> dict[str, str]:
     question = (question or "").strip()
     if not question:
         raise ValueError("Enter a question to query the index.")
 
-    batch, core, ns = k8s_clients()
+    batch, core, ns = k8s_clients(runtime_ns)
     job_id = new_job_id()
     repo_url = workflow_repo_url()
     repo_ref = workflow_repo_ref()
@@ -427,8 +420,8 @@ workflows/examples/code_understanding/scripts/run_adhoc_query.sh
     }
 
 
-def list_recent_jobs(limit: int = 15) -> list[dict[str, str]]:
-    batch, _, ns = k8s_clients()
+def list_recent_jobs(limit: int = 15, runtime_ns: str | None = None) -> list[dict[str, str]]:
+    batch, _, ns = k8s_clients(runtime_ns)
     jobs = batch.list_namespaced_job(ns, label_selector="app=code-understanding-console")
     items = sorted(
         jobs.items,
@@ -792,9 +785,9 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
     )
 
 
-def job_snapshot(job_name: str) -> dict[str, Any]:
+def job_snapshot(job_name: str, runtime_ns: str | None = None) -> dict[str, Any]:
     """Return status, logs, and extracted answer for a console job."""
-    batch, core, ns = k8s_clients()
+    batch, core, ns = k8s_clients(runtime_ns)
     job = batch.read_namespaced_job(job_name, ns)
     succeeded = bool(job.status.succeeded)
     failed = bool(job.status.failed)
