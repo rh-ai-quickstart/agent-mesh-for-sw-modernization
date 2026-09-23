@@ -577,6 +577,7 @@ deploy-console-app: apply-console-src build-console-image
 		--set repoUrl="$(GIT_REPO_URL)" \
 		--set repoRef="$(GIT_REPO_BRANCH)" \
 		--set console.enabled=true \
+		--set console.image="image-registry.openshift-image-registry.svc:5000/$$KFP_NAMESPACE/code-understanding-console:latest" \
 		-s templates/console-app.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
 	echo "==> Waiting for console ImageStreamTag to be available..." && \
 	until oc get imagestreamtag code-understanding-console:latest -n $$KFP_NAMESPACE \
