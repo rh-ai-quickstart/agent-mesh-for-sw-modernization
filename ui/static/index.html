@@ -629,10 +629,17 @@
       if (typeof mermaid === "undefined") return;
       const nodes = Array.from(container.querySelectorAll("pre.mermaid")).filter(n => !n.dataset.processed);
       if (!nodes.length) return;
-      try {
-        const result = mermaid.run({ nodes });
-        if (result && typeof result.then === "function") result.catch(() => {});
-      } catch (e) { /* diagram render error – raw text remains visible */ }
+      // Render one diagram per event-loop tick so a slow/broken diagram cannot
+      // freeze the UI or block other diagrams from rendering.
+      (async () => {
+        for (const node of nodes) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          try {
+            const result = mermaid.run({ nodes: [node] });
+            if (result && typeof result.then === "function") await result.catch(() => {});
+          } catch (e) { /* leave raw diagram text visible */ }
+        }
+      })();
     }
 
     const state = {
@@ -680,8 +687,7 @@
           const sanitized = content
             .split("\n").map(l => {
               if (/^\s*%(?!%)/.test(l)) return l.replace(/^(\s*)%/, "$1%%"); // lone % → %%
-              if (!/^\s*%%/.test(l)) return l.replace(/\s*%%.*$/, "");       // strip inline %% comments
-              return l;
+              return l.replace(/\s*%%.*$/, "");  // strip ALL %% comments (standalone and inline)
             }).join("\n")
             .replace(/\[([^\]"]+)\]/g, (m, label) => /[()]/.test(label) ? `["${label}"]` : m);
           fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
