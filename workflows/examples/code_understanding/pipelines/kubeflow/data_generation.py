@@ -131,7 +131,7 @@ def _run_pipeline(
         source_dir=prep.outputs["source_dir"],
         multi_repo=multi_repo,
     )
-    gen.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_RUN_ID_PLACEHOLDER)
+    gen.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
     return gen.outputs["target_dir"]
 

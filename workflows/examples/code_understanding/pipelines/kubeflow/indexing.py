@@ -113,7 +113,7 @@ def _run_pipeline(
         git_branch=git_branch,
         multi_repo=multi_repo,
     )
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_RUN_ID_PLACEHOLDER)
+    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
     eval_task = graphrag_evaluation_op(
         graphrag_dir=task.outputs["graphrag_dir"],
@@ -121,7 +121,7 @@ def _run_pipeline(
         git_branch=git_branch,
         multi_repo=multi_repo,
     )
-    eval_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_RUN_ID_PLACEHOLDER)
+    eval_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
     return task.outputs["graphrag_dir"]
 
@@ -130,7 +130,7 @@ def _run_pipeline(
 def _run_indexing_multi_repo_pipeline(parent_target_path: str) -> Dataset:
 
     task = run_indexing_multi_repo_op(parent_target_path=parent_target_path)
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_RUN_ID_PLACEHOLDER)
+    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
     return task.outputs["graphrag_dir"]
 
 
