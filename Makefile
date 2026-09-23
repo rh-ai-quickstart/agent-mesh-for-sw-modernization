@@ -559,6 +559,7 @@ build-console-image:
 	helm template agent-mesh-for-sw resources/helm \
 	  --set namespace="$$KFP_NAMESPACE" \
 	  --set console.enabled=true \
+	  --set console.image="image-registry.openshift-image-registry.svc:5000/$$KFP_NAMESPACE/code-understanding-console:latest" \
 	  -s templates/console-app-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
 	oc start-build code-understanding-console --from-dir=ui --follow -n $$KFP_NAMESPACE
 
