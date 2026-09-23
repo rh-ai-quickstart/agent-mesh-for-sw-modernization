@@ -472,6 +472,7 @@
     .cu-md-table tr:nth-child(even) td { background: #f9fbfd; }
     .cu-md pre.mermaid { background: transparent; color: inherit; padding: 0; }
     .gridjs-td { vertical-align: top; }
+    .cu-row-fail td.gridjs-td { background-color: #fff0f0 !important; }
     .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
     .cu-pipeline-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
     .cu-pipeline-row .cu-note { margin: 0; flex: 1; }
@@ -1131,10 +1132,16 @@
                   if (csvRows.length < 2) {
                     $("report-viewer-content").innerHTML = `<p class="cu-muted">No evaluation data.</p>`;
                   } else {
+                    const ANALYSIS_EVALUATION_THRESHOLD = 4;
+                    const headers = csvRows[0];
+                    const scoreColIndices = headers.reduce((acc, h, i) => {
+                      if (h.includes("/v1/score")) acc.push(i);
+                      return acc;
+                    }, []);
                     const gridContainer = document.createElement("div");
                     $("report-viewer-content").appendChild(gridContainer);
                     new gridjs.Grid({
-                      columns: csvRows[0].map((h, colIdx) => {
+                      columns: headers.map((h, colIdx) => {
                         const maxLen = csvRows.reduce((max, row) => Math.max(max, (row[colIdx] || "").length), 0);
                         return {
                           name: h,
@@ -1162,6 +1169,11 @@
                       search: true,
                       pagination: { limit: 20 },
                       style: { table: { fontSize: "0.875rem" } },
+                      className: {
+                        tr: (row) => scoreColIndices.some(i => parseFloat(row[i]) < ANALYSIS_EVALUATION_THRESHOLD)
+                          ? "cu-row-fail"
+                          : "",
+                      },
                     }).render(gridContainer);
                     appendReportDl(content, `${btn.dataset.runName || "report"}_evaluation_report.csv`);
                   }
