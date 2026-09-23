@@ -208,7 +208,6 @@ install:
 	fi
 	$(MAKE) upload-pipelines
 	$(MAKE) deploy-notebooks
-	$(MAKE) deploy-console-app
 
 deploy-embedding-model:
 	@set -a && . $(ENV_FILE) && set +a && \
