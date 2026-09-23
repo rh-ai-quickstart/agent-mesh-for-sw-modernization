@@ -23,12 +23,15 @@ KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-gene
 KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_PIPELINE_TOOLS_IMAGE_NAME        ?= agent-mesh-for-sw-modernization-pipeline-tools
-PLUGIN_IMAGE                         ?= code-understanding-console-plugin:latest
+CONSOLE_APP_IMAGE_NAME               ?= agent-mesh-for-sw-modernization-console-app
+CONSOLE_PLUGIN_IMAGE_NAME            ?= agent-mesh-for-sw-modernization-console-plugin
 
 export KFP_DATA_GENERATION_BASE_IMAGE_NAME \
 	KFP_INDEXING_BASE_IMAGE_NAME \
 	KFP_ANALYSIS_BASE_IMAGE_NAME \
-	KFP_PIPELINE_TOOLS_IMAGE_NAME
+	KFP_PIPELINE_TOOLS_IMAGE_NAME \
+	CONSOLE_APP_IMAGE_NAME \
+	CONSOLE_PLUGIN_IMAGE_NAME
 
 # ============================================================================
 # Container engine
@@ -557,7 +560,7 @@ build-console-image:
 	  --set namespace="$$KFP_NAMESPACE" \
 	  --set console.enabled=true \
 	  -s templates/console-app-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
-	oc start-build code-understanding-console --from-dir=. --follow -n $$KFP_NAMESPACE
+	oc start-build code-understanding-console --from-dir=ui --follow -n $$KFP_NAMESPACE
 
 run-console-app:
 	@set -a && . $(ENV_FILE) && set +a && \
@@ -639,8 +642,7 @@ build-plugin-api-image:
 	  --set namespace="$$KFP_NAMESPACE" \
 	  --set consolePlugin.enabled=true \
 	  -s templates/console-plugin-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
-	oc start-build code-understanding-plugin-api --from-dir=. --follow -n
-	$$KFP_NAMESPACE
+	oc start-build code-understanding-plugin-api --from-dir=ui --follow -n $$KFP_NAMESPACE
 
 deploy-console-plugin: apply-plugin-src build-console-plugin-image build-plugin-api-image
 	@set -a && . $(ENV_FILE) && set +a && \

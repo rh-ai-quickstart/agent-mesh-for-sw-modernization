@@ -113,14 +113,24 @@ def _run_pipeline(
         git_branch=git_branch,
         multi_repo=multi_repo,
     )
+    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
-    graphrag_evaluation_op(
+    eval_task = graphrag_evaluation_op(
         graphrag_dir=task.outputs["graphrag_dir"],
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
     )
+    eval_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
+    return task.outputs["graphrag_dir"]
+
+
+@dsl.pipeline(name="graphrag-indexing-multi-repo-pipeline")
+def _run_indexing_multi_repo_pipeline(parent_target_path: str) -> Dataset:
+
+    task = run_indexing_multi_repo_op(parent_target_path=parent_target_path)
+    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
     return task.outputs["graphrag_dir"]
 
 
@@ -130,4 +140,4 @@ def _run_pipeline(
 
 class IndexingPipeline:
     run = staticmethod(_run_pipeline)
-    run_multi_repo = staticmethod(run_indexing_multi_repo_op)
+    run_multi_repo = staticmethod(_run_indexing_multi_repo_pipeline)

@@ -145,6 +145,11 @@ code and generate assets for the refactoring catalog, including a migration plan
 <a id="add-ons"></a>
 ## Add-ons (Optional)
 
+Console add-ons use prebuilt images from `KFP_IMAGE_REGISTRY`. Before deploying
+either add-on, set `CONSOLE_IMAGE_TAG` in `.env` to the same tag used to build
+and push the console images; for the manual GitHub Actions image workflow, this
+is the `version` input.
+
 <a id="code-understanding-ui"></a>
 ### Code Understanding Console App
 
@@ -176,7 +181,7 @@ make port-forward-console-app
 The Code Understanding Console Plugin is an OpenShift web-console dynamic 
 plugin backed by a FastAPI service. 
 
-Build and deploy the console plugin:
+Deploy the console plugin:
 
 ```
 make deploy-console-plugin
