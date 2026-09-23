@@ -89,10 +89,9 @@ indexWorkspace:
 
 console:
   enabled: false
-  buildEnabled: false
   replicas: 1
   image: ""
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
   jobScripts:
     enabled: false
     runPipelines: ""
@@ -103,7 +102,7 @@ consolePlugin:
   enabled: false
   replicas: 1
   image: ""
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
   apiImage: ""
   apiRouteHost: ""
   applicationMenuSection: OpenShift Self Managed Services

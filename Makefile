@@ -23,12 +23,15 @@ KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-gene
 KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_PIPELINE_TOOLS_IMAGE_NAME        ?= agent-mesh-for-sw-modernization-pipeline-tools
-PLUGIN_IMAGE                         ?= code-understanding-console-plugin:latest
+CONSOLE_APP_IMAGE_NAME               ?= agent-mesh-for-sw-modernization-console-app
+CONSOLE_PLUGIN_IMAGE_NAME            ?= agent-mesh-for-sw-modernization-console-plugin
 
 export KFP_DATA_GENERATION_BASE_IMAGE_NAME \
 	KFP_INDEXING_BASE_IMAGE_NAME \
 	KFP_ANALYSIS_BASE_IMAGE_NAME \
-	KFP_PIPELINE_TOOLS_IMAGE_NAME
+	KFP_PIPELINE_TOOLS_IMAGE_NAME \
+	CONSOLE_APP_IMAGE_NAME \
+	CONSOLE_PLUGIN_IMAGE_NAME
 
 # ============================================================================
 # Container engine
@@ -66,14 +69,10 @@ endif
 	run-pipelines \
 	deploy-otel \
 	apply-console-src \
-	build-console-image \
 	run-console-app \
 	deploy-console-app \
 	port-forward-console-app \
 	apply-plugin-src \
-	build-console-plugin \
-	build-console-plugin-image \
-	build-plugin-api-image \
 	deploy-console-plugin \
 	enable-console-plugin
 
@@ -126,17 +125,13 @@ help-all:
 	@echo ""
 	@echo "Console application:"
 	@echo "  apply-console-src           Publish console job scripts"
-	@echo "  build-console-image         Build the console application image on the cluster"
 	@echo "  run-console-app             Run the console application locally"
-	@echo "  deploy-console-app          Build and deploy the console application"
+	@echo "  deploy-console-app          Deploy the console application"
 	@echo "  port-forward-console-app    Forward the deployed console to localhost:8080"
 	@echo ""
 	@echo "OpenShift console plugin:"
 	@echo "  apply-plugin-src            Publish console-plugin job scripts"
-	@echo "  build-console-plugin        Build the console-plugin frontend"
-	@echo "  build-console-plugin-image  Build and push the console-plugin image"
-	@echo "  build-plugin-api-image      Build the plugin API image on the cluster"
-	@echo "  deploy-console-plugin       Build and deploy the plugin and API"
+	@echo "  deploy-console-plugin       Deploy the plugin and API"
 	@echo "  enable-console-plugin       Enable the plugin in the OpenShift console"
 	@echo ""
 	@echo "Container image build overrides (used by CI):"
@@ -163,47 +158,82 @@ install:
 	@set -a && . $(ENV_FILE) && set +a && \
 	\
 	echo "==> Creating namespaces..." && \
-	helm template agent-mesh-for-sw resources/helm \
-		--set namespace="$$KFP_NAMESPACE" \
-		--set requester="$$(oc whoami)" \
-		--set otel.namespace="$$OTEL_NAMESPACE" \
-		-s templates/namespace.yaml | oc apply -f - && \
+	set -- agent-mesh-for-sw resources/helm \
+		--set "namespace=$$KFP_NAMESPACE" \
+		--set "requester=$$(oc whoami)"; \
+	if [ -n "$${OTEL_NAMESPACE:-}" ]; then \
+		set -- "$$@" --set "otel.namespace=$$OTEL_NAMESPACE"; \
+	fi; \
+	helm template "$$@" -s templates/namespace.yaml | oc apply -f - && \
 	\
 	echo "==> Waiting for OpenShift to inject service CA into odh-trusted-ca-bundle..." && \
 	until oc get configmap odh-trusted-ca-bundle -n $$KFP_NAMESPACE \
-		-o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null | grep -q CERTIFICATE; do sleep 5; done && \
-	\
-	echo "==> Running helm upgrade..." && \
-	helm upgrade --install agent-mesh-for-sw resources/helm \
-		--no-hooks \
-		--create-namespace \
-		--reuse-values \
-		--set namespace="$$KFP_NAMESPACE" \
-		--set requester="$$(oc whoami)" \
-		--set repoUrl="$(GIT_REPO_URL)" \
-		--set repoRef="$(GIT_REPO_BRANCH)" \
-		--set minio.rootUser="$$AWS_ACCESS_KEY_ID" \
-		--set minio.rootPassword="$$AWS_SECRET_ACCESS_KEY" \
-		--set minio.image="$$MINIO_IMAGE" \
-		--set dataGeneration.image.registry="$$KFP_IMAGE_REGISTRY" \
-		--set dataGeneration.image.name="$$KFP_DATA_GENERATION_BASE_IMAGE_NAME" \
-		--set dataGeneration.image.tag="$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" \
-		--set graphrag.image.registry="$$KFP_IMAGE_REGISTRY" \
-		--set graphrag.image.name="$$KFP_INDEXING_BASE_IMAGE_NAME" \
-		--set graphrag.image.tag="$$KFP_INDEXING_BASE_IMAGE_TAG" \
-		--set analysis.image.registry="$$KFP_IMAGE_REGISTRY" \
-		--set analysis.image.name="$$KFP_ANALYSIS_BASE_IMAGE_NAME" \
-		--set analysis.image.tag="$$KFP_ANALYSIS_BASE_IMAGE_TAG" \
-		--set pipelineTools.image.registry="$$KFP_IMAGE_REGISTRY" \
-		--set pipelineTools.image.name="$$KFP_PIPELINE_TOOLS_IMAGE_NAME" \
-		--set pipelineTools.image.tag="$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
-		--set clusterDomain="$(CLUSTER_DOMAIN)" \
-		--set mlflowGatewayHost="$(GATEWAY_HOST)"
+		-o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null | grep -q CERTIFICATE; do sleep 5; done
 	@if [ "$(DEPLOY_EMBEDDING_MODEL)" = "true" ]; then \
 		$(MAKE) deploy-embedding-model; \
 	fi
 	$(MAKE) apply-secrets
-	$(MAKE) deploy-otel
+	@set -a && . $(ENV_FILE) && set +a && \
+	: "$${KFP_IMAGE_REGISTRY:?KFP_IMAGE_REGISTRY must be set in $(ENV_FILE)}"; \
+	OTEL_ENABLED=false; \
+	set -- agent-mesh-for-sw resources/helm \
+		--namespace "$$KFP_NAMESPACE" \
+		--create-namespace \
+		--no-hooks \
+		--reuse-values \
+		--set "namespace=$$KFP_NAMESPACE" \
+		--set "requester=$$(oc whoami)" \
+		--set "repoUrl=$(GIT_REPO_URL)" \
+		--set "repoRef=$(GIT_REPO_BRANCH)" \
+		--set "minio.rootUser=$$AWS_ACCESS_KEY_ID" \
+		--set "minio.rootPassword=$$AWS_SECRET_ACCESS_KEY" \
+		--set "minio.image=$$MINIO_IMAGE" \
+		--set "dataGeneration.image.registry=$$KFP_IMAGE_REGISTRY" \
+		--set "dataGeneration.image.name=$$KFP_DATA_GENERATION_BASE_IMAGE_NAME" \
+		--set "dataGeneration.image.tag=$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" \
+		--set "graphrag.image.registry=$$KFP_IMAGE_REGISTRY" \
+		--set "graphrag.image.name=$$KFP_INDEXING_BASE_IMAGE_NAME" \
+		--set "graphrag.image.tag=$$KFP_INDEXING_BASE_IMAGE_TAG" \
+		--set "analysis.image.registry=$$KFP_IMAGE_REGISTRY" \
+		--set "analysis.image.name=$$KFP_ANALYSIS_BASE_IMAGE_NAME" \
+		--set "analysis.image.tag=$$KFP_ANALYSIS_BASE_IMAGE_TAG" \
+		--set "pipelineTools.image.registry=$$KFP_IMAGE_REGISTRY" \
+		--set "pipelineTools.image.name=$$KFP_PIPELINE_TOOLS_IMAGE_NAME" \
+		--set "pipelineTools.image.tag=$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
+		--set "clusterDomain=$(CLUSTER_DOMAIN)" \
+		--set "mlflowGatewayHost=$(GATEWAY_HOST)" \
+		--set deployNotebooks=true \
+		--set otel.enabled=false; \
+	if [ -n "$${OTEL_NAMESPACE:-}" ] && [ -n "$${OTEL_SERVICE_NAME:-}" ] && \
+	   oc get crd opentelemetrycollectors.opentelemetry.io >/dev/null 2>&1 && \
+	   oc get crd tempostacks.tempo.grafana.com >/dev/null 2>&1; then \
+		OTEL_ENABLED=true; \
+		set -- "$$@" \
+			--set otel.enabled=true \
+			--set "otel.namespace=$$OTEL_NAMESPACE" \
+			--set "otel.name=$$OTEL_SERVICE_NAME" \
+			--set "minio.endpoint=http://minio-service.$$KFP_NAMESPACE.svc.cluster.local:9000"; \
+	fi; \
+	echo "==> Installing Agent Mesh Helm release..."; \
+	helm upgrade --install "$$@"; \
+	if [ "$$OTEL_ENABLED" = true ]; then \
+		echo "==> Creating Tempo S3 bucket..."; \
+		oc wait deployment/minio -n $$KFP_NAMESPACE --for=condition=Available --timeout=120s; \
+		oc delete job create-tempo-bucket -n $$OTEL_NAMESPACE --ignore-not-found=true; \
+		helm template agent-mesh-for-sw resources/helm \
+			--set "namespace=$$KFP_NAMESPACE" \
+			--set "otel.namespace=$$OTEL_NAMESPACE" \
+			--set otel.createBucket=true \
+			--set "minio.endpoint=http://minio-service.$$KFP_NAMESPACE.svc.cluster.local:9000" \
+			--set "minio.rootUser=$$AWS_ACCESS_KEY_ID" \
+			--set "minio.rootPassword=$$AWS_SECRET_ACCESS_KEY" \
+			-s templates/create-tempo-bucket-job.yaml | oc apply -f -; \
+		oc wait job/create-tempo-bucket -n $$OTEL_NAMESPACE --for=condition=complete --timeout=120s; \
+		oc delete job create-tempo-bucket -n $$OTEL_NAMESPACE --ignore-not-found=true; \
+	fi; \
+	echo "==> Waiting for pipeline server..."; \
+	until oc get deployment ds-pipeline-dspa -n $$KFP_NAMESPACE >/dev/null 2>&1; do sleep 5; done; \
+	oc wait deployment/ds-pipeline-dspa -n $$KFP_NAMESPACE --for=condition=Available --timeout=300s
 	@set -a && . $(ENV_FILE) && set +a && \
 	if [ "$$ASSET_LOADER" = "mlflow" ]; then \
 		echo "==> Preloading MLflow assets..." && \
@@ -215,8 +245,6 @@ install:
 		$(MAKE) upload-prebuilt-index; \
 	fi
 	$(MAKE) upload-pipelines
-	$(MAKE) deploy-notebooks
-	$(MAKE) deploy-console-app
 
 uninstall:
 	@set -eu; \
@@ -360,10 +388,14 @@ build-all-images:
 	REGISTRY="$(REGISTRY)" && \
 	VERSION="$(VERSION)" && \
 	: "$${REGISTRY:=$$KFP_IMAGE_REGISTRY}" && \
+	CONSOLE_TAG="$${VERSION:-$$CONSOLE_IMAGE_TAG}" && \
+	: "$${CONSOLE_TAG:?Set VERSION or CONSOLE_IMAGE_TAG to build console images}" && \
 	DATAGEN_IMG="$$REGISTRY/$$KFP_DATA_GENERATION_BASE_IMAGE_NAME:$${VERSION:-$$KFP_DATA_GENERATION_BASE_IMAGE_TAG}" && \
 	INDEX_IMG="$$REGISTRY/$$KFP_INDEXING_BASE_IMAGE_NAME:$${VERSION:-$$KFP_INDEXING_BASE_IMAGE_TAG}" && \
 	ANALYSIS_IMG="$$REGISTRY/$$KFP_ANALYSIS_BASE_IMAGE_NAME:$${VERSION:-$$KFP_ANALYSIS_BASE_IMAGE_TAG}" && \
 	TOOLS_IMG="$$REGISTRY/$$KFP_PIPELINE_TOOLS_IMAGE_NAME:$${VERSION:-$$KFP_PIPELINE_TOOLS_IMAGE_TAG}" && \
+	CONSOLE_APP_IMG="$$REGISTRY/$$CONSOLE_APP_IMAGE_NAME:$$CONSOLE_TAG" && \
+	CONSOLE_PLUGIN_IMG="$$REGISTRY/$$CONSOLE_PLUGIN_IMAGE_NAME:$$CONSOLE_TAG" && \
 	echo "==> Building data generation image: $$DATAGEN_IMG" && \
 	$(IMAGE_BUILD) -t "$$DATAGEN_IMG" -f resources/images/data-generation/Containerfile resources/images/data-generation && \
 	echo "==> Building indexing image: $$INDEX_IMG" && \
@@ -375,17 +407,25 @@ build-all-images:
 		$(IMAGE_BUILD) -t "$$ANALYSIS_IMG" -f resources/images/data-indexing/Containerfile resources/images/data-indexing; \
 	fi && \
 	echo "==> Building pipeline-tools image: $$TOOLS_IMG" && \
-	$(IMAGE_BUILD) -t "$$TOOLS_IMG" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools
+	$(IMAGE_BUILD) -t "$$TOOLS_IMG" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools && \
+	echo "==> Building console application image: $$CONSOLE_APP_IMG" && \
+	$(IMAGE_BUILD) -t "$$CONSOLE_APP_IMG" -f ui/Dockerfile ui && \
+	echo "==> Building console plugin image: $$CONSOLE_PLUGIN_IMG" && \
+	$(IMAGE_BUILD) -t "$$CONSOLE_PLUGIN_IMG" -f console-plugin/Dockerfile console-plugin
 
 push-all-images:
 	@if [ -f "$(ENV_FILE)" ]; then set -a && . "$(ENV_FILE)" && set +a; fi && \
 	REGISTRY="$(REGISTRY)" && \
 	VERSION="$(VERSION)" && \
 	: "$${REGISTRY:=$$KFP_IMAGE_REGISTRY}" && \
+	CONSOLE_TAG="$${VERSION:-$$CONSOLE_IMAGE_TAG}" && \
+	: "$${CONSOLE_TAG:?Set VERSION or CONSOLE_IMAGE_TAG to push console images}" && \
 	DATAGEN_IMG="$$REGISTRY/$$KFP_DATA_GENERATION_BASE_IMAGE_NAME:$${VERSION:-$$KFP_DATA_GENERATION_BASE_IMAGE_TAG}" && \
 	INDEX_IMG="$$REGISTRY/$$KFP_INDEXING_BASE_IMAGE_NAME:$${VERSION:-$$KFP_INDEXING_BASE_IMAGE_TAG}" && \
 	ANALYSIS_IMG="$$REGISTRY/$$KFP_ANALYSIS_BASE_IMAGE_NAME:$${VERSION:-$$KFP_ANALYSIS_BASE_IMAGE_TAG}" && \
 	TOOLS_IMG="$$REGISTRY/$$KFP_PIPELINE_TOOLS_IMAGE_NAME:$${VERSION:-$$KFP_PIPELINE_TOOLS_IMAGE_TAG}" && \
+	CONSOLE_APP_IMG="$$REGISTRY/$$CONSOLE_APP_IMAGE_NAME:$$CONSOLE_TAG" && \
+	CONSOLE_PLUGIN_IMG="$$REGISTRY/$$CONSOLE_PLUGIN_IMAGE_NAME:$$CONSOLE_TAG" && \
 	echo "==> Pushing data generation image: $$DATAGEN_IMG" && \
 	$(IMAGE_PUSH) "$$DATAGEN_IMG" && \
 	echo "==> Pushing indexing image: $$INDEX_IMG" && \
@@ -397,7 +437,11 @@ push-all-images:
 		$(IMAGE_PUSH) "$$ANALYSIS_IMG"; \
 	fi && \
 	echo "==> Pushing pipeline-tools image: $$TOOLS_IMG" && \
-	$(IMAGE_PUSH) "$$TOOLS_IMG"
+	$(IMAGE_PUSH) "$$TOOLS_IMG" && \
+	echo "==> Pushing console application image: $$CONSOLE_APP_IMG" && \
+	$(IMAGE_PUSH) "$$CONSOLE_APP_IMG" && \
+	echo "==> Pushing console plugin image: $$CONSOLE_PLUGIN_IMG" && \
+	$(IMAGE_PUSH) "$$CONSOLE_PLUGIN_IMG"
 
 # ============================================================================
 # Pipelines and assets
@@ -599,25 +643,17 @@ apply-console-src:
 		--set-file console.jobScripts.mlflowAssetLoader=workflows/examples/code_understanding/loaders/mlflow_asset_loader.py \
 		--set-file console.jobScripts.defaultAssetLoader=workflows/examples/code_understanding/loaders/default_asset_loader.py
 
-build-console-image:
-	@set -a && . $(ENV_FILE) && set +a && \
-	echo "==> Building Code Understanding console image on-cluster..." && \
-	helm upgrade agent-mesh-for-sw resources/helm \
-	  --namespace "$$KFP_NAMESPACE" \
-	  --reuse-values \
-	  --no-hooks \
-	  --set namespace="$$KFP_NAMESPACE" \
-	  --set console.buildEnabled=true && \
-	oc start-build code-understanding-console --from-dir=ui --follow -n $$KFP_NAMESPACE
-
 run-console-app:
 	@set -a && . $(ENV_FILE) && set +a && \
 	AGENTMESH_REPO_URL="$(GIT_REPO_URL)" AGENTMESH_REPO_REF="$(GIT_REPO_BRANCH)" \
 	KFP_NAMESPACE="$$KFP_NAMESPACE" \
 	uv run --project ui --frozen uvicorn --app-dir ui main:app --host 127.0.0.1 --port 8080
 
-deploy-console-app: apply-console-src build-console-image
+deploy-console-app:
 	@set -a && . $(ENV_FILE) && set +a && \
+	: "$${KFP_IMAGE_REGISTRY:?KFP_IMAGE_REGISTRY must be set in $(ENV_FILE)}" && \
+	: "$${CONSOLE_IMAGE_TAG:?CONSOLE_IMAGE_TAG must be set in $(ENV_FILE)}" && \
+	CONSOLE_APP_IMAGE="$$KFP_IMAGE_REGISTRY/$$CONSOLE_APP_IMAGE_NAME:$$CONSOLE_IMAGE_TAG" && \
 	echo "==> Deploying Code Understanding console..." && \
 	helm upgrade agent-mesh-for-sw resources/helm \
 		--namespace "$$KFP_NAMESPACE" \
@@ -627,12 +663,12 @@ deploy-console-app: apply-console-src build-console-image
 		--set requester="$$(oc whoami)" \
 		--set repoUrl="$(GIT_REPO_URL)" \
 		--set repoRef="$(GIT_REPO_BRANCH)" \
-		--set console.buildEnabled=true \
-		--set console.enabled=true && \
-	echo "==> Waiting for console ImageStreamTag to be available..." && \
-	until oc get imagestreamtag code-understanding-console:latest -n $$KFP_NAMESPACE \
-		-o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
-	oc rollout restart deployment/code-understanding-console -n $$KFP_NAMESPACE && \
+		--set console.enabled=true \
+		--set-string console.image="$$CONSOLE_APP_IMAGE" \
+		--set console.jobScripts.enabled=true \
+		--set-file console.jobScripts.runPipelines=workflows/examples/code_understanding/scripts/run_pipelines.sh \
+		--set-file console.jobScripts.mlflowAssetLoader=workflows/examples/code_understanding/loaders/mlflow_asset_loader.py \
+		--set-file console.jobScripts.defaultAssetLoader=workflows/examples/code_understanding/loaders/default_asset_loader.py && \
 	oc rollout status deployment/code-understanding-console -n $$KFP_NAMESPACE --timeout=300s && \
 	ROUTE_HOST="$$(oc get route code-understanding-console -n $$KFP_NAMESPACE -o jsonpath='{.spec.host}')" && \
 	echo "" && \
@@ -661,42 +697,12 @@ apply-plugin-src:
 		--from-file=default_asset_loader.py=workflows/examples/code_understanding/loaders/default_asset_loader.py \
 		-n $$KFP_NAMESPACE --dry-run=client -o yaml | oc apply -f -
 
-build-console-plugin:
-	@echo "==> Installing and building OpenShift console plugin..." && \
-	cd console-plugin && npm install --no-audit --no-fund && npm run build
-
-build-console-plugin-image: build-console-plugin
+deploy-console-plugin: apply-plugin-src
 	@set -a && . $(ENV_FILE) && set +a && \
-	REGISTRY_HOST="$$(oc registry info 2>/dev/null || true)" && \
-	PLUGIN_IMAGE="image-registry.openshift-image-registry.svc:5000/$$KFP_NAMESPACE/code-understanding-console-plugin:latest" && \
-	CONTAINER_CMD="$$(command -v docker 2>/dev/null)" && \
-	if [ -n "$$CONTAINER_CMD" ] && $$CONTAINER_CMD info >/dev/null 2>&1; then \
-	  if [ -z "$$REGISTRY_HOST" ]; then echo "ERROR: oc registry login required."; exit 1; fi && \
-	  PLUGIN_IMAGE="$$REGISTRY_HOST/$$KFP_NAMESPACE/code-understanding-console-plugin:latest" && \
-	  echo "==> Building plugin image locally: $$PLUGIN_IMAGE" && \
-	  cd console-plugin && $$CONTAINER_CMD build --platform linux/amd64 -t "$$PLUGIN_IMAGE" . && \
-	  $$CONTAINER_CMD push "$$PLUGIN_IMAGE"; \
-	else \
-	  echo "==> Building plugin image on-cluster (no local container runtime)..." && \
-	  helm template agent-mesh-for-sw resources/helm \
-	    --set namespace="$$KFP_NAMESPACE" \
-	    --set consolePlugin.enabled=true \
-	    -s templates/console-plugin-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
-	  oc start-build code-understanding-console-plugin --from-dir=console-plugin --follow -n $$KFP_NAMESPACE; \
-	fi && \
-	echo "$$PLUGIN_IMAGE" > console-plugin/.plugin-image.ref
-
-build-plugin-api-image:
-	@set -a && . $(ENV_FILE) && set +a && \
-	echo "==> Building FastAPI console image on-cluster..." && \
-	helm template agent-mesh-for-sw resources/helm \
-	  --set namespace="$$KFP_NAMESPACE" \
-	  --set consolePlugin.enabled=true \
-	  -s templates/console-plugin-build.yaml | oc apply -n $$KFP_NAMESPACE -f - && \
-	oc start-build code-understanding-plugin-api --from-dir=ui --follow -n $$KFP_NAMESPACE
-
-deploy-console-plugin: apply-plugin-src build-console-plugin-image build-plugin-api-image
-	@set -a && . $(ENV_FILE) && set +a && \
+	: "$${KFP_IMAGE_REGISTRY:?KFP_IMAGE_REGISTRY must be set in $(ENV_FILE)}" && \
+	: "$${CONSOLE_IMAGE_TAG:?CONSOLE_IMAGE_TAG must be set in $(ENV_FILE)}" && \
+	CONSOLE_APP_IMAGE="$$KFP_IMAGE_REGISTRY/$$CONSOLE_APP_IMAGE_NAME:$$CONSOLE_IMAGE_TAG" && \
+	CONSOLE_PLUGIN_IMAGE="$$KFP_IMAGE_REGISTRY/$$CONSOLE_PLUGIN_IMAGE_NAME:$$CONSOLE_IMAGE_TAG" && \
 	CONSOLE_HOST="$$(oc get route console -n openshift-console -o jsonpath='{.spec.host}')" && \
 	CLUSTER_DOMAIN="$$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')" && \
 	echo "==> Deploying OpenShift console plugin and FastAPI backend..." && \
@@ -706,6 +712,8 @@ deploy-console-plugin: apply-plugin-src build-console-plugin-image build-plugin-
 		--set repoRef="$(GIT_REPO_BRANCH)" \
 		--set clusterDomain="$$CLUSTER_DOMAIN" \
 		--set consolePlugin.enabled=true \
+		--set-string consolePlugin.image="$$CONSOLE_PLUGIN_IMAGE" \
+		--set-string consolePlugin.apiImage="$$CONSOLE_APP_IMAGE" \
 		--set consolePlugin.consoleBaseUrl="https://$$CONSOLE_HOST" \
 		-s templates/console-plugin.yaml | oc apply -f - && \
 	echo "==> Waiting for plugin-api Route hostname to be assigned..." && \
@@ -717,15 +725,11 @@ deploy-console-plugin: apply-plugin-src build-console-plugin-image build-plugin-
 		--set repoRef="$(GIT_REPO_BRANCH)" \
 		--set clusterDomain="$$CLUSTER_DOMAIN" \
 		--set consolePlugin.enabled=true \
+		--set-string consolePlugin.image="$$CONSOLE_PLUGIN_IMAGE" \
+		--set-string consolePlugin.apiImage="$$CONSOLE_APP_IMAGE" \
 		--set consolePlugin.consoleBaseUrl="https://$$CONSOLE_HOST" \
 		--set consolePlugin.apiRouteHost="$$API_HOST" \
 		-s templates/console-plugin.yaml | oc apply -f - && \
-	echo "==> Waiting for console-plugin ImageStreamTag to be available..." && \
-	until oc get imagestreamtag code-understanding-console-plugin:latest -n $$KFP_NAMESPACE \
-		-o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
-	echo "==> Waiting for plugin-api ImageStreamTag to be available..." && \
-	until oc get imagestreamtag code-understanding-plugin-api:latest -n $$KFP_NAMESPACE \
-		-o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
 	oc rollout restart deployment/code-understanding-console-plugin -n $$KFP_NAMESPACE && \
 	oc rollout restart deployment/code-understanding-plugin-api -n $$KFP_NAMESPACE && \
 	oc rollout status deployment/code-understanding-console-plugin -n $$KFP_NAMESPACE --timeout=300s && \

@@ -1,7 +1,9 @@
+import atexit
 import logging
 import os
+
 import mlflow
-import litellm
+
 from .custom_telemetry import CustomTelemetry
 
 logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
@@ -21,9 +23,13 @@ class MlFlowCustomTelemetry(CustomTelemetry):
             MlFlowCustomTelemetry._DEFAULT_EXPERIMENT_NAME = self._get_default_experiment_name()
 
         logging.info(
-            f"MlFlowCustomTelemetry: default experiment resolved to '{self._DEFAULT_EXPERIMENT_NAME}'")
+            f"MlFlowCustomTelemetry: default experiment resolved to '{self._DEFAULT_EXPERIMENT_NAME}'"
+        )
 
     def track(self):
+        import litellm
+        from .telemetry_litellm.mlflow_token_logger import MlflowTokenLogger
+
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 
         logging.debug(f"MlFlowCustomTelemetry.track() called. MLFLOW_TRACKING_URI={tracking_uri}")
@@ -39,5 +45,30 @@ class MlFlowCustomTelemetry(CustomTelemetry):
         except Exception as e:
             logging.error(f"mlflow.openai.autolog() failed: {e}")
 
-        litellm.callbacks = ["mlflow"]
+        counter = MlflowTokenLogger(self._DEFAULT_EXPERIMENT_NAME)
+        litellm.callbacks = ["mlflow", counter]
 
+        atexit.register(counter.finalize)
+
+    @staticmethod
+    def get_token_usage(kfp_run_id: str) -> dict:
+        from mlflow.tracking import MlflowClient
+        try:
+            client = MlflowClient()
+            experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "AIP-default")
+            experiment = client.get_experiment_by_name(experiment_name)
+            if not experiment:
+                return {}
+            runs = client.search_runs(
+                experiment_ids=[experiment.experiment_id],
+                filter_string=f"tags.kfp_run_id = '{kfp_run_id}'",
+            )
+            totals: dict[str, int] = {}
+            for run in runs:
+                for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                    val = run.data.metrics.get(key)
+                    if val is not None:
+                        totals[key] = totals.get(key, 0) + int(val)
+            return totals
+        except Exception:
+            return {}

@@ -78,10 +78,16 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
 (**NOTE**: To deploy the local `e5-mistral` embedding model as part of installation, run:
    `make install DEPLOY_EMBEDDING_MODEL=true`)
 
-The main `agent-mesh-for-sw` Helm release owns the pipeline infrastructure,
-notebooks, standalone console application, and any Tempo/OpenTelemetry resources
-created by `make install`. Pipeline uploads, pipeline runs, and ad-hoc queries
-remain separately invokable operations.
+`make install` performs one Helm upgrade/install for the main
+`agent-mesh-for-sw` release. That release owns the pipeline infrastructure,
+notebooks, and any Tempo/OpenTelemetry resources created during installation.
+Pipeline uploads, pipeline runs, and ad-hoc queries remain separately invokable
+operations. The optional `e5-mistral` model remains a separate release.
+
+The standalone console is an optional add-on. Deploy it explicitly with
+`make deploy-console-app`; this enables the versioned image configured by
+`KFP_IMAGE_REGISTRY`, `CONSOLE_APP_IMAGE_NAME`, and `CONSOLE_IMAGE_TAG` in the
+existing `agent-mesh-for-sw` release.
 
 ### Uninstalling
 
@@ -169,6 +175,11 @@ code and generate assets for the refactoring catalog, including a migration plan
 <a id="add-ons"></a>
 ## Add-ons (Optional)
 
+Console add-ons use prebuilt images from `KFP_IMAGE_REGISTRY`. Before deploying
+either add-on, set `CONSOLE_IMAGE_TAG` in `.env` to the same tag used to build
+and push the console images; for the manual GitHub Actions image workflow, this
+is the `version` input.
+
 <a id="code-understanding-ui"></a>
 ### Code Understanding Console App
 
@@ -200,7 +211,7 @@ make port-forward-console-app
 The Code Understanding Console Plugin is an OpenShift web-console dynamic 
 plugin backed by a FastAPI service. 
 
-Build and deploy the console plugin:
+Deploy the console plugin:
 
 ```
 make deploy-console-plugin

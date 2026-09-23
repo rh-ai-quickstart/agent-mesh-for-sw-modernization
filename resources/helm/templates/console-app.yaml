@@ -20,8 +20,8 @@ spec:
       serviceAccountName: pipeline-upload-job
       containers:
         - name: console
-          image: "{{ if .Values.console.image }}{{ .Values.console.image }}{{ else }}image-registry.openshift-image-registry.svc:5000/{{ .Values.namespace }}/code-understanding-console:latest{{ end }}"
-          imagePullPolicy: {{ .Values.console.imagePullPolicy | default "Always" }}
+          image: {{ required "console.image is required when console.enabled=true" .Values.console.image | quote }}
+          imagePullPolicy: {{ .Values.console.imagePullPolicy }}
           ports:
             - name: http
               containerPort: 8080
