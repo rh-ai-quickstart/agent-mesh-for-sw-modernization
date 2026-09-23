@@ -21,3 +21,14 @@ class DefaultCustomTelemetry(CustomTelemetry):
     def track(self):
 
         self._telemetry.track()
+
+    @staticmethod
+    def get_token_usage(kfp_run_id: str) -> dict:
+
+        if os.getenv("CUSTOM_EVALUATOR") == "mlflow":
+
+            return MlFlowCustomTelemetry.get_token_usage(kfp_run_id)
+
+        else:
+
+            return {}

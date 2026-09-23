@@ -21,6 +21,7 @@ from services.trigger_run import trigger_run as _trigger_run
 from services.fetch_reports import fetch_reports as _fetch_reports
 from services.get_run_status import get_kfp_run_state
 from services.list_runs import list_kfp_runs, get_run_git_metadata
+from telemetry.default_custom_telemetry import DefaultCustomTelemetry
 
 
 # ---------------------------------------------------------------------------
@@ -72,4 +73,5 @@ def get_run_status(job_id: str) -> dict[str, Any]:
         "status": state.lower(),
         "evaluation_report": evaluation_report,
         "analysis_report": analysis_report,
+        "token_usage": DefaultCustomTelemetry.get_token_usage(job_id) if state in {"SUCCEEDED", "SKIPPED"} else {},
     }
