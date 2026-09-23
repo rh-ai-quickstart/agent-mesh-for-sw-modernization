@@ -332,18 +332,18 @@ test-all:
 
 format:
 	@echo "==> Sorting Python imports with isort..."
-	uv run --project ui --frozen isort .
+	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' .
 	@echo "==> Formatting Python code with Black..."
-	uv run --project ui --frozen black .
+	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' .
 	@echo "==> Formatting completed successfully."
 
 lint:
 	@echo "==> Running Flake8..."
-	uv run --project ui --frozen flake8 --max-line-length=99 --extend-ignore=E203,W503 .
+	uv run --project ui --frozen flake8 --extend-exclude=.venv --max-line-length=99 --extend-ignore=E203,W503 .
 	@echo "==> Checking Python formatting with Black..."
-	uv run --project ui --frozen black --check --diff .
+	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' --check --diff .
 	@echo "==> Checking Python import sorting with isort..."
-	uv run --project ui --frozen isort --check-only --diff .
+	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' --check-only --diff .
 	@echo "==> Lint checks completed successfully."
 
 # ============================================================================
