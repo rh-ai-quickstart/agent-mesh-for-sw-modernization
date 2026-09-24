@@ -1,9 +1,10 @@
 import json
-import os
 import logging
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+import os
 
-from .asset_loader import AssetLoader
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+from .asset_loader import AssetLoader  # noqa: E402
 
 
 class LocalAssetLoader(AssetLoader):
@@ -77,15 +78,17 @@ class LocalAssetLoader(AssetLoader):
 
             raise e
 
-    def log_results(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                    content: str = None):
+    def log_results(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
         """Writes content to results_path if provided. No remote logging step."""
         if content is not None and not os.path.isdir(results_path):
             with open(results_path, "w") as f:
                 f.write(content)
 
-    def log_static_asset(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                  content: str = None):
+    def log_static_asset(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
         """Delegates to log_results; no experiment distinction for local storage."""
         self.log_results(results_path, artifact_path, tags, content)
 

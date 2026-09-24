@@ -13,6 +13,7 @@ def run_adhoc_query(
 ) -> str:
     """Query the GraphRAG index with an LLM and return the result."""
     from pipelines.base.analysis import run_adhoc_query_pipeline
+
     return run_adhoc_query_pipeline(
         question=question,
         retry_count=retry_count,

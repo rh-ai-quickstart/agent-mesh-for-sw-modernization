@@ -27,9 +27,9 @@ def run_graphrag(root_dir: str) -> None:
     LiteLLM callbacks registered before this call (e.g. via
     DefaultCustomTelemetry().track()) will capture all LLM calls.
     """
+    import graphrag.api as graphrag_api
     from graphrag.cli.initialize import initialize_project_at
     from graphrag.config.load_config import load_config
-    import graphrag.api as graphrag_api
 
     root_path = Path(root_dir)
 

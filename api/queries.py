@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-import logging
 logging.basicConfig(level=logging.INFO)
-import traceback
+import traceback  # noqa: E402
 
-from . import query_service
+from . import query_service  # noqa: E402
 
 router = APIRouter()
 

@@ -37,13 +37,16 @@ def trigger_run(
     if repos is not None:
         try:
             from loaders.default_asset_loader import DefaultAssetLoader
+
             DefaultAssetLoader().log_static_asset(
                 "repo_list.json",
                 artifact_path="repos",
-                content=json.dumps([
-                    {"git_repo": r["git_repo"], "git_branch": r.get("git_branch", "main")}
-                    for r in repos
-                ]),
+                content=json.dumps(
+                    [
+                        {"git_repo": r["git_repo"], "git_branch": r.get("git_branch", "main")}
+                        for r in repos
+                    ]
+                ),
                 tags={"kfp_run_id": run.run_id},
             )
         except Exception:

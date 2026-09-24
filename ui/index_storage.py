@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import shutil
 import tempfile
-
+from pathlib import Path
 
 DEFAULT_MAX_INDEX_BYTES = 5 * 1024**3
 INDEX_WORKSPACE_MAX_BYTES_ENV_NAME = "INDEX_WORKSPACE_MAX_BYTES"

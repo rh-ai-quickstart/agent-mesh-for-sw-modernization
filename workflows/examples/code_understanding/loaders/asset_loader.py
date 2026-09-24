@@ -1,6 +1,7 @@
 import os
-import yaml
 from abc import ABC, abstractmethod
+
+import yaml
 
 
 class AssetLoader(ABC):
@@ -15,25 +16,25 @@ class AssetLoader(ABC):
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
 
-
     @staticmethod
     def _get_prompt_body_and_metadata(raw: str) -> tuple[str, dict]:
         """Parses YAML frontmatter from a prompt string, returning (body, metadata)."""
-        parts = raw.split('---', 2)
-        if not raw.startswith('---') or len(parts) < 3:
+        parts = raw.split("---", 2)
+        if not raw.startswith("---") or len(parts) < 3:
             return raw, {}
-        return parts[2].lstrip('\n'), yaml.safe_load(parts[1]) or {}
+        return parts[2].lstrip("\n"), yaml.safe_load(parts[1]) or {}
 
     @staticmethod
-    def get_log_results_artifact_path(results_path: str,
-                                      git_slug: str = None,
-                                      multi_repo: bool = False) -> str:
+    def get_log_results_artifact_path(
+        results_path: str, git_slug: str = None, multi_repo: bool = False
+    ) -> str:
         """Returns the path to a log results artifact within the run's artifact store."""
         if not multi_repo and not git_slug:
             raise ValueError("git_slug is required when multi_repo=False")
 
         artifact_path = (
-            f"{results_path}/multi-repo/{git_slug or ''}" if multi_repo
+            f"{results_path}/multi-repo/{git_slug or ''}"
+            if multi_repo
             else f"{results_path}/{git_slug}"
         ).strip("/")
 
@@ -65,20 +66,23 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_results(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                    content: str = None):
+    def log_results(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
         """Logs pipeline output artifacts for the current run.
 
         Args:
             results_path: Local path to the file or directory to log.
-            artifact_path: Optional subdirectory within the run's artifact store to organize results under.
+            artifact_path: Optional subdirectory within the run's artifact store to organize
+                results under.
             tags: Optional key-value tags to attach to the run.
             content: Optional string content to write to results_path before logging.
         """
 
     @abstractmethod
-    def log_static_asset(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                  content: str = None):
+    def log_static_asset(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
         """Logs an artifact to the static asset store (same experiment as ``download``).
 
         Identical signature to ``log_results`` but writes to the static asset
@@ -87,7 +91,8 @@ class AssetLoader(ABC):
 
         Args:
             results_path: Local path to the file or directory to log.
-            artifact_path: Optional subdirectory within the run's artifact store to organize results under.
+            artifact_path: Optional subdirectory within the run's artifact store to organize
+                results under.
             tags: Optional key-value tags to attach to the run.
             content: Optional string content to write to results_path before logging.
         """

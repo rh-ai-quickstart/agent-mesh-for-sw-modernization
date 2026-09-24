@@ -11,8 +11,7 @@ from typing import Any
 
 # Make the code_understanding package importable.
 _CU_ROOT = str(
-    Path(__file__).resolve().parent.parent
-    / "workflows" / "examples" / "code_understanding"
+    Path(__file__).resolve().parent.parent / "workflows" / "examples" / "code_understanding"
 )
 if _CU_ROOT not in sys.path:
     sys.path.insert(0, _CU_ROOT)
@@ -30,7 +29,7 @@ os.environ.setdefault("SSL_VERIFY", "false")
 # Redirect the cache to a writable temp directory before numba is imported.
 os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
 
-import services
+import services  # noqa: E402
 
 _jobs: dict[str, dict[str, Any]] = {}
 

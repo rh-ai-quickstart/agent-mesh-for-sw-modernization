@@ -10,7 +10,13 @@ from utils.service_utils import create_client
 def is_pipeline_uploaded(pipeline_name: str) -> bool:
     """Return True if the named pipeline exists in KFP."""
     client = create_client()
-    result = client.list_pipelines(filter=json.dumps({
-        "predicates": [{"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}]
-    }))
+    result = client.list_pipelines(
+        filter=json.dumps(
+            {
+                "predicates": [
+                    {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+                ]
+            }
+        )
+    )
     return bool(result.pipelines)

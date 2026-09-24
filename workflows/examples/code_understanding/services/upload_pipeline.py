@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any
-
 from utils.service_utils import create_client
 
 
@@ -22,10 +20,13 @@ def upload_pipeline(yaml_path: str, pipeline_name: str) -> None:
         msg = str(exc)
         if "already exist" not in msg.lower() and "409" not in msg:
             raise
-        filt = json.dumps({
-            "predicates": [{"key": "display_name", "operation": "EQUALS",
-                            "stringValue": pipeline_name}]
-        })
+        filt = json.dumps(
+            {
+                "predicates": [
+                    {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+                ]
+            }
+        )
         items = client.list_pipelines(filter=filt, page_size=1).pipelines or []
         if not items:
             raise RuntimeError(f"Pipeline '{pipeline_name}' not found after 409") from exc

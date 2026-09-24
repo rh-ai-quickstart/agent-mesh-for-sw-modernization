@@ -1,10 +1,8 @@
-import os
 import logging
+import os
 from contextlib import contextmanager
 
-import os
-
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 ##############################################################################
 # Base images
@@ -33,6 +31,7 @@ ANALYSIS_BASE_IMAGE = (
 # Logging setup
 ##############################################################################
 
+
 def setup_logging():
     """Configures logging for KFP component pods.
 
@@ -41,7 +40,8 @@ def setup_logging():
     Calling ``setLevel`` on the root logger overrides the level regardless.
     """
     import logging
-    _level = os.environ.get('LOGLEVEL', 'INFO').upper()
+
+    _level = os.environ.get("LOGLEVEL", "INFO").upper()
     logging.basicConfig(level=_level)
     logging.getLogger().setLevel(_level)
 
@@ -49,6 +49,7 @@ def setup_logging():
 ##############################################################################
 # Git URL helper
 ##############################################################################
+
 
 def get_pip_installable_git_url(
     git_username: str,
@@ -70,6 +71,7 @@ def get_pip_installable_git_url(
 # Secret-injection decorator
 ##############################################################################
 
+
 def inject_secret_as_env(secret_name: str):
     """Decorator factory that injects ALL keys from a K8s secret as env vars.
 
@@ -80,11 +82,11 @@ def inject_secret_as_env(secret_name: str):
     import functools
 
     def read_secret_keys() -> list:
-        """Returns the data keys of the secret, or [] on any error.
-        """
+        """Returns the data keys of the secret, or [] on any error."""
         try:
 
-            from kubernetes import client as k8s_client, config as k8s_config
+            from kubernetes import client as k8s_client
+            from kubernetes import config as k8s_config
 
             try:
                 k8s_config.load_incluster_config()
@@ -134,6 +136,7 @@ def inject_secret_as_env(secret_name: str):
 # Pipeline compilation helper
 ##############################################################################
 
+
 def compile_all_and_exit(pipelines: dict):
     """Compiles all pipeline functions to <KFP_PIPELINE_OUTPUT_DIR>/<name>.yaml and exits."""
     if os.getenv("PIPELINE_COMPILE_ONLY"):
@@ -159,11 +162,13 @@ def compile_all_and_exit(pipelines: dict):
 # Artifact I/O context managers
 ##############################################################################
 
+
 @contextmanager
 def read_from_input_artifact(artifact):
-    """Extract a KFP Input[Dataset] tar.gz archive to a temp dir.
-    """
-    import shutil, tarfile, tempfile
+    """Extract a KFP Input[Dataset] tar.gz archive to a temp dir."""
+    import shutil
+    import tarfile
+    import tempfile
 
     tmp = tempfile.mkdtemp()
 
@@ -189,7 +194,10 @@ def write_to_output_artifact(artifact, compresslevel=1):
                        Defaults to 1; switch to 0 / ``"w:"`` mode for binary
                        data (e.g. parquet + embeddings) that compresses poorly.
     """
-    import os, shutil, tarfile, tempfile
+    import os
+    import shutil
+    import tarfile
+    import tempfile
 
     tmp = tempfile.mkdtemp()
 
@@ -210,7 +218,8 @@ def write_to_output_artifact(artifact, compresslevel=1):
 @contextmanager
 def use_ephemeral_space():
     """Yield a temporary directory and remove it on exit."""
-    import shutil, tempfile
+    import shutil
+    import tempfile
 
     tmp = tempfile.mkdtemp()
 

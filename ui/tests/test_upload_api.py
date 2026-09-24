@@ -8,11 +8,11 @@ import pytest
 
 pytest.importorskip("fastapi")
 pytest.importorskip("kubernetes")
-from fastapi.testclient import TestClient
-from starlette.middleware.body_limit import RequestBodyLimitMiddleware
+from archive_helpers import make_index_bundle  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
 
-import main
-from archive_helpers import make_index_bundle
+import main  # noqa: E402
 
 
 class UploadClient:

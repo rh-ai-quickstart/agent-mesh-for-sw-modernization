@@ -20,7 +20,9 @@ def _workflow_catalog() -> Path | None:
 
 
 _REPO_CATALOG = _workflow_catalog()
-DEFAULT_CATALOG = _PACKAGED_CATALOG if _PACKAGED_CATALOG.is_file() else (_REPO_CATALOG or _PACKAGED_CATALOG)
+DEFAULT_CATALOG = (
+    _PACKAGED_CATALOG if _PACKAGED_CATALOG.is_file() else (_REPO_CATALOG or _PACKAGED_CATALOG)
+)
 
 
 def _normalize(entry: dict[str, Any]) -> dict[str, str]:

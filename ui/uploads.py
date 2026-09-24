@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import posixpath
 import re
 import tarfile
+from pathlib import Path
 from typing import Any, BinaryIO
 
 
@@ -57,8 +57,10 @@ def _member_path(member_name: str) -> str:
         raise IndexArchiveError("Archive contains an unsafe member path")
     normalized = posixpath.normpath(member_name).removesuffix("/")
     parts = normalized.split("/")
-    if normalized in {"", ".", ".."} or normalized.startswith("../") or any(
-        part in {"", ".", ".."} for part in parts
+    if (
+        normalized in {"", ".", ".."}
+        or normalized.startswith("../")
+        or any(part in {"", ".", ".."} for part in parts)
     ):
         raise IndexArchiveError("Archive contains an unsafe member path")
     return normalized
@@ -109,12 +111,15 @@ def extract_uploaded_index(
                     raise IndexArchiveError("Archive contains duplicate member paths")
                 seen.add(normalized)
                 if not (member.isfile() or member.isdir()):
-                    raise IndexArchiveError("Archive may contain only regular files and directories")
+                    raise IndexArchiveError(
+                        "Archive may contain only regular files and directories"
+                    )
                 if member.isfile():
                     declared_size += member.size
                     if declared_size > max_bytes:
                         raise IndexArchiveTooLargeError(
-                            f"Extracted archive content exceeds the maximum size of {max_bytes} bytes."
+                            f"Extracted archive content exceeds the maximum size of "
+                            f"{max_bytes} bytes."
                         )
                 if normalized == "manifest.json":
                     if not member.isfile():
@@ -155,7 +160,8 @@ def extract_uploaded_index(
                             extracted_size += len(chunk)
                             if extracted_size > max_bytes:
                                 raise IndexArchiveTooLargeError(
-                                    f"Extracted archive content exceeds the maximum size of {max_bytes} bytes."
+                                    f"Extracted archive content exceeds the maximum size of "
+                                    f"{max_bytes} bytes."
                                 )
                             target.write(chunk)
                 finally:

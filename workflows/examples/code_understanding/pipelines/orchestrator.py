@@ -7,31 +7,33 @@ Run directly to compile all pipelines to YAML:
     PYTHONPATH=<code_understanding_dir> \\
     python3 pipelines/orchestrator.py
 """
+
+import json
 import os
 import sys
-import json
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from kfp import dsl
-from utils.kubeflow_utils import compile_all_and_exit
-
-from utils.pipeline_utils import uses_kfp
+from kfp import dsl  # noqa: E402
+from utils.kubeflow_utils import compile_all_and_exit  # noqa: E402
+from utils.pipeline_utils import uses_kfp  # noqa: E402
 
 if uses_kfp():
 
+    from pipelines.kubeflow.analysis import AnalysisPipeline
     from pipelines.kubeflow.data_generation import DataGenerationPipeline
     from pipelines.kubeflow.indexing import IndexingPipeline
-    from pipelines.kubeflow.analysis import AnalysisPipeline
 
 else:
 
+    from pipelines.base.analysis import AnalysisPipeline
     from pipelines.base.data_generation import DataGenerationPipeline
     from pipelines.base.indexing import IndexingPipeline
-    from pipelines.base.analysis import AnalysisPipeline
 
 ##############################################################################
 # Pipeline definitions
 ##############################################################################
+
 
 @dsl.pipeline(name="single-repo-pipeline")
 def single_repo_pipeline(
@@ -119,9 +121,7 @@ def multi_repo_pipeline(
 
     else:
 
-        from loaders.default_asset_loader import DefaultAssetLoader
-
-        #git_repos = DefaultAssetLoader().download("repos/repo_list.json")
+        # git_repos = DefaultAssetLoader().download("repos/repo_list.json")
         git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS"))
 
         DataGenerationPipeline().run_multi_repo(git_repos)
@@ -137,10 +137,12 @@ def multi_repo_pipeline(
 
 if __name__ == "__main__":
 
-    compile_all_and_exit({
-        "data_generation": DataGenerationPipeline.run,
-        "single_repo":     single_repo_pipeline,
-        "multi_repo":      multi_repo_pipeline,
-        "indexing":        IndexingPipeline.run,
-        "analysis":        AnalysisPipeline.run,
-    })
+    compile_all_and_exit(
+        {
+            "data_generation": DataGenerationPipeline.run,
+            "single_repo": single_repo_pipeline,
+            "multi_repo": multi_repo_pipeline,
+            "indexing": IndexingPipeline.run,
+            "analysis": AnalysisPipeline.run,
+        }
+    )

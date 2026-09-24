@@ -1,14 +1,15 @@
 import logging
 import os
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 def prepare_indexing_config(
-        graphrag_source_path: str, git_slug: str, git_repo: str, multi_repo: bool):
-    """Downloads GraphRAG prompt files and copies them to graphrag_source_path.
-    """
+    graphrag_source_path: str, git_slug: str, git_repo: str, multi_repo: bool
+):
+    """Downloads GraphRAG prompt files and copies them to graphrag_source_path."""
     import shutil
+
     from loaders.default_asset_loader import DefaultAssetLoader
 
     loader = DefaultAssetLoader()

@@ -1,18 +1,17 @@
 ##############################################################################
 # Register custom blocks
 ##############################################################################
-from sdg_hub.core.blocks.base import BaseBlock
-from sdg_hub.core.blocks.llm.llm_chat_block import LLMChatBlock
-from sdg_hub.core.blocks.registry import BlockRegistry
-from pydantic import ConfigDict, field_validator
-import validators
-from sdg_hub.core.utils.logger_config import setup_logger
-from litellm import acompletion, completion
+from typing import Any
+
 import pandas as pd
-from typing import Any, Optional
-import asyncio
+from pydantic import field_validator
+from sdg_hub.core.blocks.base import BaseBlock
+from sdg_hub.core.blocks.registry import BlockRegistry
+from sdg_hub.core.utils.logger_config import setup_logger
+
 logger = setup_logger(__name__)
-import os
+import os  # noqa: E402
+
 
 @BlockRegistry.register(
     "CustomDeleteColumnsBlock",
@@ -61,9 +60,7 @@ class CustomDeleteColumnsBlock(BaseBlock):
 
         missing_cols = droppable_cols - existing_cols
         if missing_cols:
-            raise ValueError(
-                f"Droppable column names {sorted(missing_cols)} not in the dataset"
-            )
+            raise ValueError(f"Droppable column names {sorted(missing_cols)} not in the dataset")
 
         # Drop columns using pandas method
         return samples.drop(columns=self.input_cols)

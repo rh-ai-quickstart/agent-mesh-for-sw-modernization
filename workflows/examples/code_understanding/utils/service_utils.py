@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import urllib3
 from pathlib import Path
 from typing import Any
+
+import urllib3
 
 _SA_TOKEN = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
@@ -45,11 +46,15 @@ def create_client(host: str | None = None, namespace: str | None = None) -> Any:
 
 def find_pipeline_id(client: Any, pipeline_name: str) -> str:
     """Return the pipeline_id for a registered pipeline, or raise ValueError."""
-    result = client.list_pipelines(filter=json.dumps({
-        "predicates": [
-            {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
-        ]
-    }))
+    result = client.list_pipelines(
+        filter=json.dumps(
+            {
+                "predicates": [
+                    {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+                ]
+            }
+        )
+    )
     if not result.pipelines:
         raise ValueError(f"Pipeline '{pipeline_name}' not found in KFP.")
     return result.pipelines[0].pipeline_id
@@ -61,6 +66,6 @@ def latest_version_id(client: Any, pipeline_id: str) -> str:
     versions = client.list_pipeline_versions(pipeline_id=pipeline_id, page_size=int(total))
     if not versions.pipeline_versions:
         raise ValueError("Pipeline has no versions in KFP.")
-    return sorted(
-        versions.pipeline_versions, key=lambda v: v.created_at, reverse=True
-    )[0].pipeline_version_id
+    return sorted(versions.pipeline_versions, key=lambda v: v.created_at, reverse=True)[
+        0
+    ].pipeline_version_id

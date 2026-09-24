@@ -5,13 +5,18 @@ import tempfile
 
 import mlflow
 import pandas as pd
-from mlflow.metrics.genai import faithfulness, answer_relevance, answer_similarity, answer_correctness
-
-from .custom_evaluator import CustomEvaluator, _DEFAULT_EVAL_DATASET, build_repo_context
-from utils.graphrag_utils import DependencyAnalyzer
+from mlflow.metrics.genai import (
+    answer_correctness,
+    answer_relevance,
+    answer_similarity,
+    faithfulness,
+)
 from utils.eval_utils import load_evaluation_results
+from utils.graphrag_utils import DependencyAnalyzer
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+from .custom_evaluator import _DEFAULT_EVAL_DATASET, CustomEvaluator, build_repo_context
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 class MlFlowCustomEvaluator(CustomEvaluator):
@@ -22,8 +27,12 @@ class MlFlowCustomEvaluator(CustomEvaluator):
     and answer_similarity metrics.
     """
 
-    _EXPERIMENT_NAME = f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}/code-refactoring/evaluations"
+    _EXPERIMENT_NAME = (
+        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
+        "/code-refactoring/evaluations"
+    )
     _RUN_NAME = "code-understanding-eval"
+
     def __init__(self):
 
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
@@ -57,7 +66,10 @@ class MlFlowCustomEvaluator(CustomEvaluator):
 
         try:
             response = completion(
-                model=f"{os.getenv('GROUND_TRUTH_LLM_PROVIDER')}/{os.getenv('GROUND_TRUTH_LLM_ID')}",
+                model=(
+                    f"{os.getenv('GROUND_TRUTH_LLM_PROVIDER')}"
+                    f"/{os.getenv('GROUND_TRUTH_LLM_ID')}"
+                ),
                 api_base=os.getenv("GROUND_TRUTH_LLM_API_BASE"),
                 api_key=os.getenv("GROUND_TRUTH_LLM_TOKEN"),
                 messages=[
@@ -79,13 +91,21 @@ class MlFlowCustomEvaluator(CustomEvaluator):
             logging.error(f"Ground truth LLM failed: {e}")
             return "Could not process query"
 
-    def evaluate(self, input: str, graphrag_source_dir: str, git_repo: str, git_branch: str,
-                 git_slug: str = None, multi_repo: bool = False):
+    def evaluate(
+        self,
+        input: str,
+        graphrag_source_dir: str,
+        git_repo: str,
+        git_branch: str,
+        git_slug: str = None,
+        multi_repo: bool = False,
+    ):
         """Evaluates a GraphRAG response using MLflow's genai evaluation API.
 
         Args:
             input: The question or prompt to evaluate.
-            graphrag_source_dir: Root directory of the GraphRAG index (must contain output/*.parquet).
+            graphrag_source_dir: Root directory of the GraphRAG index (must contain
+                output/*.parquet).
             git_repo: Repository URL used as context for the ground truth LLM.
             git_branch: Branch name used as context for the ground truth LLM.
             git_slug: Optional repository slug used to scope results.
@@ -95,9 +115,13 @@ class MlFlowCustomEvaluator(CustomEvaluator):
         """
         try:
 
-            analyzer = DependencyAnalyzer(root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo)
+            analyzer = DependencyAnalyzer(
+                root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo
+            )
 
-            actual_answer, context_data = asyncio.run(analyzer.query_with_llm(input, include_context=True))
+            actual_answer, context_data = asyncio.run(
+                analyzer.query_with_llm(input, include_context=True)
+            )
 
             context_str = DependencyAnalyzer.extract_context_content(context_data)
 
@@ -105,12 +129,14 @@ class MlFlowCustomEvaluator(CustomEvaluator):
 
             judge_model = self._judge_model_uri()
 
-            eval_data = pd.DataFrame({
-                "inputs": [input],
-                "targets": [reference_answer],
-                "predictions": [actual_answer],
-                "context": [context_str],
-            })
+            eval_data = pd.DataFrame(
+                {
+                    "inputs": [input],
+                    "targets": [reference_answer],
+                    "predictions": [actual_answer],
+                    "context": [context_str],
+                }
+            )
 
             from mlflow.tracking import MlflowClient
 
@@ -124,9 +150,7 @@ class MlFlowCustomEvaluator(CustomEvaluator):
                     client.create_experiment(name=self._EXPERIMENT_NAME)
                 )
 
-            with mlflow.start_run(
-                experiment_id=experiment.experiment_id, run_name=self._RUN_NAME
-            ):
+            with mlflow.start_run(experiment_id=experiment.experiment_id, run_name=self._RUN_NAME):
 
                 results = mlflow.evaluate(
                     data=eval_data,
@@ -180,16 +204,20 @@ class MlFlowCustomEvaluator(CustomEvaluator):
             The updated pandas DataFrame with "answer", "reference", and metric columns populated.
         """
         from loaders.default_asset_loader import DefaultAssetLoader
-
         from mlflow.tracking import MlflowClient
-
         from utils import code_utils
 
         df = pd.read_csv(eval_dataset_file)
 
-        analyzer = DependencyAnalyzer(root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo)
+        analyzer = DependencyAnalyzer(
+            root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo
+        )
 
-        df["inputs"] = df["question"].astype(str) + "\n\n**Example format:**\n" + df["one_shot_example"].astype(str)
+        df["inputs"] = (
+            df["question"].astype(str)
+            + "\n\n**Example format:**\n"
+            + df["one_shot_example"].astype(str)
+        )
 
         df["targets"] = df["inputs"].apply(
             lambda t: self._ground_truth_answer(t, graphrag_source_dir)
@@ -204,7 +232,11 @@ class MlFlowCustomEvaluator(CustomEvaluator):
 
             try:
 
-                answer, context_data = asyncio.run(analyzer.query_with_llm(input_text, include_context=True, use_global=use_global))
+                answer, context_data = asyncio.run(
+                    analyzer.query_with_llm(
+                        input_text, include_context=True, use_global=use_global
+                    )
+                )
 
                 context_str = DependencyAnalyzer.extract_context_content(context_data)
 
@@ -270,7 +302,9 @@ class MlFlowCustomEvaluator(CustomEvaluator):
 
         else:
 
-            logging.info("MLflow eval_results_table not available; metric scores will not be captured.")
+            logging.info(
+                "MLflow eval_results_table not available; metric scores will not be captured."
+            )
 
         df["answer"] = df["predictions"]
 
@@ -279,13 +313,9 @@ class MlFlowCustomEvaluator(CustomEvaluator):
         df = df.drop(columns=["inputs", "predictions", "reference_answer"], errors="ignore")
 
         artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
-
             DefaultAssetLoader.RESULTS_PATH_PREFIX_EVAL,
-
             git_slug=slug,
-
             multi_repo=multi_repo,
-
         )
 
         df["git_slug"] = slug

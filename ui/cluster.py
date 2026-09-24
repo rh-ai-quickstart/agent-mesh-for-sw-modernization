@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
-import json
+import logging
 import os
 import subprocess
-import time
-import uuid
+
 # from collections.abc import Iterator  # only used by wait_for_job (commented out)
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import logging
 logging.basicConfig(level=logging.INFO)
-import traceback
+import traceback  # noqa: E402
 
-from kubernetes import client, config
-from kubernetes.client.exceptions import ApiException
+from kubernetes import client, config  # noqa: E402
 
 ADHOC_MARKER = "ADHOC RESULTS"
 
@@ -49,8 +45,9 @@ def available_namespaces() -> list[str]:
                 if item.get("metadata", {}).get("name")
             )
             if names:
-                logging.info(f"Available namespaces from OpenShift Projects "
-                             f"API: {', '.join(names)}")
+                logging.info(
+                    f"Available namespaces from OpenShift Projects " f"API: {', '.join(names)}"
+                )
                 return names
         except Exception as e:
             logging.debug(traceback.format_exc(), exc_info=e)
@@ -65,8 +62,7 @@ def available_namespaces() -> list[str]:
     except Exception as e:
         logging.debug(traceback.format_exc(), exc_info=e)
         ns = current_namespace()
-        logging.info(f"Available namespaces: Fallback to current namespace:"
-                     f" {ns}")
+        logging.info(f"Available namespaces: Fallback to current namespace:" f" {ns}")
         return [ns] if ns else []
 
 
@@ -175,7 +171,9 @@ def _decode_hex_escapes_as_utf8(text: str) -> str:
 
     def repl(match: re.Match[str]) -> str:
         try:
-            raw = bytes(int(byte_hex, 16) for byte_hex in re.findall(r"[0-9a-fA-F]{2}", match.group(0)))
+            raw = bytes(
+                int(byte_hex, 16) for byte_hex in re.findall(r"[0-9a-fA-F]{2}", match.group(0))
+            )
             return raw.decode("utf-8")
         except (UnicodeDecodeError, ValueError):
             return match.group(0)
@@ -453,11 +451,11 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #   exit 1
 # fi
 # git config --global --add safe.directory {WORKSPACE}
-# git config --global credential.helper '!f() {{ echo "username=${{GIT_USERNAME}}"; echo "password=${{GIT_TOKEN}}"; }}; f'
+# git config --global credential.helper '!f() {{ echo "username=${{GIT_USERNAME}}"; echo "password=${{GIT_TOKEN}}"; }}; f'  # noqa: E501
 # rm -rf "{WORKSPACE}"/*
 # git -C {WORKSPACE} init -q
-# git -C {WORKSPACE} remote add origin "{repo_url}" 2>/dev/null || git -C {WORKSPACE} remote set-url origin "{repo_url}"
-# git -C {WORKSPACE} fetch --depth 1 origin "{repo_ref}" || git -C {WORKSPACE} fetch --depth 1 origin main
+# git -C {WORKSPACE} remote add origin "{repo_url}" 2>/dev/null || git -C {WORKSPACE} remote set-url origin "{repo_url}"  # noqa: E501
+# git -C {WORKSPACE} fetch --depth 1 origin "{repo_ref}" || git -C {WORKSPACE} fetch --depth 1 origin main  # noqa: E501
 # git -C {WORKSPACE} reset --hard FETCH_HEAD
 # test -f workflows/examples/code_understanding/scripts/run_adhoc_query.sh
 # """.strip()
@@ -482,7 +480,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     volumes = [client.V1Volume(name="workspace", empty_dir=client.V1EmptyDirVolumeSource())]
 #     if mount_job_scripts:
 #         volume_mounts.append(
-#             client.V1VolumeMount(name="job-scripts", mount_path="/opt/job-scripts", read_only=True)
+#             client.V1VolumeMount(name="job-scripts", mount_path="/opt/job-scripts", read_only=True)  # noqa: E501
 #         )
 #         volumes.append(
 #             client.V1Volume(
@@ -531,7 +529,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     )
 
 
-# def submit_pipeline_run(repos: list[dict[str, str]], runtime_ns: str | None = None) -> dict[str, str]:
+# def submit_pipeline_run(repos: list[dict[str, str]], runtime_ns: str | None = None) -> dict[str, str]:  # noqa: E501
 #     """Superseded by api/pipelines.py (POST /api/v2/pipelines)."""
 #     if not repos:
 #         raise ValueError("Select at least one repository.")
@@ -575,7 +573,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #
 #     apply_repo_list = ""
 #     if config_map_name:
-#         apply_repo_list = f"mkdir -p $(dirname {REPO_LIST_FILE}) && cp /repo-list/repo_list.json {REPO_LIST_FILE}\n"
+#         apply_repo_list = f"mkdir -p $(dirname {REPO_LIST_FILE}) && cp /repo-list/repo_list.json {REPO_LIST_FILE}\n"  # noqa: E501
 #     command = f"""
 # set -euo pipefail
 # pip install --quiet 'kfp>=2.0.0,<3.0.0' mlflow
@@ -632,7 +630,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     repo_url = workflow_repo_url()
 #     repo_ref = workflow_repo_ref()
 #     if not repo_url:
-#         raise RuntimeError("AGENTMESH_REPO_URL is not set (needed to clone this workflow into the job).")
+#         raise RuntimeError("AGENTMESH_REPO_URL is not set (needed to clone this workflow into the job).")  # noqa: E501
 #
 #     if use_global is None:
 #         use_global = not bool(git_repo)
@@ -663,8 +661,8 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     command = f"""
 # set -euo pipefail
 # {git_setup(repo_url, repo_ref)}
-# cp /opt/job-scripts/mlflow_asset_loader.py workflows/examples/code_understanding/loaders/mlflow_asset_loader.py
-# cp /opt/job-scripts/default_asset_loader.py workflows/examples/code_understanding/loaders/default_asset_loader.py
+# cp /opt/job-scripts/mlflow_asset_loader.py workflows/examples/code_understanding/loaders/mlflow_asset_loader.py  # noqa: E501
+# cp /opt/job-scripts/default_asset_loader.py workflows/examples/code_understanding/loaders/default_asset_loader.py  # noqa: E501
 # workflows/examples/code_understanding/scripts/run_adhoc_query.sh
 # """.strip()
 #
@@ -704,7 +702,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     jobs = batch.list_namespaced_job(ns, label_selector="app=code-understanding-console")
 #     items = sorted(
 #         jobs.items,
-#         key=lambda job: job.metadata.creation_timestamp or datetime.min.replace(tzinfo=timezone.utc),
+#         key=lambda job: job.metadata.creation_timestamp or datetime.min.replace(tzinfo=timezone.utc),  # noqa: E501
 #         reverse=True,
 #     )[:limit]
 #     rows = []
@@ -730,13 +728,13 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     if not pods.items:
 #         return None
 #     pods.items.sort(
-#         key=lambda pod: pod.metadata.creation_timestamp or datetime.min.replace(tzinfo=timezone.utc)
+#         key=lambda pod: pod.metadata.creation_timestamp or datetime.min.replace(tzinfo=timezone.utc)  # noqa: E501
 #     )
 #     return pods.items[-1].metadata.name
 
 
 # def fetch_job_logs(core: client.CoreV1Api, ns: str, pod_name: str) -> str:
-#     """Read pod logs, preferring the tail where adhoc answers are written. Used by job_snapshot (commented out)."""
+#     """Read pod logs, preferring the tail where adhoc answers are written. Used by job_snapshot (commented out)."""  # noqa: E501
 #     best = ""
 #     for tail_lines in (4000, 1500, None):
 #         try:
@@ -753,7 +751,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #     return best
 
 
-# def wait_for_job(job_name: str, timeout_s: int = 1800, poll_s: float = 3.0) -> Iterator[dict[str, Any]]:
+# def wait_for_job(job_name: str, timeout_s: int = 1800, poll_s: float = 3.0) -> Iterator[dict[str, Any]]:  # noqa: E501
 #     """Blocking generator that polls a job until completion or timeout.
 #     No longer called — superseded by the v2 pipeline polling in api/pipelines.py
 #     and the client-side pollV2 / pollQuery loops in index.html.
@@ -794,7 +792,7 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 
 
 # def job_snapshot(job_name: str, runtime_ns: str | None = None) -> dict[str, Any]:
-#     """Return status, logs, and extracted answer for a console job. Superseded by api/pipelines.py and api/queries.py."""
+#     """Return status, logs, and extracted answer for a console job. Superseded by api/pipelines.py and api/queries.py."""  # noqa: E501
 #     batch, core, ns = k8s_clients(runtime_ns)
 #     job = batch.read_namespaced_job(job_name, ns)
 #     succeeded = bool(job.status.succeeded)
@@ -820,5 +818,5 @@ def extract_adhoc_answer(logs: str | bytes | None) -> str:
 #         "succeeded": succeeded,
 #         "logs": format_job_logs(logs) if logs else "",
 #         "answer": answer,
-#         "summary": extract_pipeline_summary(logs) if job_name.startswith(PIPELINE_JOB_PREFIX) else {},
+#         "summary": extract_pipeline_summary(logs) if job_name.startswith(PIPELINE_JOB_PREFIX) else {},  # noqa: E501
 #     }

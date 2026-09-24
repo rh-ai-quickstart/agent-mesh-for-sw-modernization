@@ -3,11 +3,10 @@ import os
 
 import pandas as pd
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 def load_evaluation_results(results, experiment_name: str, eval_tags: dict) -> pd.DataFrame | None:
-
     """Returns per-row evaluation scores from an MLflow EvaluationResult.
 
     Args:
@@ -25,7 +24,9 @@ def load_evaluation_results(results, experiment_name: str, eval_tags: dict) -> p
 
         return eval_results
 
-    logging.info("eval_results_table not in run memory; attempting download via DefaultAssetLoader...")
+    logging.info(
+        "eval_results_table not in run memory; attempting download via DefaultAssetLoader..."
+    )
 
     try:
 

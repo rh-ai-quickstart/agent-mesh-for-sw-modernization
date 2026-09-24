@@ -1,10 +1,15 @@
 import os
 import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
-from kfp import dsl
-from kfp.dsl import Dataset, Input, Markdown, Output
-from utils.kubeflow_utils import ANALYSIS_BASE_IMAGE, get_pip_installable_git_url, inject_secret_as_env
+from kfp import dsl  # noqa: E402
+from kfp.dsl import Dataset, Input, Markdown, Output  # noqa: E402
+from utils.kubeflow_utils import (  # noqa: E402
+    ANALYSIS_BASE_IMAGE,
+    get_pip_installable_git_url,
+    inject_secret_as_env,
+)
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -19,20 +24,31 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 # Components
 ##############################################################################
 
+
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(base_image=ANALYSIS_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def generate_migration_report_op(graphrag_dir: Input[Dataset], report: Output[Markdown],
-                                  git_repo: str = "", git_branch: str = "",
-                                  multi_repo: bool = False):
+def generate_migration_report_op(
+    graphrag_dir: Input[Dataset],
+    report: Output[Markdown],
+    git_repo: str = "",
+    git_branch: str = "",
+    multi_repo: bool = False,
+):
 
     from pipelines.base.analysis import write_migration_report
-    from utils.kubeflow_utils import setup_logging, read_from_input_artifact
+    from utils.kubeflow_utils import read_from_input_artifact, setup_logging
+
     setup_logging()
 
     with read_from_input_artifact(graphrag_dir) as tmp_graphrag:
-        write_migration_report(tmp_graphrag, report.path, git_repo=git_repo,
-                               git_branch=git_branch, multi_repo=multi_repo)
+        write_migration_report(
+            tmp_graphrag,
+            report.path,
+            git_repo=git_repo,
+            git_branch=git_branch,
+            multi_repo=multi_repo,
+        )
 
 
 @inject_secret_as_env(secret_name="code-understanding-env")
@@ -41,7 +57,8 @@ def run_analysis_multi_repo_op(graphrag_dir: Input[Dataset], report: Output[Mark
     """Runs migration report generation across the combined multi-repo GraphRAG index."""
 
     from pipelines.base.analysis import write_migration_report
-    from utils.kubeflow_utils import setup_logging, read_from_input_artifact
+    from utils.kubeflow_utils import read_from_input_artifact, setup_logging
+
     setup_logging()
 
     with read_from_input_artifact(graphrag_dir) as tmp_graphrag:
@@ -52,6 +69,7 @@ def run_analysis_multi_repo_op(graphrag_dir: Input[Dataset], report: Output[Mark
 # Pipeline
 ##############################################################################
 
+
 @dsl.pipeline(name="graphrag-analysis-pipeline")
 def _run_pipeline(
     graphrag_dir: Input[Dataset],
@@ -60,8 +78,9 @@ def _run_pipeline(
     multi_repo: bool = False,
 ):
 
-    task = generate_migration_report_op(graphrag_dir=graphrag_dir, git_repo=git_repo,
-                                        git_branch=git_branch, multi_repo=multi_repo)
+    task = generate_migration_report_op(
+        graphrag_dir=graphrag_dir, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
+    )
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
 
@@ -75,6 +94,7 @@ def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
 ##############################################################################
 # Pipeline stage
 ##############################################################################
+
 
 class AnalysisPipeline:
     run = staticmethod(_run_pipeline)

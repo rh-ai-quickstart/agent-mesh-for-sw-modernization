@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
-from pathlib import Path
 import re
 import tarfile
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
@@ -80,9 +80,7 @@ def _download_index_directory(
         )
     )
     if not downloaded.is_dir():
-        raise FileNotFoundError(
-            f"MLflow artifact directory was not downloaded: {artifact_path}"
-        )
+        raise FileNotFoundError(f"MLflow artifact directory was not downloaded: {artifact_path}")
     return downloaded
 
 
@@ -129,7 +127,8 @@ def create_index_archive(
     artifact_size = _directory_size(source_directory, limit=max_bytes)
     if artifact_size > max_bytes:
         raise DownloadTooLargeError(
-            f"Index artifact is {artifact_size} bytes; the maximum download size is {max_bytes} bytes."
+            f"Index artifact is {artifact_size} bytes; "
+            f"the maximum download size is {max_bytes} bytes."
         )
 
     filename = index_archive_filename(metadata)
@@ -143,6 +142,7 @@ def create_index_archive(
     archive_size = archive_path.stat().st_size
     if archive_size > max_bytes:
         raise DownloadTooLargeError(
-            f"Generated index archive is {archive_size} bytes; the maximum download size is {max_bytes} bytes."
+            f"Generated index archive is {archive_size} bytes; "
+            f"the maximum download size is {max_bytes} bytes."
         )
     return archive_path, filename

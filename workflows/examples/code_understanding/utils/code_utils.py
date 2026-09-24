@@ -1,26 +1,17 @@
+import logging
+import os
+import sys
 from collections import defaultdict
-
-from jsonpath_ng import jsonpath, parse
-
-from github import Github
-
-from pygments.lexers import guess_lexer_for_filename
-
-from pygments.util import ClassNotFound
-
 from urllib.parse import urlparse
 
-import logging
-
-import os
-
-import sys
+from pygments.lexers import guess_lexer_for_filename
+from pygments.util import ClassNotFound
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from loaders.default_asset_loader import DefaultAssetLoader
+from loaders.default_asset_loader import DefaultAssetLoader  # noqa: E402
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 CODE_METADATA_DIR = ".code_metadata"
 
@@ -28,6 +19,7 @@ CODE_METADATA_DIR = ".code_metadata"
 def _load_mappings():
     """Loads language mappings from the language_mappings.json file."""
     return DefaultAssetLoader().download("mappings/language_mappings.json")
+
 
 def _extract_git_owner_and_repo(git_url: str):
     """
@@ -45,12 +37,13 @@ def _extract_git_owner_and_repo(git_url: str):
     parts = path.removesuffix(".git").split("/")
 
     if len(parts) < 2:
-        raise ValueError(
-            f"Could not extract owner and repo from URL: {git_url}")
+        raise ValueError(f"Could not extract owner and repo from URL: {git_url}")
 
     return tuple(parts[-2:])
 
+
 _MAPPINGS = _load_mappings()
+
 
 def get_file_extensions_for_language(language):
     mappings = _MAPPINGS["file_extensions"]
@@ -86,6 +79,7 @@ def is_large_code_file(abs_path: str, max_size: int) -> bool:
     Returns True if the file at abs_path exceeds max_size bytes, False otherwise.
     """
     import os
+
     return os.path.getsize(abs_path) > max_size
 
 
@@ -97,8 +91,9 @@ def process_large_code_file(abs_path: str, source_path: str):
     extended to support chunking large files into smaller segments for
     incremental processing rather than skipping them entirely.
     """
-    import os
     import logging
+    import os
+
     rel_path = os.path.relpath(abs_path, source_path)
     logging.info(f"Skipping large file: {rel_path}")
 
@@ -142,9 +137,6 @@ def get_detected_languages_for_repo(code_dir: str):
 
     mappings = _MAPPINGS["pygments_mappings"]
 
-    all_files = [os.path.join(root, f) for root, _, files in
-                 os.walk(code_dir) for f in files]
-
     logging.debug(f"Language mappings: {mappings}")
 
     for root, _, files in os.walk(code_dir):
@@ -178,6 +170,7 @@ def get_detected_languages_for_repo(code_dir: str):
     logging.info(f"Detected languages: {languages}")
 
     return list(languages)
+
 
 def generate_slug_from_repo(repo_url: str, repo_branch: str = "master"):
     """

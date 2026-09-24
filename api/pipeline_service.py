@@ -11,21 +11,20 @@ from typing import Any
 # Make the code_understanding package importable so we can reuse its loaders,
 # artifact-path helpers, git-slug generation, and services.
 _CU_ROOT = str(
-    Path(__file__).resolve().parent.parent
-    / "workflows" / "examples" / "code_understanding"
+    Path(__file__).resolve().parent.parent / "workflows" / "examples" / "code_understanding"
 )
 if _CU_ROOT not in sys.path:
     sys.path.insert(0, _CU_ROOT)
 
-from services.trigger_run import trigger_run as _trigger_run
-from services.fetch_reports import fetch_reports as _fetch_reports
-from services.get_run_status import get_kfp_run_state
-from services.list_runs import list_kfp_runs, get_run_git_metadata
-
+from services.fetch_reports import fetch_reports as _fetch_reports  # noqa: E402
+from services.get_run_status import get_kfp_run_state  # noqa: E402
+from services.list_runs import get_run_git_metadata, list_kfp_runs  # noqa: E402
+from services.trigger_run import trigger_run as _trigger_run  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Submit
 # ---------------------------------------------------------------------------
+
 
 def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
     if not repos:
@@ -53,6 +52,7 @@ def submit_pipeline_run(repos: list[dict[str, str]]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------
+
 
 def list_pipeline_runs() -> list[dict[str, Any]]:
     """Return all KFP runs newest-first with their current status."""

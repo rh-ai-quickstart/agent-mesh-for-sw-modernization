@@ -12,22 +12,22 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-from starlette.background import BackgroundTask
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.body_limit import RequestBodyLimitMiddleware
-from starlette.requests import Request
+from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+from starlette.background import BackgroundTask  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
+from starlette.requests import Request  # noqa: E402
 
-import catalog
-import cluster
-import downloads
-import index_storage
-import indexes
-import uploads
+import catalog  # noqa: E402
+import cluster  # noqa: E402
+import downloads  # noqa: E402
+import index_storage  # noqa: E402
+import indexes  # noqa: E402
+import uploads  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 MULTIPART_OVERHEAD_BYTES = 64 * 1024
@@ -58,6 +58,7 @@ app.add_middleware(
 
 from api.pipelines import router as _v2_router  # noqa: E402
 from api.queries import router as _v2_queries_router  # noqa: E402
+
 app.include_router(_v2_router, prefix="/api/v2")
 app.include_router(_v2_queries_router, prefix="/api/v2")
 
@@ -72,7 +73,9 @@ def index() -> FileResponse:
 
 
 @app.get("/api/health")
-def health(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
+def health(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)
+) -> dict[str, str]:
     status = cluster.cluster_status(ns=cu_namespace)
     if not status.get("ok"):
         raise HTTPException(503, status.get("message") or "cluster unavailable")
@@ -80,12 +83,16 @@ def health(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=Non
 
 
 @app.get("/api/status")
-def status(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+def status(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)
+) -> dict[str, Any]:
     return cluster.cluster_status(ns=cu_namespace)
 
 
 @app.get("/api/namespaces")
-def get_namespaces(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+def get_namespaces(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)
+) -> dict[str, Any]:
     return {
         "namespaces": cluster.available_namespaces(),
         "current": cluster.current_namespace(cu_namespace),
@@ -137,7 +144,9 @@ def download_index(run_id: str) -> FileResponse:
     except indexes.IndexRunValidationError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Unable to validate MLflow index run: {exc}") from exc
+        raise HTTPException(
+            status_code=503, detail=f"Unable to validate MLflow index run: {exc}"
+        ) from exc
 
     workspace = index_storage.create_index_workspace()
     try:
@@ -153,7 +162,9 @@ def download_index(run_id: str) -> FileResponse:
             raise HTTPException(status_code=413, detail=str(exc)) from exc
         if isinstance(exc, FileNotFoundError):
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        raise HTTPException(status_code=502, detail=f"Unable to download MLflow index artifact: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Unable to download MLflow index artifact: {exc}"
+        ) from exc
 
     return FileResponse(
         path=archive_path,
@@ -232,7 +243,7 @@ def upload_index(
 
 
 # @app.get("/api/jobs")
-# def get_jobs(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+# def get_jobs(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:  # noqa: E501
 #     try:
 #         return {"jobs": cluster.list_recent_jobs(runtime_ns=cu_namespace)}
 #     except Exception as exc:
@@ -240,7 +251,7 @@ def upload_index(
 #
 #
 # @app.get("/api/jobs/{job_name}")
-# def get_job(job_name: str, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:
+# def get_job(job_name: str, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:  # noqa: E501
 #     try:
 #         return cluster.job_snapshot(job_name, runtime_ns=cu_namespace)
 #     except Exception as exc:
@@ -248,7 +259,7 @@ def upload_index(
 #
 #
 # @app.post("/api/pipelines")
-# def start_pipeline(body: PipelineRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
+# def start_pipeline(body: PipelineRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:  # noqa: E501
 #     repos = [item.model_dump() for item in body.repos]
 #     try:
 #         return cluster.submit_pipeline_run(repos, runtime_ns=cu_namespace)
@@ -259,7 +270,7 @@ def upload_index(
 #
 #
 # @app.post("/api/query")
-# def start_query(body: QueryRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:
+# def start_query(body: QueryRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:  # noqa: E501
 #     try:
 #         return cluster.submit_adhoc_query(
 #             body.question,

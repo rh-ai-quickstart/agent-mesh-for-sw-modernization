@@ -1,24 +1,37 @@
 import json
+import logging
 import os
+
 import mlflow
 from mlflow.tracking import MlflowClient
-import logging
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
 
-from .asset_loader import AssetLoader
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+from .asset_loader import AssetLoader  # noqa: E402
 
 
 class MlFlowAssetLoader(AssetLoader):
     """Loads an asset from the MLflow artifacts registry."""
 
-    STATIC_ASSET_EXPERIMENT = f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}/code-refactoring/assets/static"
-    RESULT_DIRECTORY_ASSET_EXPERIMENT = f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}/code-refactoring/assets/result-directories"
-    RESULT_ASSET_EXPERIMENT = f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}/code-refactoring/assets/results"
+    STATIC_ASSET_EXPERIMENT = (
+        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
+        "/code-refactoring/assets/static"
+    )
+    RESULT_DIRECTORY_ASSET_EXPERIMENT = (
+        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
+        "/code-refactoring/assets/result-directories"
+    )
+    RESULT_ASSET_EXPERIMENT = (
+        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
+        "/code-refactoring/assets/results"
+    )
     _RUN_NAME = "code-understanding"
 
     def __init__(self, namespace: str = None):
 
-        ns = namespace or os.environ.get("MLFLOW_NAMESPACE", os.environ.get("KFP_NAMESPACE", "demo"))
+        ns = namespace or os.environ.get(
+            "MLFLOW_NAMESPACE", os.environ.get("KFP_NAMESPACE", "demo")
+        )
         self.STATIC_ASSET_EXPERIMENT = f"{ns}/code-refactoring/assets/static"
         self.RESULT_DIRECTORY_ASSET_EXPERIMENT = f"{ns}/code-refactoring/assets/result-directories"
         self.RESULT_ASSET_EXPERIMENT = f"{ns}/code-refactoring/assets/results"
@@ -29,24 +42,22 @@ class MlFlowAssetLoader(AssetLoader):
 
             mlflow.set_tracking_uri(tracking_uri)
 
-    def _get_absolute_artifact_uri(self,
-                                   asset_file_path: str,
-                                   experiment_name: str,
-                                   tags: dict = None):
+    def _get_absolute_artifact_uri(
+        self, asset_file_path: str, experiment_name: str, tags: dict = None
+    ):
 
         client = MlflowClient()
 
-        experiment = self.get_or_create_experiment_by_name(client,
-                                                           experiment_name)
+        experiment = self.get_or_create_experiment_by_name(client, experiment_name)
 
         if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags:
 
-            filter_string = f"tags.latest = 'true'"
+            filter_string = "tags.latest = 'true'"
 
         else:
 
             filter_string = " AND ".join(
-                f'tags."{k}" = \'{str(v)}\''
+                f"tags.\"{k}\" = '{str(v)}'"
                 for k, v in (tags or {}).items()
                 if v is not None and v != ""
             )
@@ -60,7 +71,9 @@ class MlFlowAssetLoader(AssetLoader):
             max_results=1,
         )
 
-        asset_base_uri = latest_runs[0].info.artifact_uri if latest_runs else experiment.artifact_location
+        asset_base_uri = (
+            latest_runs[0].info.artifact_uri if latest_runs else experiment.artifact_location
+        )
 
         logging.info(f"Base absolute storage URI: {asset_base_uri}")
 
@@ -96,7 +109,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             elif experiment.lifecycle_stage != "active":
 
-                logging.info(f"Experiment '{experiment_name}' is not active. Deleting and recreating.")
+                logging.info(
+                    f"Experiment '{experiment_name}' is not active. Deleting and recreating."
+                )
 
                 client.delete_experiment(experiment.experiment_id)
 
@@ -106,15 +121,18 @@ class MlFlowAssetLoader(AssetLoader):
 
         return client.get_experiment(client.create_experiment(name=experiment_name))
 
-    def download(self,
-                 asset_file_path: str,
-                 download_dir: str = None,
-                 experiment_name=STATIC_ASSET_EXPERIMENT,
-                 asset_tags: dict = None):
+    def download(
+        self,
+        asset_file_path: str,
+        download_dir: str = None,
+        experiment_name=STATIC_ASSET_EXPERIMENT,
+        asset_tags: dict = None,
+    ):
         """Downloads and returns the asset from the MLflow artifacts registry.
 
         Args:
-            asset_file_path: Path to the asset file relative to its artifact backend location in MLflow.
+            asset_file_path: Path to the asset file relative to its artifact backend location
+                in MLflow.
             download_dir: Optional directory path to download the artifact to.
             experiment_name: The name of the MLflow experiment to search for the asset.
             asset_tags: Optional tags to filter the asset by.
@@ -126,9 +144,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             import shutil
 
-            asset_uri = self._get_absolute_artifact_uri(asset_file_path,
-                                                        experiment_name=experiment_name,
-                                                        tags=asset_tags)
+            asset_uri = self._get_absolute_artifact_uri(
+                asset_file_path, experiment_name=experiment_name, tags=asset_tags
+            )
 
             local_path = mlflow.artifacts.download_artifacts(artifact_uri=asset_uri)
 
@@ -154,20 +172,21 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
-    def download_dir(self,
-                     asset_dir_path: str,
-                     download_dir: str,
-                     experiment_name=STATIC_ASSET_EXPERIMENT,
-                     asset_tags: dict = None
-                     ):
+    def download_dir(
+        self,
+        asset_dir_path: str,
+        download_dir: str,
+        experiment_name=STATIC_ASSET_EXPERIMENT,
+        asset_tags: dict = None,
+    ):
         """Downloads a directory from the MLflow artifacts registry to a local directory."""
         try:
 
             import shutil
 
-            asset_uri = self._get_absolute_artifact_uri(asset_dir_path,
-                                                        experiment_name=experiment_name,
-                                                        tags=asset_tags)
+            asset_uri = self._get_absolute_artifact_uri(
+                asset_dir_path, experiment_name=experiment_name, tags=asset_tags
+            )
 
             local_path = mlflow.artifacts.download_artifacts(artifact_uri=asset_uri)
 
@@ -181,8 +200,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
-    def log_results(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                    content: str = None):
+    def log_results(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
         """Logs pipeline output artifacts to a new MLflow run."""
         try:
             is_dir = os.path.isdir(results_path)
@@ -199,7 +219,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             client = MlflowClient()
 
-            experiment_name = self.RESULT_DIRECTORY_ASSET_EXPERIMENT if is_dir else self.RESULT_ASSET_EXPERIMENT
+            experiment_name = (
+                self.RESULT_DIRECTORY_ASSET_EXPERIMENT if is_dir else self.RESULT_ASSET_EXPERIMENT
+            )
 
             experiment = self.get_or_create_experiment_by_name(client, experiment_name)
 
@@ -225,8 +247,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
-    def log_static_asset(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                  content: str = None):
+    def log_static_asset(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
         try:
             is_dir = os.path.isdir(results_path)
@@ -243,7 +266,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             client = MlflowClient()
 
-            experiment = self.get_or_create_experiment_by_name(client, self.STATIC_ASSET_EXPERIMENT)
+            experiment = self.get_or_create_experiment_by_name(
+                client, self.STATIC_ASSET_EXPERIMENT
+            )
 
             with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
 
@@ -268,15 +293,17 @@ class MlFlowAssetLoader(AssetLoader):
             raise e
 
     def get_prompt_name(self, prompt_path: str) -> str:
-        """Derives the MLflow prompt registry name by replacing path separators with dashes and using a double-dash to delimit the directory from the filename."""
-        prompt_name = "--".join(prompt_path.rsplit("/",1))
+        """Derives the MLflow prompt registry name by replacing path separators with dashes
+        and using a double-dash to delimit the directory from the filename."""
+        prompt_name = "--".join(prompt_path.rsplit("/", 1))
 
         prompt_name = prompt_name.replace("/", "-")
 
         return prompt_name
 
     def upload_prompt(self, prompt_path: str):
-        """Registers a prompt template from the local assets directory to the MLflow prompt registry."""
+        """Registers a prompt template from the local assets directory to the MLflow prompt
+        registry."""
         try:
 
             asset_uri = os.path.join(self._PROMPTS_DIR, prompt_path + ".txt")
@@ -297,7 +324,8 @@ class MlFlowAssetLoader(AssetLoader):
             raise e
 
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
-        """Loads a prompt from the MLflow prompt registry and renders it with the provided variables."""
+        """Loads a prompt from the MLflow prompt registry and renders it with the provided
+        variables."""
         try:
 
             from jinja2 import Template
@@ -342,7 +370,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             client = MlflowClient()
 
-            experiment = self.get_or_create_experiment_by_name(client, self.STATIC_ASSET_EXPERIMENT)
+            experiment = self.get_or_create_experiment_by_name(
+                client, self.STATIC_ASSET_EXPERIMENT
+            )
 
             run = client.create_run(experiment.experiment_id, run_name=self._RUN_NAME)
 

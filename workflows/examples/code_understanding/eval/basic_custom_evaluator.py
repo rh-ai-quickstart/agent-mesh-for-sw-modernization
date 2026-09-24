@@ -5,12 +5,12 @@ import tempfile
 
 import pandas as pd
 from litellm import completion
-
-from .custom_evaluator import CustomEvaluator, _DEFAULT_EVAL_DATASET, build_repo_context
 from utils.graphrag_utils import DependencyAnalyzer
 from utils.json_utils import extract_json_from_string
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+from .custom_evaluator import _DEFAULT_EVAL_DATASET, CustomEvaluator, build_repo_context
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 def _llm_kwargs(prefix: str) -> dict:
@@ -23,8 +23,8 @@ def _llm_kwargs(prefix: str) -> dict:
 
 
 class BasicCustomEvaluator(CustomEvaluator):
-    """LLM-as-judge evaluator using direct LiteLLM calls without an external evaluation framework.
-    """
+    """LLM-as-judge evaluator using direct LiteLLM calls without an external evaluation
+    framework."""
 
     _JUDGE_PROMPT = """Evaluate the following answer against the reference answer.
 
@@ -43,10 +43,18 @@ Rate the actual answer on each dimension from 1 to 5:
 - answer_correctness: Is the actual answer factually correct based on the reference?
 
 Respond ONLY with valid JSON in this exact format:
-{{"faithfulness": <score>, "answer_relevance": <score>, "answer_similarity": <score>, "answer_correctness": <score>, "reasoning": "<brief explanation>"}}"""
+{{"faithfulness": <score>, "answer_relevance": <score>, "answer_similarity": <score>,
+"answer_correctness": <score>, "reasoning": "<brief explanation>"}}"""
 
-    def evaluate(self, input: str, graphrag_source_dir: str, git_repo: str, git_branch: str,
-                 git_slug: str = None, multi_repo: bool = False):
+    def evaluate(
+        self,
+        input: str,
+        graphrag_source_dir: str,
+        git_repo: str,
+        git_branch: str,
+        git_slug: str = None,
+        multi_repo: bool = False,
+    ):
         """Evaluates a GraphRAG response using LLM-as-judge with a generated reference answer.
 
         Queries GraphRAG with the input, generates a reference answer via GROUND_TRUTH_LLM,
@@ -54,18 +62,21 @@ Respond ONLY with valid JSON in this exact format:
 
         Args:
             input: The question or prompt to evaluate.
-            graphrag_source_dir: Root directory of the GraphRAG index (must contain output/*.parquet).
+            graphrag_source_dir: Root directory of the GraphRAG index (must contain
+                output/*.parquet).
             git_repo: Repository URL used as context for the ground truth LLM.
             git_branch: Branch name used as context for the ground truth LLM.
             git_slug: Optional repository slug used to scope results.
 
         Returns:
-            dict with keys: faithfulness, answer_relevance, answer_similarity, answer_correctness, reasoning,
-            question, actual_answer, reference_answer.
+            dict with keys: faithfulness, answer_relevance, answer_similarity,
+            answer_correctness, reasoning, question, actual_answer, reference_answer.
         """
         try:
 
-            analyzer = DependencyAnalyzer(root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo)
+            analyzer = DependencyAnalyzer(
+                root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo
+            )
 
             actual_answer = asyncio.run(analyzer.query_with_llm(input))
 
@@ -137,7 +148,8 @@ Respond ONLY with valid JSON in this exact format:
         git_slug: str = None,
         multi_repo: bool = False,
     ):
-        """Evaluates all rows in a CSV dataset using a DataFrame-based pipeline and uploads the results.
+        """Evaluates all rows in a CSV dataset using a DataFrame-based pipeline and uploads
+        the results.
 
         Builds inputs from question and one_shot_example columns, generates reference answers
         via GROUND_TRUTH_LLM, queries GraphRAG for actual answers, then scores each row
@@ -160,12 +172,15 @@ Respond ONLY with valid JSON in this exact format:
 
         df = pd.read_csv(eval_dataset_file)
 
-        analyzer = DependencyAnalyzer(root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo)
+        analyzer = DependencyAnalyzer(
+            root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo
+        )
 
         df["inputs"] = df.apply(
             lambda row: (
                 f"{row['question']}\n\n**Example format:**\n{row['one_shot_example']}"
-                if pd.notna(row.get("one_shot_example")) and str(row.get("one_shot_example", "")).strip()
+                if pd.notna(row.get("one_shot_example"))
+                and str(row.get("one_shot_example", "")).strip()
                 else str(row["question"])
             ),
             axis=1,
@@ -175,22 +190,30 @@ Respond ONLY with valid JSON in this exact format:
 
         def _ground_truth(input_text):
             try:
-                return completion(
-                    **_llm_kwargs("GROUND_TRUTH"),
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are a senior software architect providing authoritative "
-                                "reference answers about code structure and dependencies."
-                            ),
-                        },
-                        {
-                            "role": "user",
-                            "content": f"{repo_context}\n\n{input_text}" if repo_context else input_text,
-                        },
-                    ],
-                ).choices[0].message.content
+                return (
+                    completion(
+                        **_llm_kwargs("GROUND_TRUTH"),
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a senior software architect providing authoritative "
+                                    "reference answers about code structure and dependencies."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"{repo_context}\n\n{input_text}"
+                                    if repo_context
+                                    else input_text
+                                ),
+                            },
+                        ],
+                    )
+                    .choices[0]
+                    .message.content
+                )
             except Exception as e:
                 logging.error(f"Ground truth LLM failed: {e}")
                 return "Could not process query"
@@ -208,7 +231,13 @@ Respond ONLY with valid JSON in this exact format:
 
         df["predictions"] = df.apply(_query, axis=1)
 
-        _METRIC_KEYS = ["faithfulness", "answer_relevance", "answer_similarity", "answer_correctness", "reasoning"]
+        _METRIC_KEYS = [
+            "faithfulness",
+            "answer_relevance",
+            "answer_similarity",
+            "answer_correctness",
+            "reasoning",
+        ]
 
         def _judge(row):
             try:
@@ -242,16 +271,13 @@ Respond ONLY with valid JSON in this exact format:
         df = df.drop(columns=["inputs", "predictions", "reference_answer"], errors="ignore")
 
         from utils import code_utils
+
         slug = git_slug or code_utils.generate_slug_from_repo(git_repo, git_branch)
 
         artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
-
             DefaultAssetLoader.RESULTS_PATH_PREFIX_EVAL,
-
             git_slug=slug,
-
             multi_repo=multi_repo,
-
         )
 
         df["git_slug"] = slug

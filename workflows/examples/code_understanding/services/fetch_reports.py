@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 from typing import Any
-import logging
+
 logging.basicConfig(level=logging.INFO)
-import traceback
+import traceback  # noqa: E402
 
 
 def _read_dir_contents(path: str) -> str | None:
@@ -27,8 +28,8 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
     if not multi_repo and not git_slug:
         return None, None
     try:
-        from loaders.mlflow_asset_loader import MlFlowAssetLoader
         from loaders.asset_loader import AssetLoader
+        from loaders.mlflow_asset_loader import MlFlowAssetLoader
 
         loader = MlFlowAssetLoader()
         base_tags: dict[str, Any] = (
@@ -48,14 +49,18 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
                         asset_tags={**base_tags, "category": category},
                     )
                     content = _read_dir_contents(tmpdir)
-                    logging.info(f"Downloaded {category} report from "
-                                 f"artifact '{artifact_path}', git_slug='{git_slug}', multi_repo='{multi_repo}'")
+                    logging.info(
+                        f"Downloaded {category} report from artifact '{artifact_path}', "
+                        f"git_slug='{git_slug}', multi_repo='{multi_repo}'"
+                    )
                     logging.debug(f"Contents: {content}")
                     return content
                 except Exception:
-                    logging.error(f"Error: Could not download {category} report"
-                                  f" from artifact '{artifact_path}', "
-                                  f"tags: {base_tags}, experiment: {loader.RESULT_ASSET_EXPERIMENT}")
+                    logging.error(
+                        f"Error: Could not download {category} report"
+                        f" from artifact '{artifact_path}', "
+                        f"tags: {base_tags}, experiment: {loader.RESULT_ASSET_EXPERIMENT}"
+                    )
                     logging.error(traceback.format_exc())
                     return None
 
@@ -64,6 +69,8 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
             _get(AssetLoader.RESULTS_PATH_PREFIX_PIPELINES, "analysis"),
         )
     except Exception:
-        logging.error(f"Could not fetch reports for git_slug='{git_slug}', multi_repo='{multi_repo}':")
+        logging.error(
+            f"Could not fetch reports for git_slug='{git_slug}', multi_repo='{multi_repo}':"
+        )
         logging.error(traceback.format_exc())
         return None, None
