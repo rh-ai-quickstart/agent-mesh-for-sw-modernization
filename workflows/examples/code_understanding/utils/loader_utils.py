@@ -62,6 +62,8 @@ def download_code_metadata_directories(git_repos: list, parent_target_path: str)
                             "code-metadata": True, "multi_repo": True},
 
             )
-        except Exception as e:
+        except Exception:
 
-            logging.error(f"Could not find generated data for {git_repo} ({repo_slug}); skipping...")
+            logging.error(
+                f"Could not find generated data for {git_repo} ({repo_slug}); skipping..."
+            )

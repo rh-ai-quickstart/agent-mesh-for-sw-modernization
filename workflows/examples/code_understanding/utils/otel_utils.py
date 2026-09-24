@@ -10,6 +10,8 @@ def enable_telemetry(fn):
             DefaultCustomTelemetry().track()
         except Exception as e:
             import logging
-            logging.warning(f"enable_telemetry: telemetry setup failed, continuing without telemetry: {e}")
+            logging.warning(
+                f"enable_telemetry: telemetry setup failed, continuing without telemetry: {e}"
+            )
         return fn(*args, **kwargs)
     return wrapper

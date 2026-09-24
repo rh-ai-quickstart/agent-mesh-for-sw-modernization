@@ -4,7 +4,8 @@ import os
 logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
 
 
-def prepare_indexing_config(graphrag_source_path: str, git_slug: str, git_repo: str, multi_repo: bool):
+def prepare_indexing_config(
+        graphrag_source_path: str, git_slug: str, git_repo: str, multi_repo: bool):
     """Downloads GraphRAG prompt files and copies them to graphrag_source_path.
     """
     import shutil

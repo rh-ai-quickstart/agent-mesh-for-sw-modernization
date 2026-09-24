@@ -3,15 +3,17 @@ NOTE: This class has a dependency on the pyvis library:
     pip install pyvis
 """
 
-from graphrag.config.load_config import load_config
 import logging
 import os
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
-import networkx as nx
-import matplotlib.pyplot as plt
-from pyvis.network import Network
-from utils.graphrag_utils import DependencyAnalyzer
 import traceback
+
+import matplotlib.pyplot as plt
+import networkx as nx
+from pyvis.network import Network
+
+from utils.graphrag_utils import DependencyAnalyzer
+
+logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
 
 
 def visualize_dependencies(analyzer: DependencyAnalyzer):
@@ -33,8 +35,8 @@ def visualize_dependencies(analyzer: DependencyAnalyzer):
 
         for _, row in analyzer.relationship_df.iterrows():
 
-            if 'import' in row['description'].lower() or 'depend' in row[
-                'description'].lower():
+            desc = row['description'].lower()
+            if 'import' in desc or 'depend' in desc:
                 G.add_edge(
 
                     row['source'],
@@ -107,7 +109,8 @@ def visualize_dependencies(analyzer: DependencyAnalyzer):
 
 
 def log_interactive_dependency_graph(analyzer: DependencyAnalyzer):
-    """Generates the interactive dependency graph and logs it as an artifact via DefaultAssetLoader."""
+    """Generates the interactive dependency graph and logs it as an artifact via DefaultAssetLoader.
+    """
     from loaders.default_asset_loader import DefaultAssetLoader
 
     html_path = visualize_dependencies(analyzer)
@@ -128,8 +131,8 @@ def log_interactive_dependency_graph(analyzer: DependencyAnalyzer):
 
     )
 
-    DefaultAssetLoader().log_results(html_path,
-
-                                     artifact_path=artifact_path,
-
-                                     tags={"category": "visualization", "git_slug": analyzer.git_slug})
+    DefaultAssetLoader().log_results(
+        html_path,
+        artifact_path=artifact_path,
+        tags={"category": "visualization", "git_slug": analyzer.git_slug},
+    )

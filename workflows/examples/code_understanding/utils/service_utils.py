@@ -46,7 +46,9 @@ def create_client(host: str | None = None, namespace: str | None = None) -> Any:
 def find_pipeline_id(client: Any, pipeline_name: str) -> str:
     """Return the pipeline_id for a registered pipeline, or raise ValueError."""
     result = client.list_pipelines(filter=json.dumps({
-        "predicates": [{"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}]
+        "predicates": [
+            {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+        ]
     }))
     if not result.pipelines:
         raise ValueError(f"Pipeline '{pipeline_name}' not found in KFP.")
