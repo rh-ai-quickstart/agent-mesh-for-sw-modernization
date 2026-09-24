@@ -29,7 +29,7 @@ os.environ.setdefault("SSL_VERIFY", "false")
 # Redirect the cache to a writable temp directory before numba is imported.
 os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
 
-import services  # noqa: E402
+from services.run_adhoc_query import run_adhoc_query as _run_adhoc_query  # noqa: E402
 
 _jobs: dict[str, dict[str, Any]] = {}
 
@@ -51,7 +51,7 @@ def submit_query(
 
     def _run():
         try:
-            result = services.run_adhoc_query(
+            result = _run_adhoc_query(
                 question=question,
                 retry_count=retry_count,
                 use_global=use_global,
