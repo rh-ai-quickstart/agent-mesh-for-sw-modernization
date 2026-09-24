@@ -161,7 +161,7 @@ def _run_pipeline(
 def _run_pipeline_multi_repo():
     """Generates code metadata for all repositories in the asset-loader repo list."""
 
-    repo_list_task = get_repo_list_op(kfp_run_id=dsl.PIPELINE_RUN_ID_PLACEHOLDER)
+    repo_list_task = get_repo_list_op(kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
     with dsl.ParallelFor(
         items=repo_list_task.output, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
