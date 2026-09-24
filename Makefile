@@ -54,6 +54,9 @@ endif
 .PHONY: \
 	help \
 	help-all \
+	test-all \
+	format \
+	lint \
 	install \
 	deploy-embedding-model \
 	deploy-notebooks \
@@ -111,6 +114,13 @@ help-all:
 	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
 	@echo "  apply-secrets               Create or update application secrets"
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test-all                    Run all test suites"
+	@echo ""
+	@echo "Utility commands:"
+	@echo "  format                      Format Python code with isort and Black"
+	@echo "  lint                        Check Python code with Flake8, Black, and isort"
 	@echo ""
 	@echo "Container images:"
 	@echo "  build-images                Build and push all application images"
@@ -310,6 +320,34 @@ apply-secrets:
 			--type=merge \
 			-p "{\"stringData\":{\"MLFLOW_TRACKING_URI\":\"https://$(GATEWAY_HOST)/mlflow\"}}"; \
 	fi
+
+# ============================================================================
+# Testing
+# ============================================================================
+
+test-all:
+	@echo "==> Running UI tests..."
+	uv run --project ui --frozen pytest ui/tests
+
+# ============================================================================
+# Utility commands
+# ============================================================================
+
+format:
+	@echo "==> Sorting Python imports with isort..."
+	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' .
+	@echo "==> Formatting Python code with Black..."
+	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' .
+	@echo "==> Formatting completed successfully."
+
+lint:
+	@echo "==> Running Flake8..."
+	uv run --project ui --frozen flake8 --extend-exclude=.venv --max-line-length=99 --extend-ignore=E203,W503 .
+	@echo "==> Checking Python formatting with Black..."
+	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' --check --diff .
+	@echo "==> Checking Python import sorting with isort..."
+	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' --check-only --diff .
+	@echo "==> Lint checks completed successfully."
 
 # ============================================================================
 # Container images
