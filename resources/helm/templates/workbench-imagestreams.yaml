@@ -1,35 +1,15 @@
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: datagen-storage
-  namespace: {{ .Values.namespace}}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: graphrag-storage
-  namespace: {{ .Values.namespace}}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
+{{- if .Values.imageStreams.enabled }}
 ---
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: custom-data-generation
-  namespace: redhat-ods-applications
+  name: {{ include "agent-mesh.imageStreamName" (dict "root" . "base" .Values.imageStreams.names.dataGeneration) }}
+  namespace: {{ .Values.imageStreams.namespace }}
   labels:
     app.kubernetes.io/created-by: "byon"
+    app.kubernetes.io/part-of: agent-mesh-for-sw
+    app.kubernetes.io/component: data-generation-image
+    agent-mesh.redhat.com/owner-namespace: {{ .Values.namespace | quote }}
     opendatahub.io/dashboard: "true"
     opendatahub.io/notebook-image: "true"
   annotations:
@@ -56,10 +36,13 @@ spec:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: custom-graphrag
-  namespace: redhat-ods-applications
+  name: {{ include "agent-mesh.imageStreamName" (dict "root" . "base" .Values.imageStreams.names.graphrag) }}
+  namespace: {{ .Values.imageStreams.namespace }}
   labels:
     app.kubernetes.io/created-by: "byon"
+    app.kubernetes.io/part-of: agent-mesh-for-sw
+    app.kubernetes.io/component: graphrag-image
+    agent-mesh.redhat.com/owner-namespace: {{ .Values.namespace | quote }}
     opendatahub.io/dashboard: "true"
     opendatahub.io/notebook-image: "true"
   annotations:
@@ -86,10 +69,13 @@ spec:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: custom-analysis
-  namespace: redhat-ods-applications
+  name: {{ include "agent-mesh.imageStreamName" (dict "root" . "base" .Values.imageStreams.names.analysis) }}
+  namespace: {{ .Values.imageStreams.namespace }}
   labels:
     app.kubernetes.io/created-by: "byon"
+    app.kubernetes.io/part-of: agent-mesh-for-sw
+    app.kubernetes.io/component: analysis-image
+    agent-mesh.redhat.com/owner-namespace: {{ .Values.namespace | quote }}
     opendatahub.io/dashboard: "true"
     opendatahub.io/notebook-image: "true"
   annotations:
@@ -112,3 +98,4 @@ spec:
         importMode: Legacy
       referencePolicy:
         type: Source
+{{- end }}

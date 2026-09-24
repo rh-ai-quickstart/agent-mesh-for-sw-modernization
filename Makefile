@@ -5,6 +5,7 @@
 .DEFAULT_GOAL := install
 
 ENV_FILE            	?= ./.env
+WORKBENCH_IMAGESTREAM_NAMESPACE ?= redhat-ods-applications
 GIT_REPO_URL        	:= $(shell git remote get-url origin 2>/dev/null | sed 's|^git@\([^:]*\):\(.*\)$$|https://\1/\2|')
 GIT_REPO_BRANCH     	:= $(shell git branch --show-current 2>/dev/null)
 CLUSTER_DOMAIN      	:= $(shell oc get ingress.config cluster -o jsonpath='{.spec.domain}' 2>/dev/null)
@@ -13,6 +14,7 @@ PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
 DEPLOY_EMBEDDING_MODEL ?= false
+DEPLOY_OTEL            ?= false
 # Local development uses Podman by default. GitHub Actions sets CI=true and
 # provides Docker Buildx; callers can override this with CONTAINER_ENGINE.
 CONTAINER_ENGINE      ?= $(if $(CI),docker,podman)
@@ -57,6 +59,7 @@ endif
 	install \
 	uninstall \
 	deploy-embedding-model \
+	prepare-workbench-images \
 	deploy-notebooks \
 	apply-secrets \
 	build-images \
@@ -107,6 +110,7 @@ help-all:
 	@echo "  install                     Install the complete application stack"
 	@echo "  uninstall                   Remove the application stack and PVC-backed data"
 	@echo "  deploy-embedding-model      Deploy the e5-mistral embedding model"
+	@echo "  prepare-workbench-images    Register project workbench images with OpenShift AI"
 	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
 	@echo "  apply-secrets               Create or update application secrets"
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
@@ -142,6 +146,7 @@ help-all:
 	@echo "Common runtime overrides (not exhaustive):"
 	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
+	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
@@ -155,13 +160,13 @@ help-all:
 # ============================================================================
 
 install:
-	@set -a && . $(ENV_FILE) && set +a && \
+	@set -e; set -a; . $(ENV_FILE); set +a; \
 	\
 	echo "==> Creating namespaces..." && \
 	set -- agent-mesh-for-sw resources/helm \
 		--set "namespace=$$KFP_NAMESPACE" \
 		--set "requester=$$(oc whoami)"; \
-	if [ -n "$${OTEL_NAMESPACE:-}" ]; then \
+	if [ "$(DEPLOY_OTEL)" = "true" ] && [ -n "$${OTEL_NAMESPACE:-}" ]; then \
 		set -- "$$@" --set "otel.namespace=$$OTEL_NAMESPACE"; \
 	fi; \
 	helm template "$$@" -s templates/namespace.yaml | oc apply -f - && \
@@ -169,18 +174,19 @@ install:
 	echo "==> Waiting for OpenShift to inject service CA into odh-trusted-ca-bundle..." && \
 	until oc get configmap odh-trusted-ca-bundle -n $$KFP_NAMESPACE \
 		-o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null | grep -q CERTIFICATE; do sleep 5; done
+	$(MAKE) prepare-workbench-images
 	@if [ "$(DEPLOY_EMBEDDING_MODEL)" = "true" ]; then \
 		$(MAKE) deploy-embedding-model; \
 	fi
 	$(MAKE) apply-secrets
-	@set -a && . $(ENV_FILE) && set +a && \
+	@set -e; set -a; . $(ENV_FILE); set +a; \
 	: "$${KFP_IMAGE_REGISTRY:?KFP_IMAGE_REGISTRY must be set in $(ENV_FILE)}"; \
 	OTEL_ENABLED=false; \
 	set -- agent-mesh-for-sw resources/helm \
 		--namespace "$$KFP_NAMESPACE" \
 		--create-namespace \
 		--no-hooks \
-		--reuse-values \
+		--reset-then-reuse-values \
 		--set "namespace=$$KFP_NAMESPACE" \
 		--set "requester=$$(oc whoami)" \
 		--set "repoUrl=$(GIT_REPO_URL)" \
@@ -202,9 +208,12 @@ install:
 		--set "pipelineTools.image.tag=$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
 		--set "clusterDomain=$(CLUSTER_DOMAIN)" \
 		--set "mlflowGatewayHost=$(GATEWAY_HOST)" \
+		--set "imageStreams.namespace=$(WORKBENCH_IMAGESTREAM_NAMESPACE)" \
+		--set imageStreams.enabled=false \
 		--set deployNotebooks=true \
 		--set otel.enabled=false; \
-	if [ -n "$${OTEL_NAMESPACE:-}" ] && [ -n "$${OTEL_SERVICE_NAME:-}" ] && \
+	if [ "$(DEPLOY_OTEL)" = "true" ] && \
+	   [ -n "$${OTEL_NAMESPACE:-}" ] && [ -n "$${OTEL_SERVICE_NAME:-}" ] && \
 	   oc get crd opentelemetrycollectors.opentelemetry.io >/dev/null 2>&1 && \
 	   oc get crd tempostacks.tempo.grafana.com >/dev/null 2>&1; then \
 		OTEL_ENABLED=true; \
@@ -261,12 +270,21 @@ uninstall:
 				oc delete "$$resource" -n "$$KFP_NAMESPACE" --ignore-not-found;; \
 		esac; \
 	done; \
+	if oc get workflows.argoproj.io -n "$$KFP_NAMESPACE" >/dev/null 2>&1; then \
+		echo "==> Removing Kubeflow pipeline runs..."; \
+		oc delete workflows.argoproj.io -n "$$KFP_NAMESPACE" \
+			-l pipeline/runid --ignore-not-found \
+			--cascade=foreground --wait=true --timeout=2m; \
+	fi; \
 	echo "==> Removing Helm releases..."; \
 	helm uninstall e5-mistral -n "$$KFP_NAMESPACE" \
 		--ignore-not-found --cascade foreground --wait --timeout 2m; \
 	helm uninstall agent-mesh-for-sw -n "$$KFP_NAMESPACE" \
 		--ignore-not-found --cascade foreground --wait --timeout 2m; \
 	echo "==> Removing non-Helm resources..."; \
+	oc delete imagestream -n "$(WORKBENCH_IMAGESTREAM_NAMESPACE)" \
+		-l "app.kubernetes.io/part-of=agent-mesh-for-sw,agent-mesh.redhat.com/owner-namespace=$$KFP_NAMESPACE" \
+		--ignore-not-found; \
 	oc delete secret git-credentials code-understanding-env \
 		-n "$$KFP_NAMESPACE" --ignore-not-found; \
 	oc delete pvc mariadb-dspa -n "$$KFP_NAMESPACE" \
@@ -293,23 +311,32 @@ deploy-embedding-model:
 			--namespace "$$KFP_NAMESPACE" \
 			--create-namespace
 
-deploy-notebooks:
-	@set -a && . $(ENV_FILE) && set +a && \
-		echo "==> Waiting for data-generation ImageStream to import..." && \
-		until oc get imagestreamtag custom-data-generation:$$KFP_DATA_GENERATION_BASE_IMAGE_TAG -n redhat-ods-applications -o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
-		DATAGEN_IMAGE="$$(oc get imagestream custom-data-generation -n redhat-ods-applications -o jsonpath='{.status.dockerImageRepository}'):$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" && \
-		echo "  image: $$DATAGEN_IMAGE" && \
-		\
-		echo "==> Waiting for graphrag ImageStream to import..." && \
-		until oc get imagestreamtag custom-graphrag:$$KFP_INDEXING_BASE_IMAGE_TAG -n redhat-ods-applications -o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
-		GRAPHRAG_IMAGE="$$(oc get imagestream custom-graphrag -n redhat-ods-applications -o jsonpath='{.status.dockerImageRepository}'):$$KFP_INDEXING_BASE_IMAGE_TAG" && \
-		echo "  image: $$GRAPHRAG_IMAGE" && \
-		\
-		echo "==> Waiting for analysis ImageStream to import..." && \
-		until oc get imagestreamtag custom-graphrag:$$KFP_ANALYSIS_BASE_IMAGE_TAG -n redhat-ods-applications -o jsonpath='{.image.dockerImageReference}' 2>/dev/null | grep -q '@sha256:'; do sleep 5; done && \
-		ANALYSIS_IMAGE="$$(oc get imagestream custom-graphrag -n redhat-ods-applications -o jsonpath='{.status.dockerImageRepository}'):$$KFP_ANALYSIS_BASE_IMAGE_TAG" && \
-		echo "  image: $$ANALYSIS_IMAGE" && \
-		\
+prepare-workbench-images:
+	@set -e; set -a; . $(ENV_FILE); set +a; \
+		echo "==> Registering project workbench images with OpenShift AI..."; \
+		IMAGESTREAMS="$$(helm template agent-mesh-for-sw resources/helm \
+			--namespace "$$KFP_NAMESPACE" \
+			--set "namespace=$$KFP_NAMESPACE" \
+			--set imageStreams.enabled=true \
+			--set "imageStreams.namespace=$(WORKBENCH_IMAGESTREAM_NAMESPACE)" \
+			--set "dataGeneration.image.registry=$$KFP_IMAGE_REGISTRY" \
+			--set "dataGeneration.image.name=$$KFP_DATA_GENERATION_BASE_IMAGE_NAME" \
+			--set "dataGeneration.image.tag=$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" \
+			--set "graphrag.image.registry=$$KFP_IMAGE_REGISTRY" \
+			--set "graphrag.image.name=$$KFP_INDEXING_BASE_IMAGE_NAME" \
+			--set "graphrag.image.tag=$$KFP_INDEXING_BASE_IMAGE_TAG" \
+			--set "analysis.image.registry=$$KFP_IMAGE_REGISTRY" \
+			--set "analysis.image.name=$$KFP_ANALYSIS_BASE_IMAGE_NAME" \
+			--set "analysis.image.tag=$$KFP_ANALYSIS_BASE_IMAGE_TAG" \
+			-s templates/workbench-imagestreams.yaml | \
+			oc apply -f - -o name)"; \
+		echo "==> Waiting for project workbench images to import..."; \
+		oc wait -n "$(WORKBENCH_IMAGESTREAM_NAMESPACE)" \
+			--for=jsonpath='{.status.tags[0].items[0].image}' \
+			--timeout=300s $$IMAGESTREAMS
+
+deploy-notebooks: prepare-workbench-images
+	@set -e; set -a; . $(ENV_FILE); set +a; \
 		echo "==> Waiting for DSPA to be fully reconciled..." && \
 		until oc get datasciencepipelinesapplication dspa -n $$KFP_NAMESPACE \
 			-o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; do sleep 5; done && \
@@ -317,7 +344,7 @@ deploy-notebooks:
 		echo "==> Deploying notebooks..." && \
 		helm upgrade agent-mesh-for-sw resources/helm \
 			--namespace "$$KFP_NAMESPACE" \
-			--reuse-values \
+			--reset-then-reuse-values \
 			--no-hooks \
 			--set namespace="$$KFP_NAMESPACE" \
 			--set requester="$$(oc whoami)" \
@@ -326,15 +353,13 @@ deploy-notebooks:
 			--set dataGeneration.image.registry="$$KFP_IMAGE_REGISTRY" \
 			--set dataGeneration.image.name="$$KFP_DATA_GENERATION_BASE_IMAGE_NAME" \
 			--set dataGeneration.image.tag="$$KFP_DATA_GENERATION_BASE_IMAGE_TAG" \
-			--set dataGeneration.image.digestRef="$$DATAGEN_IMAGE" \
 			--set graphrag.image.registry="$$KFP_IMAGE_REGISTRY" \
 			--set graphrag.image.name="$$KFP_INDEXING_BASE_IMAGE_NAME" \
 			--set graphrag.image.tag="$$KFP_INDEXING_BASE_IMAGE_TAG" \
-			--set graphrag.image.digestRef="$$GRAPHRAG_IMAGE" \
 			--set analysis.image.registry="$$KFP_IMAGE_REGISTRY" \
 			--set analysis.image.name="$$KFP_ANALYSIS_BASE_IMAGE_NAME" \
 			--set analysis.image.tag="$$KFP_ANALYSIS_BASE_IMAGE_TAG" \
-			--set analysis.image.digestRef="$$ANALYSIS_IMAGE" \
+			--set imageStreams.namespace="$(WORKBENCH_IMAGESTREAM_NAMESPACE)" \
 			--set deployNotebooks=true
 
 apply-secrets:
@@ -616,7 +641,7 @@ deploy-otel:
 	echo "==> Deploying TempoStack and OpenTelemetry Collector..." && \
 	helm upgrade agent-mesh-for-sw resources/helm \
 		--namespace "$$KFP_NAMESPACE" \
-		--reuse-values \
+		--reset-then-reuse-values \
 		--no-hooks \
 		--set namespace="$$KFP_NAMESPACE" \
 		--set otel.namespace=$$OTEL_NAMESPACE \
@@ -635,7 +660,7 @@ apply-console-src:
 	echo "==> Publishing job scripts ConfigMap..." && \
 	helm upgrade agent-mesh-for-sw resources/helm \
 		--namespace "$$KFP_NAMESPACE" \
-		--reuse-values \
+		--reset-then-reuse-values \
 		--no-hooks \
 		--set namespace="$$KFP_NAMESPACE" \
 		--set console.jobScripts.enabled=true \
@@ -657,7 +682,7 @@ deploy-console-app:
 	echo "==> Deploying Code Understanding console..." && \
 	helm upgrade agent-mesh-for-sw resources/helm \
 		--namespace "$$KFP_NAMESPACE" \
-		--reuse-values \
+		--reset-then-reuse-values \
 		--no-hooks \
 		--set namespace="$$KFP_NAMESPACE" \
 		--set requester="$$(oc whoami)" \

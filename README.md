@@ -78,16 +78,8 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
 (**NOTE**: To deploy the local `e5-mistral` embedding model as part of installation, run:
    `make install DEPLOY_EMBEDDING_MODEL=true`)
 
-`make install` performs one Helm upgrade/install for the main
-`agent-mesh-for-sw` release. That release owns the pipeline infrastructure,
-notebooks, and any Tempo/OpenTelemetry resources created during installation.
-Pipeline uploads, pipeline runs, and ad-hoc queries remain separately invokable
-operations. The optional `e5-mistral` model remains a separate release.
-
-The standalone console is an optional add-on. Deploy it explicitly with
-`make deploy-console-app`; this enables the versioned image configured by
-`KFP_IMAGE_REGISTRY`, `CONSOLE_APP_IMAGE_NAME`, and `CONSOLE_IMAGE_TAG` in the
-existing `agent-mesh-for-sw` release.
+OpenTelemetry and Tempo are optional and disabled by default. To deploy them as
+part of installation, run `make install DEPLOY_OTEL=true`.
 
 ### Uninstalling
 
@@ -97,11 +89,13 @@ Run:
 make uninstall
 ```
 
-Uninstall stops project upload/run/query Jobs, removes the optional
-`e5-mistral` release, uninstalls `agent-mesh-for-sw`, removes manually created
-secrets and operator-generated storage, and deletes the application's
-PVC-backed data. The application and OpenTelemetry namespaces are preserved.
-OpenTelemetry variables are not required when telemetry was not deployed.
+Uninstall stops project upload/run/query Jobs, removes Kubeflow pipeline
+Workflows and their task pods, removes the optional `e5-mistral` release,
+uninstalls `agent-mesh-for-sw`, removes the project workbench ImageStreams,
+manually created secrets, and operator-generated storage, and deletes the
+application's PVC-backed data. The application and OpenTelemetry namespaces are
+preserved. OpenTelemetry variables are not required when telemetry was not
+deployed.
 
 The uninstall target supports deployments created with the current Helm
 ownership model. It does not remove externally stored MLflow data, externally

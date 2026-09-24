@@ -1,15 +1,17 @@
 {{- if .Values.deployNotebooks }}
-{{- $datagen_image := .Values.dataGeneration.image.digestRef | default (printf "%s/%s:%s" .Values.dataGeneration.image.registry .Values.dataGeneration.image.name .Values.dataGeneration.image.tag) }}
-{{- $graphrag_image := .Values.graphrag.image.digestRef | default (printf "%s/%s:%s" .Values.graphrag.image.registry .Values.graphrag.image.name .Values.graphrag.image.tag) }}
+{{- $datagen_image_stream := include "agent-mesh.imageStreamName" (dict "root" . "base" .Values.imageStreams.names.dataGeneration) }}
+{{- $graphrag_image_stream := include "agent-mesh.imageStreamName" (dict "root" . "base" .Values.imageStreams.names.graphrag) }}
+{{- $datagen_image := include "agent-mesh.imageStreamRef" (dict "root" . "base" .Values.imageStreams.names.dataGeneration "tag" .Values.dataGeneration.image.tag) }}
+{{- $graphrag_image := include "agent-mesh.imageStreamRef" (dict "root" . "base" .Values.imageStreams.names.graphrag "tag" .Values.graphrag.image.tag) }}
 ---
 apiVersion: kubeflow.org/v1
 kind: Notebook
 metadata:
   annotations:
     notebooks.opendatahub.io/inject-auth: "true"
-    notebooks.opendatahub.io/last-image-selection: "custom-data-generation:{{ .Values.dataGeneration.image.tag}}"
+    notebooks.opendatahub.io/last-image-selection: "{{ $datagen_image_stream }}:{{ .Values.dataGeneration.image.tag}}"
     opendatahub.io/image-display-name: {{ .Values.dataGeneration.image.title}}
-    opendatahub.io/workbench-image-namespace: "redhat-ods-applications"
+    opendatahub.io/workbench-image-namespace: {{ .Values.imageStreams.namespace | quote }}
     openshift.io/description: ""
     openshift.io/display-name: {{ .Values.dataGeneration.notebook.name}}
     {{- if .Values.dataGeneration.notebook.mlflowInstance }}
@@ -138,9 +140,9 @@ kind: Notebook
 metadata:
   annotations:
     notebooks.opendatahub.io/inject-auth: "true"
-    notebooks.opendatahub.io/last-image-selection: "custom-graphrag:{{ .Values.graphrag.image.tag}}"
+    notebooks.opendatahub.io/last-image-selection: "{{ $graphrag_image_stream }}:{{ .Values.graphrag.image.tag}}"
     opendatahub.io/image-display-name: {{ .Values.graphrag.image.title}}
-    opendatahub.io/workbench-image-namespace: "redhat-ods-applications"
+    opendatahub.io/workbench-image-namespace: {{ .Values.imageStreams.namespace | quote }}
     openshift.io/description: ""
     openshift.io/display-name: {{ .Values.graphrag.notebook.name}}
     {{- if .Values.graphrag.notebook.mlflowInstance }}

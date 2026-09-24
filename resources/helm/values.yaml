@@ -5,6 +5,15 @@ clusterDomain: ""
 mlflowGatewayHost: ""
 deployNotebooks: false
 
+imageStreams:
+  enabled: false
+  namespace: redhat-ods-applications
+  registry: image-registry.openshift-image-registry.svc:5000
+  names:
+    dataGeneration: custom-data-generation
+    graphrag: custom-graphrag
+    analysis: custom-analysis
+
 repoUrl: ""
 repoRef: main
 
@@ -22,7 +31,6 @@ dataGeneration:
     name: ""
     title: "Agent Mesh - Data Generation"
     tag: latest
-    digestRef: ""
   notebook:
     name: data-generation
     mlflowInstance: ""
@@ -33,7 +41,6 @@ graphrag:
     name: ""
     title: "Agent Mesh - GraphRAG Indexing"
     tag: latest
-    digestRef: ""
   notebook:
     name: graphrag-indexing
     mlflowInstance: ""
