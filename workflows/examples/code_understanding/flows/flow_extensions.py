@@ -10,7 +10,6 @@ from sdg_hub.core.blocks.registry import BlockRegistry
 from sdg_hub.core.utils.logger_config import setup_logger
 
 logger = setup_logger(__name__)
-import os  # noqa: E402
 
 
 @BlockRegistry.register(
