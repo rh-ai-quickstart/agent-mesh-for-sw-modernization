@@ -296,13 +296,17 @@ def generate_code_comment(
             lines.append("\nDependencies:")
             lines.extend(f"- [import] {imp}" for imp in imports)
             lines.extend(
-                (f"- [library] {lib.get('library_name', '')} "
-                 f"{lib.get('library_version', '')}").strip()
+                (
+                    f"- [library] {lib.get('library_name', '')} "
+                    f"{lib.get('library_version', '')}"
+                ).strip()
                 for lib in libraries
             )
             lines.extend(
-                (f"- [library] {lib.get('library_name', '')} "
-                 f"{lib.get('library_version', '')}").strip()
+                (
+                    f"- [library] {lib.get('library_name', '')} "
+                    f"{lib.get('library_version', '')}"
+                ).strip()
                 for lib in external_libraries
             )
 
@@ -318,11 +322,8 @@ def generate_code_comment(
             lines.append("\n Methods:")
             lines.extend(
                 [
-                    "- " + (
-                        method.get("method_name", method)
-                        if isinstance(method, dict)
-                        else method
-                    )
+                    "- "
+                    + (method.get("method_name", method) if isinstance(method, dict) else method)
                     for method in metadata["methods"]
                 ]
             )
