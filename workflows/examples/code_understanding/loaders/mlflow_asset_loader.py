@@ -251,18 +251,24 @@ class MlFlowAssetLoader(AssetLoader):
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
+        import shutil
+        import tempfile
+
         try:
             is_dir = os.path.isdir(results_path)
 
-            if os.path.dirname(results_path):
-
-                os.makedirs(os.path.dirname(results_path), exist_ok=True)
-
+            # When content is provided, write to a temp directory so we are not
+            # dependent on the current working directory being writable.
             if content is not None and not is_dir:
-
-                with open(results_path, "w") as f:
-
+                tmp_dir = tempfile.mkdtemp()
+                log_path = os.path.join(tmp_dir, os.path.basename(results_path))
+                with open(log_path, "w") as f:
                     f.write(content)
+            else:
+                tmp_dir = None
+                log_path = results_path
+                if os.path.dirname(results_path):
+                    os.makedirs(os.path.dirname(results_path), exist_ok=True)
 
             client = MlflowClient()
 
@@ -278,13 +284,16 @@ class MlFlowAssetLoader(AssetLoader):
 
                 if is_dir:
 
-                    mlflow.log_artifacts(results_path, artifact_path=artifact_path)
+                    mlflow.log_artifacts(log_path, artifact_path=artifact_path)
 
                 else:
 
-                    mlflow.log_artifact(results_path, artifact_path=artifact_path)
+                    mlflow.log_artifact(log_path, artifact_path=artifact_path)
 
                 logging.info(f"Logged asset to run {run.info.run_id}")
+
+            if tmp_dir:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
         except Exception as e:
 
