@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Cookie, HTTPException
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO)
@@ -26,9 +26,12 @@ class RunQueryRequest(BaseModel):
 
 
 @router.post("/queries")
-async def post_query(body: RunQueryRequest) -> dict[str, Any]:
+async def post_query(
+    body: RunQueryRequest,
+    cu_namespace: str | None = Cookie(default=None),
+) -> dict[str, Any]:
     try:
-        return query_service.submit_query(**body.model_dump())
+        return query_service.submit_query(**body.model_dump(), namespace=cu_namespace)
     except ValueError as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(exc)) from exc

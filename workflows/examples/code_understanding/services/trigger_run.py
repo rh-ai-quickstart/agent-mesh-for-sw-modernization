@@ -14,6 +14,7 @@ def trigger_run(
     run_name: str,
     params: dict[str, str],
     repos: list[dict[str, str]] | None = None,
+    namespace: str | None = None,
 ) -> Any:
     """Look up a pipeline, resolve its latest version, and submit a run.
 
@@ -21,7 +22,7 @@ def trigger_run(
     with the KFP run ID so that ``get_repo_list_op`` can retrieve it via
     ``asset_tags={"kfp_run_id": ...}``.
     """
-    client = create_client()
+    client = create_client(namespace=namespace)
     pipeline_id = find_pipeline_id(client, pipeline_name)
     version_id = latest_version_id(client, pipeline_id)
     experiment = client.create_experiment(name="Default")

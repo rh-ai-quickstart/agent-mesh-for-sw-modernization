@@ -5,14 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from archive_helpers import make_index_bundle
+from fastapi.testclient import TestClient
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
-pytest.importorskip("fastapi")
-pytest.importorskip("kubernetes")
-from archive_helpers import make_index_bundle  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
-
-import main  # noqa: E402
+import main
 
 
 class UploadClient:

@@ -5,9 +5,9 @@ from __future__ import annotations
 from utils.service_utils import create_client
 
 
-def get_kfp_run_state(job_id: str) -> str:
+def get_kfp_run_state(job_id: str, namespace: str | None = None) -> str:
     """Return the normalised uppercase state string for a KFP run."""
-    client = create_client()
+    client = create_client(namespace=namespace)
     try:
         run_detail = client.get_run(run_id=job_id)
     except Exception as exc:

@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Cookie, HTTPException
 from pydantic import BaseModel, Field
 
 logging.basicConfig(level=logging.INFO)
@@ -27,10 +27,13 @@ class RunPipelinesRequest(BaseModel):
 
 
 @router.post("/pipelines")
-async def post_pipeline_service(body: RunPipelinesRequest) -> dict[str, Any]:
+async def post_pipeline_service(
+    body: RunPipelinesRequest,
+    cu_namespace: str | None = Cookie(default=None),
+) -> dict[str, Any]:
     repos = [r.model_dump() for r in body.repos]
     try:
-        return await asyncio.to_thread(pipeline_service.submit_pipeline_run, repos)
+        return await asyncio.to_thread(pipeline_service.submit_pipeline_run, repos, cu_namespace)
     except ValueError as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -40,14 +43,17 @@ async def post_pipeline_service(body: RunPipelinesRequest) -> dict[str, Any]:
 
 
 @router.get("/pipelines/runs")
-async def list_pipeline_runs() -> dict[str, Any]:
-    return {"runs": await asyncio.to_thread(pipeline_service.list_pipeline_runs)}
+async def list_pipeline_runs(cu_namespace: str | None = Cookie(default=None)) -> dict[str, Any]:
+    return {"runs": await asyncio.to_thread(pipeline_service.list_pipeline_runs, cu_namespace)}
 
 
 @router.get("/pipelines/runs/{run_id}")
-async def get_run_status(run_id: str) -> dict[str, Any]:
+async def get_run_status(
+    run_id: str,
+    cu_namespace: str | None = Cookie(default=None),
+) -> dict[str, Any]:
     try:
-        return await asyncio.to_thread(pipeline_service.get_run_status, run_id)
+        return await asyncio.to_thread(pipeline_service.get_run_status, run_id, cu_namespace)
     except ValueError as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=404, detail=str(exc)) from exc

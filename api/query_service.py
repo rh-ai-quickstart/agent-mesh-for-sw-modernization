@@ -43,6 +43,7 @@ def submit_query(
     git_repo: str = "",
     git_branch: str = "main",
     multi_repo: bool = False,
+    namespace: str | None = None,
 ) -> dict[str, Any]:
     if not question.strip():
         raise ValueError("Question must not be empty.")

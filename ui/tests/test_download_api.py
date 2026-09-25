@@ -7,12 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from fastapi.testclient import TestClient
 
-pytest.importorskip("fastapi")
-pytest.importorskip("kubernetes")
-from fastapi.testclient import TestClient  # noqa: E402
-
-import main  # noqa: E402
+import main
 
 
 class FakeClient:
