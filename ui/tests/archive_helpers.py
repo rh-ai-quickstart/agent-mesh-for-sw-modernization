@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
 import tarfile
+from pathlib import Path
 from typing import Any
-
 
 INDEX_MANIFEST = {
     "run_id": "old-run",

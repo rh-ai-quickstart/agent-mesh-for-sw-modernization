@@ -12,19 +12,20 @@ if os.getenv("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "false").lower() in ("true"
 
     ssl.create_default_context = _unverified_context
 
+import logging
+from pathlib import Path
+
 import graphrag.api as api
 from graphrag.config.load_config import load_config
-from pathlib import Path
-import logging
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
-import pandas as pd
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+import pandas as pd  # noqa: E402
 
 
 class DependencyAnalyzer:
     """Query GraphRAG for dependency analysis"""
 
-    GIT_URL_REGEX = r'https?://(?:github|gitlab)\.com/[\w\-\.]+/[\w\-\.]+'
+    GIT_URL_REGEX = r"https?://(?:github|gitlab)\.com/[\w\-\.]+/[\w\-\.]+"
 
     def __init__(self, root_dir=".", git_slug: str = "", multi_repo: bool = False):
 
@@ -68,19 +69,21 @@ class DependencyAnalyzer:
         self.community_level = (
             self._community_level_for_multi_repo()
             if self.multi_repo
-            else int(community_reports_df["level"].max())
-            if not community_reports_df.empty and "level" in community_reports_df.columns
-            else 0
+            else (
+                int(community_reports_df["level"].max())
+                if not community_reports_df.empty and "level" in community_reports_df.columns
+                else 0
+            )
         )
 
     def _extract_indexed_git_urls(self) -> frozenset:
         """Return the set of unique git repository URLs found in REPOSITORY entity descriptions."""
         import re
 
-        repo_mask = self.entity_df['type'].str.upper() == 'REPOSITORY'
+        repo_mask = self.entity_df["type"].str.upper() == "REPOSITORY"
         return frozenset(
-            url.rstrip('.,;').lower()
-            for desc in self.entity_df.loc[repo_mask, 'description'].dropna()
+            url.rstrip(".,;").lower()
+            for desc in self.entity_df.loc[repo_mask, "description"].dropna()
             for url in re.findall(self.GIT_URL_REGEX, str(desc), re.IGNORECASE)
         )
 
@@ -90,7 +93,9 @@ class DependencyAnalyzer:
         community reports (levels 0..N)."""
         import re
 
-        logging.info("[multi_repo] Computing minimum community level to cover all repository URLs...")
+        logging.info(
+            "[multi_repo] Computing minimum community level to cover all repository URLs..."
+        )
 
         all_git_urls = self._extract_indexed_git_urls()
 
@@ -98,17 +103,24 @@ class DependencyAnalyzer:
             return 0
 
         covered = set()
-        for level, group in self.community_reports_df.sort_values('level').groupby('level'):
-            content = group['full_content'].dropna().str.cat(sep=' ')
-            covered |= {url.rstrip('.,;').lower() for url in re.findall(self.GIT_URL_REGEX,
-                                                                        content, re.IGNORECASE)}
+        for level, group in self.community_reports_df.sort_values("level").groupby("level"):
+            content = group["full_content"].dropna().str.cat(sep=" ")
+            covered |= {
+                url.rstrip(".,;").lower()
+                for url in re.findall(self.GIT_URL_REGEX, content, re.IGNORECASE)
+            }
             if covered >= all_git_urls:
-                logging.info(f"[multi_repo] community_level={level} covers all {len(all_git_urls)} repo URLs")
+                logging.info(
+                    f"[multi_repo] community_level={level} covers all "
+                    f"{len(all_git_urls)} repo URLs"
+                )
                 return int(level)
 
-        max_level = int(self.community_reports_df['level'].max())
-        logging.warning(f"[multi_repo] Not all repo URLs covered; using max community_level={max_level}. "
-                        f"Missing: {all_git_urls - covered}")
+        max_level = int(self.community_reports_df["level"].max())
+        logging.warning(
+            f"[multi_repo] Not all repo URLs covered; using max community_level={max_level}. "
+            f"Missing: {all_git_urls - covered}"
+        )
         return max_level
 
     def _setup_prompts(self):
@@ -132,44 +144,37 @@ class DependencyAnalyzer:
 
                 return ""
 
-        self.SYSTEM_PROMPT_DATA_EXTRACTION = _load(
-            "analysis/system-prompt/data-extraction")
+        self.SYSTEM_PROMPT_DATA_EXTRACTION = _load("analysis/system-prompt/data-extraction")
 
-        self.SYSTEM_PROMPT_RHEL_ADMIN = _load(
-            "analysis/system-prompt/rhel-admin")
+        self.SYSTEM_PROMPT_RHEL_ADMIN = _load("analysis/system-prompt/rhel-admin")
 
         self.SYSTEM_PROMPT_CHARACTERIZATION_TESTS = _load(
             "analysis/system-prompt/characterization-tests"
         )
 
-        self.POST_AMBLE = _load(
-            "analysis/post-amble/json-format")
+        self.POST_AMBLE = _load("analysis/post-amble/json-format")
 
-        self.RHEL_8to10_CONTEXT = _load(
-            "analysis/additional-context/rhel8-to-10")
+        self.RHEL_8to10_CONTEXT = _load("analysis/additional-context/rhel8-to-10")
 
     def _find_dependencies(self, module_name):
         """Find all dependencies for a given module"""
 
         deps = self.relationship_df[
-            (self.relationship_df['source'].str.contains(module_name,
-                                                         case=False)) &
-            (self.relationship_df['description'].str.contains('import|depend',
-                                                              case=False))
-            ]
+            (self.relationship_df["source"].str.contains(module_name, case=False))
+            & (self.relationship_df["description"].str.contains("import|depend", case=False))
+        ]
 
         results = []
 
         for _, row in deps.iterrows():
-            results.append({
-                'from': row['source'],
-
-                'to': row['target'],
-
-                'type': row['description'],
-
-                'weight': row.get('weight', 1.0)
-            })
+            results.append(
+                {
+                    "from": row["source"],
+                    "to": row["target"],
+                    "type": row["description"],
+                    "weight": row.get("weight", 1.0),
+                }
+            )
 
         return results
 
@@ -177,27 +182,22 @@ class DependencyAnalyzer:
         """Find all modules that depend on this module"""
 
         deps = self.relationship_df[
-
-            (self.relationship_df['target'].str.contains(module_name,
-                                                         case=False)) &
-            (self.relationship_df['description'].str.contains('import|depend',
-                                                              case=False))
-            ]
+            (self.relationship_df["target"].str.contains(module_name, case=False))
+            & (self.relationship_df["description"].str.contains("import|depend", case=False))
+        ]
 
         results = []
 
         for _, row in deps.iterrows():
 
-            results.append({
-
-                'from': row['source'],
-
-                'to': row['target'],
-
-                'type': row['description'],
-
-                'weight': row.get('weight', 1.0)
-            })
+            results.append(
+                {
+                    "from": row["source"],
+                    "to": row["target"],
+                    "type": row["description"],
+                    "weight": row.get("weight", 1.0),
+                }
+            )
 
         return results
 
@@ -208,9 +208,9 @@ class DependencyAnalyzer:
 
         for _, row in self.relationship_df.iterrows():
 
-            source = row['source']
+            source = row["source"]
 
-            target = row['target']
+            target = row["target"]
 
             if source not in graph:
 
@@ -274,13 +274,13 @@ class DependencyAnalyzer:
 
         for _, row in self.relationship_df.iterrows():
 
-            target = row['target']
+            target = row["target"]
 
             in_degree[target] = in_degree.get(target, 0) + 1
 
         layers = {}
 
-        for entity in self.entity_df['title']:
+        for entity in self.entity_df["title"]:
 
             if entity not in in_degree:
 
@@ -289,20 +289,20 @@ class DependencyAnalyzer:
         sorted_entities = sorted(in_degree.items(), key=lambda x: x[1])
 
         return {
-            'leaf_modules': [k for k, v in sorted_entities[:5]],
-
-            'intermediate_modules': [k for k, v in sorted_entities[5:15]],
-
-            'top_modules': [k for k, v in sorted_entities[-5:]]
+            "leaf_modules": [k for k, v in sorted_entities[:5]],
+            "intermediate_modules": [k for k, v in sorted_entities[5:15]],
+            "top_modules": [k for k, v in sorted_entities[-5:]],
         }
 
-    async def query_with_llm(self,
-                             question: str,
-                             retry_count: int = 3,
-                             use_global: bool = True,
-                             include_context: bool = False,
-                             bypass_index: bool = False,
-                             response_type: str = "Multiple Paragraphs"):
+    async def query_with_llm(
+        self,
+        question: str,
+        retry_count: int = 3,
+        use_global: bool = True,
+        include_context: bool = False,
+        bypass_index: bool = False,
+        response_type: str = "Multiple Paragraphs",
+    ):
         """
         Use LLM to answer a question.
 
@@ -325,7 +325,9 @@ class DependencyAnalyzer:
 
             if bypass_index:
 
-                logging.debug(f"Bypassing index for prompt={question}. Sending question directly to LLM...")
+                logging.debug(
+                    f"Bypassing index for prompt={question}. Sending question directly to LLM..."
+                )
 
                 from graphrag.language_model.manager import ModelManager
 
@@ -344,7 +346,9 @@ class DependencyAnalyzer:
 
                 result = response.output.content
 
-                logging.debug(f"Raw LLM response with bypass_index=True: {response.output.content}")
+                logging.debug(
+                    f"Raw LLM response with bypass_index=True: {response.output.content}"
+                )
 
                 context_data = None
 
@@ -352,7 +356,9 @@ class DependencyAnalyzer:
 
                 if use_global:
 
-                    _community_threshold = int(os.getenv("GRAPHRAG_DYNAMIC_COMMUNITY_THRESHOLD", "50"))
+                    _community_threshold = int(
+                        os.getenv("GRAPHRAG_DYNAMIC_COMMUNITY_THRESHOLD", "50")
+                    )
 
                     result, context_data = await api.global_search(
                         config=config,
@@ -362,7 +368,11 @@ class DependencyAnalyzer:
                         community_level=self.community_level,
                         response_type=response_type,
                         query=question,
-                        dynamic_community_selection=False if self.multi_repo else len(self.communities_df) > _community_threshold,
+                        dynamic_community_selection=(
+                            False
+                            if self.multi_repo
+                            else len(self.communities_df) > _community_threshold
+                        ),
                     )
 
                 else:
@@ -380,7 +390,6 @@ class DependencyAnalyzer:
                         query=question,
                     )
 
-
         except Exception as e:
 
             num_tries_left -= 1
@@ -389,12 +398,14 @@ class DependencyAnalyzer:
 
                 logging.info(f"Retrying query ({num_tries_left} tries left): {e}")
 
-                return await self.query_with_llm(question,
-                                                 retry_count=num_tries_left,
-                                                 use_global=use_global,
-                                                 include_context=include_context,
-                                                 bypass_index=bypass_index,
-                                                 response_type=response_type)
+                return await self.query_with_llm(
+                    question,
+                    retry_count=num_tries_left,
+                    use_global=use_global,
+                    include_context=include_context,
+                    bypass_index=bypass_index,
+                    response_type=response_type,
+                )
 
             else:
 
@@ -406,7 +417,9 @@ class DependencyAnalyzer:
         return result
 
     @staticmethod
-    def download_graphrag_directory(download_dir: str, git_slug: str, multi_repo: bool, git_repo: str = ""):
+    def download_graphrag_directory(
+        download_dir: str, git_slug: str, multi_repo: bool, git_repo: str = ""
+    ):
         """Downloads GraphRAG index artifacts and prepares settings.
 
         Args:
@@ -421,6 +434,7 @@ class DependencyAnalyzer:
         """
         import os
         import traceback
+
         from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_result_directory
 
@@ -432,7 +446,11 @@ class DependencyAnalyzer:
                 download_dir=output_dir,
                 results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
                 multi_repo=multi_repo,
-                asset_tags={"git_slug": git_slug, "multi_repo": multi_repo, "category": "indexing"},
+                asset_tags={
+                    "git_slug": git_slug,
+                    "multi_repo": multi_repo,
+                    "category": "indexing",
+                },
             )
         except Exception:
             logging.debug(traceback.format_exc())
@@ -442,13 +460,15 @@ class DependencyAnalyzer:
 
     @staticmethod
     def prepare_settings(template_dir: str, output_dir: str):
-        """Downloads and processes the GraphRAG settings template, writing the result to output_dir.
+        """Downloads and processes the GraphRAG settings template, writing the result to
+        output_dir.
 
         Args:
             template_dir: Directory to download settings.yaml.in into.
             output_dir: Directory to write the processed settings.yaml into.
         """
         import string
+
         from loaders.default_asset_loader import DefaultAssetLoader
 
         DefaultAssetLoader().download("graphrag/settings.yaml.in", download_dir=template_dir)
@@ -498,11 +518,12 @@ class DependencyAnalyzer:
 
     def raw_data(self):
         """Return the raw dataframes used for analysis"""
-        return {"entities": self.entity_df,
-                "relationships": self.relationship_df,
-                "communities": self.communities_df,
-                "community_reports": self.community_reports_df,
-                "text_units": self.text_unit_df
+        return {
+            "entities": self.entity_df,
+            "relationships": self.relationship_df,
+            "communities": self.communities_df,
+            "community_reports": self.community_reports_df,
+            "text_units": self.text_unit_df,
         }
 
     async def generate_migration_report(self):
@@ -512,9 +533,15 @@ class DependencyAnalyzer:
 
         loader = DefaultAssetLoader()
 
-        graphrag_prompts = [f"analysis/migration-report/{i}" for i in range(loader.num_prompts("analysis/migration-report"))]
+        graphrag_prompts = [
+            f"analysis/migration-report/{i}"
+            for i in range(loader.num_prompts("analysis/migration-report"))
+        ]
 
-        enhanced_prompts = [f"analysis/migration-report/enhanced/{i}" for i in range(loader.num_prompts("analysis/migration-report/enhanced"))]
+        enhanced_prompts = [
+            f"analysis/migration-report/enhanced/{i}"
+            for i in range(loader.num_prompts("analysis/migration-report/enhanced"))
+        ]
 
         prompts = graphrag_prompts + enhanced_prompts
 
@@ -544,17 +571,21 @@ class DependencyAnalyzer:
                 multi_repo=self.multi_repo,
             )
 
-            skip_prompt = meta.get('skip_prompt') == 'multi_repo' if self.multi_repo else meta.get('skip_prompt') == 'single_repo'
+            skip_prompt = (
+                meta.get("skip_prompt") == "multi_repo"
+                if self.multi_repo
+                else meta.get("skip_prompt") == "single_repo"
+            )
 
             if not skip_prompt:
 
                 bypass_index = prompt_path.startswith("analysis/migration-report/enhanced")
 
-                use_global = self.multi_repo or meta.get('search_mode') != 'local'
+                use_global = self.multi_repo or meta.get("search_mode") != "local"
 
-                result = await self.query_with_llm(prompt,
-                                                   bypass_index=bypass_index,
-                                                   use_global=use_global)
+                result = await self.query_with_llm(
+                    prompt, bypass_index=bypass_index, use_global=use_global
+                )
 
                 result = f"{meta.get('title')}\n\n{result}"
 
@@ -567,7 +598,7 @@ class DependencyAnalyzer:
         log_interactive_dependency_graph(self)
 
         return f"{title}{report}"
-    
+
     async def generate_report(self, service_name: str):
 
         deps = self._find_dependencies(service_name)
@@ -605,5 +636,3 @@ class DependencyAnalyzer:
         logging.info(f"  Leaf modules (no dependencies): {layers['leaf_modules']}")
 
         logging.info(f"  Top modules (many dependencies): {layers['top_modules']}")
-    
-    

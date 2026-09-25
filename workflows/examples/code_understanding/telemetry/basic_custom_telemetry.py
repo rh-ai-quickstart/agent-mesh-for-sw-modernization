@@ -6,6 +6,7 @@ class BasicCustomTelemetry(CustomTelemetry):
 
     def track(self):
         import litellm
+
         from .telemetry_litellm.basic_token_logger import BasicTokenLogger
 
         litellm.callbacks = [BasicTokenLogger()]

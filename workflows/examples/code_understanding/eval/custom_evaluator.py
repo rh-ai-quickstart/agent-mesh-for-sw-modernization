@@ -5,7 +5,11 @@ from abc import ABC, abstractmethod
 _DEFAULT_EVAL_DATASET = os.path.normpath(
     os.path.join(
         os.path.dirname(__file__),
-        "..", "assets", "datasets", "eval", "code_understanding.csv",
+        "..",
+        "assets",
+        "datasets",
+        "eval",
+        "code_understanding.csv",
     )
 )
 
@@ -18,11 +22,14 @@ def build_repo_context(graphrag_source_dir: str = "") -> str:
     Logs a warning and returns an empty string if no directory is provided, the directory
     is missing, or ingestion fails.
     """
-    import pathlib, logging
+    import logging
+    import pathlib
 
     if not graphrag_source_dir:
 
-        logging.warning("No graphrag_source_dir provided; ground truth LLM will have no source context.")
+        logging.warning(
+            "No graphrag_source_dir provided; ground truth LLM will have no source context."
+        )
 
         return ""
 
@@ -30,23 +37,40 @@ def build_repo_context(graphrag_source_dir: str = "") -> str:
 
     if not codebase_dir.is_dir():
 
-        logging.warning("Codebase directory %s not found; ground truth LLM will have no source context.", codebase_dir)
+        logging.warning(
+            "Codebase directory %s not found; ground truth LLM will have no source context.",
+            codebase_dir,
+        )
 
         return ""
 
     try:
         from gitingest import ingest
+
         _, _, content = ingest(
             str(codebase_dir),
-            max_file_size=50_000, # TODO: make this an environment variable setting
-            exclude_patterns={"*.lock", "*.min.js", "*.min.css", "dist/*", "vendor/*",
-                              "node_modules/*", "*.egg-info/*", "*.pyc", "__pycache__/*", "*_metadata.txt"},
+            max_file_size=50_000,  # TODO: make this an environment variable setting
+            exclude_patterns={
+                "*.lock",
+                "*.min.js",
+                "*.min.css",
+                "dist/*",
+                "vendor/*",
+                "node_modules/*",
+                "*.egg-info/*",
+                "*.pyc",
+                "__pycache__/*",
+                "*_metadata.txt",
+            },
         )
 
-        _MAX_CONTEXT_CHARS = 480_000 # TODO: make this an environment variable setting
+        _MAX_CONTEXT_CHARS = 480_000  # TODO: make this an environment variable setting
         if len(content) > _MAX_CONTEXT_CHARS:
-            logging.warning("Codebase context truncated from %d to %d chars (~120K tokens).",
-                            len(content), _MAX_CONTEXT_CHARS)
+            logging.warning(
+                "Codebase context truncated from %d to %d chars (~120K tokens).",
+                len(content),
+                _MAX_CONTEXT_CHARS,
+            )
             content = content[:_MAX_CONTEXT_CHARS]
 
         return f"Source code of the codebase being analyzed:\n\n{content}"
@@ -60,8 +84,15 @@ def build_repo_context(graphrag_source_dir: str = "") -> str:
 class CustomEvaluator(ABC):
 
     @abstractmethod
-    def evaluate(self, input: str, graphrag_source_dir: str, git_repo: str, git_branch: str,
-                 git_slug: str = None, multi_repo: bool = False):
+    def evaluate(
+        self,
+        input: str,
+        graphrag_source_dir: str,
+        git_repo: str,
+        git_branch: str,
+        git_slug: str = None,
+        multi_repo: bool = False,
+    ):
         """Evaluates a single input against a GraphRAG index using LLM-as-judge.
 
         Args:

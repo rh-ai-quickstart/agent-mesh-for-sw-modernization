@@ -1,26 +1,39 @@
-import os
 import json
+import os
 import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
-from utils.otel_utils import enable_telemetry
+from utils.otel_utils import enable_telemetry  # noqa: E402
 
 
 @enable_telemetry
-def generate_graphrag_index(codebase_path: str, graphrag_source_path: str,
-                            git_repo: str = "", git_branch: str = "", multi_repo: bool = False):
+def generate_graphrag_index(
+    codebase_path: str,
+    graphrag_source_path: str,
+    git_repo: str = "",
+    git_branch: str = "",
+    multi_repo: bool = False,
+):
     """Generates a GraphRAG index from the provided codebase."""
-    import json, os, lancedb, shutil, traceback, tracemalloc, nest_asyncio, logging
+    import json
+    import logging
+    import os
+    import shutil
+    import traceback
+    import tracemalloc
+
+    import nest_asyncio
     from loaders.default_asset_loader import DefaultAssetLoader
     from pipelines.base.data_generation import generate_git_slug
-    from utils.graphrag_utils import DependencyAnalyzer
     from pipelines.graphrag import run_graphrag
+    from utils.graphrag_utils import DependencyAnalyzer
 
     tracemalloc.start()
 
     nest_asyncio.apply()
 
-    logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     git_slug = generate_git_slug(git_repo, git_branch) if git_repo else None
 
@@ -40,10 +53,12 @@ def generate_graphrag_index(codebase_path: str, graphrag_source_path: str,
 
         logging.info("Preparing GraphRAG config files...")
 
-        prepare_indexing_config(graphrag_source_path,
-                                git_slug=git_slug or "",
-                                git_repo=git_repo or "",
-                                multi_repo=multi_repo)
+        prepare_indexing_config(
+            graphrag_source_path,
+            git_slug=git_slug or "",
+            git_repo=git_repo or "",
+            multi_repo=multi_repo,
+        )
 
         logging.info("Copying source code to GraphRAG directory...")
 
@@ -54,20 +69,16 @@ def generate_graphrag_index(codebase_path: str, graphrag_source_path: str,
         run_graphrag(graphrag_source_path)
 
         artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
-
             DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
-
             git_slug=git_slug,
-
             multi_repo=multi_repo,
-
         )
 
-        DefaultAssetLoader().log_results(f"{graphrag_source_path}/output",
-                                         artifact_path=artifact_path,
-                                         tags={"git_slug": git_slug,
-                                               "category": "indexing",
-                                               "multi_repo": multi_repo})
+        DefaultAssetLoader().log_results(
+            f"{graphrag_source_path}/output",
+            artifact_path=artifact_path,
+            tags={"git_slug": git_slug, "category": "indexing", "multi_repo": multi_repo},
+        )
 
         status = "success"
 
@@ -81,40 +92,38 @@ def generate_graphrag_index(codebase_path: str, graphrag_source_path: str,
 
     finally:
 
-        result = {"codebase_path": codebase_path, "graphrag_source_path": graphrag_source_path,
-                  "status": status, "fail_message": "" if status == "success" else traceback.format_exc()}
+        result = {
+            "codebase_path": codebase_path,
+            "graphrag_source_path": graphrag_source_path,
+            "status": status,
+            "fail_message": "" if status == "success" else traceback.format_exc(),
+        }
 
-        result_file = "indexing_result_multi_repo.json" if multi_repo else f"indexing_result_{git_slug}.json"
+        result_file = (
+            "indexing_result_multi_repo.json" if multi_repo else f"indexing_result_{git_slug}.json"
+        )
 
         DefaultAssetLoader().log_results(
-
             result_file,
-
             artifact_path=DefaultAssetLoader.get_log_results_artifact_path(
-
                 DefaultAssetLoader.RESULTS_PATH_PREFIX_PIPELINES,
-
                 git_slug=git_slug,
-
                 multi_repo=multi_repo,
-
             ),
-
             content=json.dumps(result),
-
             tags={"git_slug": git_slug, "category": "indexing", "multi_repo": multi_repo},
-
         )
 
 
 @enable_telemetry
-def evaluate_graphrag_index(graphrag_source_path: str, git_repo: str, git_branch: str,
-                            multi_repo: bool = False):
+def evaluate_graphrag_index(
+    graphrag_source_path: str, git_repo: str, git_branch: str, multi_repo: bool = False
+):
     """Evaluates a GraphRAG index using DefaultCustomEvaluator.evaluate_with_dataset."""
     import logging
     import os
 
-    logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     from eval.default_custom_evaluator import DefaultCustomEvaluator
 
@@ -122,9 +131,9 @@ def evaluate_graphrag_index(graphrag_source_path: str, git_repo: str, git_branch
 
     try:
 
-        results = DefaultCustomEvaluator().evaluate_with_dataset(graphrag_source_path,
-                                                                 git_repo, git_branch,
-                                                                 multi_repo=multi_repo)
+        results = DefaultCustomEvaluator().evaluate_with_dataset(
+            graphrag_source_path, git_repo, git_branch, multi_repo=multi_repo
+        )
 
         logging.info("GraphRAG index evaluation complete.")
 
@@ -139,22 +148,33 @@ def evaluate_graphrag_index(graphrag_source_path: str, git_repo: str, git_branch
 # Pipeline stage
 ##############################################################################
 
+
 class IndexingPipeline:
 
-    def run(self, codebase_path: str, graphrag_source_path: str, git_repo: str, git_branch: str,
-            multi_repo: bool = False):
+    def run(
+        self,
+        codebase_path: str,
+        graphrag_source_path: str,
+        git_repo: str,
+        git_branch: str,
+        multi_repo: bool = False,
+    ):
         """Generates a GraphRAG index and returns a status dict."""
-        import traceback, logging
+        import logging
         import os
+        import traceback
 
-        logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+        logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
         try:
 
-            generate_graphrag_index(codebase_path=codebase_path,
-                                    graphrag_source_path=graphrag_source_path,
-                                    git_repo=git_repo, git_branch=git_branch,
-                                    multi_repo=multi_repo)
+            generate_graphrag_index(
+                codebase_path=codebase_path,
+                graphrag_source_path=graphrag_source_path,
+                git_repo=git_repo,
+                git_branch=git_branch,
+                multi_repo=multi_repo,
+            )
 
             logging.info("GraphRAG index generation complete.")
 
@@ -166,8 +186,12 @@ class IndexingPipeline:
 
             logging.error(error_message)
 
-            return {"codebase_path": codebase_path, "graphrag_source_path": graphrag_source_path,
-                    "status": "fail", "fail_message": error_message}
+            return {
+                "codebase_path": codebase_path,
+                "graphrag_source_path": graphrag_source_path,
+                "status": "fail",
+                "fail_message": error_message,
+            }
 
         if multi_repo:
 
@@ -177,29 +201,39 @@ class IndexingPipeline:
 
             try:
 
-                evaluate_graphrag_index(graphrag_source_path=graphrag_source_path,
-                                        git_repo=git_repo, git_branch=git_branch,
-                                        multi_repo=False)
+                evaluate_graphrag_index(
+                    graphrag_source_path=graphrag_source_path,
+                    git_repo=git_repo,
+                    git_branch=git_branch,
+                    multi_repo=False,
+                )
 
             except Exception as e:
 
                 logging.warning(f"GraphRAG index evaluation failed: {e}")
 
-        return {"codebase_path": codebase_path, "graphrag_source_path": graphrag_source_path,
-                "status": "success", "fail_message": ""}
+        return {
+            "codebase_path": codebase_path,
+            "graphrag_source_path": graphrag_source_path,
+            "status": "success",
+            "fail_message": "",
+        }
 
     def run_multi_repo(self, parent_target_path: str, graphrag_source_path: str = None):
         """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
-        import os, logging
-        from loaders.default_asset_loader import DefaultAssetLoader
+        import logging
+        import os
+
         from utils.loader_utils import download_code_metadata_directories
 
-        logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+        logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
         if graphrag_source_path is None:
-            graphrag_source_path = os.getenv("KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source")
+            graphrag_source_path = os.getenv(
+                "KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"
+            )
 
-        #git_repos = DefaultAssetLoader().download("repos/repo_list.json") or []
+        # git_repos = DefaultAssetLoader().download("repos/repo_list.json") or []
         git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS")) or []
 
         download_code_metadata_directories(git_repos, parent_target_path)
@@ -220,8 +254,10 @@ class IndexingPipeline:
 # Module-level aliases for external callers (notebooks)
 ##############################################################################
 
+
 def run_full_pipeline(*args, **kwargs):
     return IndexingPipeline().run(*args, **kwargs)
+
 
 def run_full_pipeline_multi_repo(*args, **kwargs):
     return IndexingPipeline().run_multi_repo(*args, **kwargs)

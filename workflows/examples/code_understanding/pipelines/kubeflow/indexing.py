@@ -1,10 +1,15 @@
 import os
 import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
-from kfp import dsl
-from kfp.dsl import Dataset, Input, Metrics, Output
-from utils.kubeflow_utils import get_pip_installable_git_url, INDEXING_BASE_IMAGE, inject_secret_as_env
+from kfp import dsl  # noqa: E402
+from kfp.dsl import Dataset, Input, Metrics, Output  # noqa: E402
+from utils.kubeflow_utils import (  # noqa: E402
+    INDEXING_BASE_IMAGE,
+    get_pip_installable_git_url,
+    inject_secret_as_env,
+)
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -19,19 +24,32 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 # Components
 ##############################################################################
 
+
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(base_image=INDEXING_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def graphrag_indexing_op(codebase_dir: Input[Dataset],
-                          graphrag_dir: Output[Dataset], result: Output[Metrics],
-                          git_repo: str = "", git_branch: str = "", multi_repo: bool = False):
+def graphrag_indexing_op(
+    codebase_dir: Input[Dataset],
+    graphrag_dir: Output[Dataset],
+    result: Output[Metrics],
+    git_repo: str = "",
+    git_branch: str = "",
+    multi_repo: bool = False,
+):
 
     from pipelines.base.indexing import generate_graphrag_index
-    from utils.kubeflow_utils import setup_logging, read_from_input_artifact, write_to_output_artifact
+    from utils.kubeflow_utils import (
+        read_from_input_artifact,
+        setup_logging,
+        write_to_output_artifact,
+    )
+
     setup_logging()
 
-    with read_from_input_artifact(codebase_dir) as tmp_codebase, \
-         write_to_output_artifact(graphrag_dir) as tmp_graphrag:
+    with (
+        read_from_input_artifact(codebase_dir) as tmp_codebase,
+        write_to_output_artifact(graphrag_dir) as tmp_graphrag,
+    ):
 
         generate_graphrag_index(
             codebase_path=tmp_codebase,
@@ -47,13 +65,19 @@ def graphrag_indexing_op(codebase_dir: Input[Dataset],
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(base_image=INDEXING_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def graphrag_evaluation_op(graphrag_dir: Input[Dataset], eval_results: Output[Dataset],
-                            git_repo: str = "", git_branch: str = "",
-                            multi_repo: bool = False):
+def graphrag_evaluation_op(
+    graphrag_dir: Input[Dataset],
+    eval_results: Output[Dataset],
+    git_repo: str = "",
+    git_branch: str = "",
+    multi_repo: bool = False,
+):
 
     import logging
+
     import pandas as pd
-    from utils.kubeflow_utils import setup_logging, read_from_input_artifact
+    from utils.kubeflow_utils import read_from_input_artifact, setup_logging
+
     setup_logging()
 
     if not git_repo or multi_repo:
@@ -79,14 +103,15 @@ def graphrag_evaluation_op(graphrag_dir: Input[Dataset], eval_results: Output[Da
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(base_image=INDEXING_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def run_indexing_multi_repo_op(parent_target_path: str,
-                                graphrag_dir: Output[Dataset],
-                                eval_results: Output[Dataset]):
+def run_indexing_multi_repo_op(
+    parent_target_path: str, graphrag_dir: Output[Dataset], eval_results: Output[Dataset]
+):
     """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
 
     import pandas as pd
     from pipelines.base.indexing import IndexingPipeline
     from utils.kubeflow_utils import setup_logging, write_to_output_artifact
+
     setup_logging()
 
     with write_to_output_artifact(graphrag_dir) as tmp_graphrag:
@@ -98,6 +123,7 @@ def run_indexing_multi_repo_op(parent_target_path: str,
 ##############################################################################
 # Pipeline
 ##############################################################################
+
 
 @dsl.pipeline(name="graphrag-indexing-pipeline")
 def _run_pipeline(
@@ -137,6 +163,7 @@ def _run_indexing_multi_repo_pipeline(parent_target_path: str) -> Dataset:
 ##############################################################################
 # Pipeline stage
 ##############################################################################
+
 
 class IndexingPipeline:
     run = staticmethod(_run_pipeline)

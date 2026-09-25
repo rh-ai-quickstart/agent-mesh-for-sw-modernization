@@ -17,6 +17,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODE_UNDERSTANDING_DIR="$(dirname "$SCRIPT_DIR")"
+
 usage() {
     cat >&2 <<EOF
 Usage: $(basename "$0") [OPTION]...
@@ -69,49 +72,11 @@ trigger_pipeline() {
     KFP_TRIGGER_PIPELINE="$pipeline_name" \
     KFP_TRIGGER_RUN="$run_name" \
     KFP_TRIGGER_PARAMS="$params" \
-    python3 <<PYEOF
-import os, sys, json, subprocess, urllib3, kfp_server_api.configuration as _kfp_conf, kfp
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-_kfp_conf.Configuration.verify_ssl = property(lambda self: False, lambda self, v: None)
-_SA = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-if os.path.exists(_SA):
-    with open(_SA) as _f:
-        token = _f.read().strip()
-else:
-    token = subprocess.check_output(["oc", "whoami", "--show-token"], text=True).strip()
-client = kfp.Client(host="$KFP_HOST", namespace="$KFP_NAMESPACE", existing_token=token)
-
-pipeline_name = os.environ["KFP_TRIGGER_PIPELINE"]
-run_name = os.environ["KFP_TRIGGER_RUN"]
-params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
-
-result = client.list_pipelines(filter=json.dumps({
-    "predicates": [{"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}]
-}))
-if not result.pipelines:
-    print(f"Error: pipeline '{pipeline_name}' not found in KFP.", file=sys.stderr)
-    print("Upload it first with: make upload-pipelines", file=sys.stderr)
-    sys.exit(1)
-
-pipeline_id = result.pipelines[0].pipeline_id
-
-total = client.list_pipeline_versions(pipeline_id=pipeline_id, page_size=1).total_size or 1
-versions = client.list_pipeline_versions(pipeline_id=pipeline_id, page_size=total)
-if not versions.pipeline_versions:
-    print(f"Error: pipeline '{pipeline_name}' has no versions in KFP.", file=sys.stderr)
-    sys.exit(1)
-latest_version = sorted(versions.pipeline_versions, key=lambda v: v.created_at, reverse=True)[0]
-version_id = latest_version.pipeline_version_id
-
-experiment = client.create_experiment(name="Default")
-run = client.run_pipeline(
-    experiment_id=experiment.experiment_id,
-    job_name=run_name,
-    pipeline_id=pipeline_id,
-    version_id=version_id,
-    params=params,
-    enable_caching=False,
-)
+    PYTHONPATH="$CODE_UNDERSTANDING_DIR:${PYTHONPATH:-}" \
+    python3 - <<'PYEOF'
+import os, json
+from services.trigger_run import trigger_run
+run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], json.loads(os.environ["KFP_TRIGGER_PARAMS"]))
 print(f"  Submitted run id: {run.run_id}")
 PYEOF
     echo "  OK: $run_name submitted."

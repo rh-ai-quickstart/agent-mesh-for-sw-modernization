@@ -1,11 +1,11 @@
-
 import json
-
-import re
-import yaml
 import logging
 import os
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+import re
+
+import yaml
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 def _apply_defaults_to_json_keys(target: dict, schema: dict, handle_iterables: bool) -> None:
@@ -30,25 +30,27 @@ def _apply_defaults_to_json_keys(target: dict, schema: dict, handle_iterables: b
 
             target[key] = default
 
+
 def _str_representer(dumper, data):
-    if '\n' in data:
+    if "\n" in data:
 
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data)
 
 
 def extract_json_from_string(text: str) -> dict | list | None:
     """Extracts json from given string."""
     try:
-        match = re.search(r'\{.*\}|\[.*\]', text, re.DOTALL)
+        match = re.search(r"\{.*\}|\[.*\]", text, re.DOTALL)
 
         return json.loads(match.group())
 
     except Exception:
         return None
 
-def get_as_json(obj, prefix: str ="", sep: str ="_"):
+
+def get_as_json(obj, prefix: str = "", sep: str = "_"):
     """Flattens code metadata file."""
 
     items = {}
@@ -72,18 +74,18 @@ def get_as_json(obj, prefix: str ="", sep: str ="_"):
 
 
 def flatten_code_metadata(obj, schema: dict = None):
-
     """
     Converts code metadata to a YAML string with literal block style for multiline fields.
     """
 
     yaml.add_representer(str, _str_representer)
 
-    if schema: _apply_defaults_to_json_keys(obj, schema, handle_iterables=True)
+    if schema:
+        _apply_defaults_to_json_keys(obj, schema, handle_iterables=True)
 
     json_obj = get_as_json(obj)
 
-    if schema: _apply_defaults_to_json_keys(json_obj, schema, handle_iterables=False)
+    if schema:
+        _apply_defaults_to_json_keys(json_obj, schema, handle_iterables=False)
 
     return yaml.dump(json_obj, default_flow_style=False, allow_unicode=True)
-

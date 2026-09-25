@@ -31,9 +31,7 @@ class MlflowTokenLogger(BasicTokenLogger):
                 if experiment
                 else client.create_experiment(self._experiment_name)
             )
-            self.run_id = client.create_run(
-                experiment_id=experiment_id, tags=tags
-            ).info.run_id
+            self.run_id = client.create_run(experiment_id=experiment_id, tags=tags).info.run_id
 
         client.log_batch(
             self.run_id,
@@ -47,6 +45,7 @@ class MlflowTokenLogger(BasicTokenLogger):
         if self.run_id:
             try:
                 from mlflow.tracking import MlflowClient
+
                 MlflowClient().set_terminated(self.run_id, "FINISHED")
             except Exception:
                 pass

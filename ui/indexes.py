@@ -75,9 +75,9 @@ def _run_index_metadata(run: Any) -> dict[str, Any]:
         "multi_repo": multi,
         "uploaded": uploaded,
         "run_id": str(getattr(run_info, "run_id", "")),
-        "indexed_at": datetime.fromtimestamp(started / 1000, tz=timezone.utc).isoformat()
-        if started
-        else "",
+        "indexed_at": (
+            datetime.fromtimestamp(started / 1000, tz=timezone.utc).isoformat() if started else ""
+        ),
         "artifact_path": artifact_path,
     }
 
@@ -108,7 +108,9 @@ def validate_index_run(client: Any, run_id: str) -> dict[str, Any]:
 
     run_info = getattr(run, "info", None)
     if str(getattr(run_info, "experiment_id", "")) != str(experiment.experiment_id):
-        raise IndexRunValidationError("MLflow run is not in the configured result-directory experiment")
+        raise IndexRunValidationError(
+            "MLflow run is not in the configured result-directory experiment"
+        )
 
     tags = getattr(getattr(run, "data", None), "tags", None) or {}
     if str(tags.get("category", "")).strip().lower() != "indexing":

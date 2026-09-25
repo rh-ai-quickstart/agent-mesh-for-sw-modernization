@@ -3,9 +3,9 @@ from __future__ import annotations
 import tarfile
 
 import pytest
+from archive_helpers import make_index_bundle
 
 import uploads
-from archive_helpers import make_index_bundle
 
 
 def test_extracts_index_bundle(tmp_path):

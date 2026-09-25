@@ -483,7 +483,7 @@ build-all-images:
 	echo "==> Building pipeline-tools image: $$TOOLS_IMG" && \
 	$(IMAGE_BUILD) -t "$$TOOLS_IMG" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools && \
 	echo "==> Building console application image: $$CONSOLE_APP_IMG" && \
-	$(IMAGE_BUILD) -t "$$CONSOLE_APP_IMG" -f ui/Dockerfile ui && \
+	$(IMAGE_BUILD) -t "$$CONSOLE_APP_IMG" -f ui/Dockerfile . && \
 	echo "==> Building console plugin image: $$CONSOLE_PLUGIN_IMG" && \
 	$(IMAGE_BUILD) -t "$$CONSOLE_PLUGIN_IMG" -f console-plugin/Dockerfile console-plugin
 

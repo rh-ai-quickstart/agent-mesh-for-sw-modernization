@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
 import tarfile
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-pytest.importorskip("fastapi")
-pytest.importorskip("kubernetes")
 from fastapi.testclient import TestClient
 
 import main
@@ -85,7 +82,10 @@ def test_download_api_headers_and_cleanup(monkeypatch, workspaces):
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/gzip"
-    assert response.headers["content-disposition"] == 'attachment; filename="acme-widget-main-run-1.tar.gz"'
+    assert (
+        response.headers["content-disposition"]
+        == 'attachment; filename="acme-widget-main-run-1.tar.gz"'
+    )
     with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as archive:
         manifest = json.load(archive.extractfile("manifest.json"))
     assert manifest["git_slug"] == "acme-widget-main"

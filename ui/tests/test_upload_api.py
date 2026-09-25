@@ -5,14 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
-pytest.importorskip("fastapi")
-pytest.importorskip("kubernetes")
+from archive_helpers import make_index_bundle
 from fastapi.testclient import TestClient
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 import main
-from archive_helpers import make_index_bundle
 
 
 class UploadClient:

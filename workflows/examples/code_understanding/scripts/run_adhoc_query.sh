@@ -22,12 +22,12 @@ GIT_REPO="${GIT_REPO:-}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 MULTI_REPO="${MULTI_REPO:-false}"
 
-RESULT=$(CODE_UNDERSTANDING_DIR="$CODE_UNDERSTANDING_DIR" QUESTION="$QUESTION" USE_GLOBAL="$USE_GLOBAL" RETRY_COUNT="$RETRY_COUNT" GIT_REPO="$GIT_REPO" GIT_BRANCH="$GIT_BRANCH" MULTI_REPO="$MULTI_REPO" \
+RESULT=$(QUESTION="$QUESTION" USE_GLOBAL="$USE_GLOBAL" RETRY_COUNT="$RETRY_COUNT" GIT_REPO="$GIT_REPO" GIT_BRANCH="$GIT_BRANCH" MULTI_REPO="$MULTI_REPO" \
+  PYTHONPATH="$CODE_UNDERSTANDING_DIR:${PYTHONPATH:-}" \
   python3 - << 'PYEOF'
-import os, sys
-sys.path.insert(0, os.environ["CODE_UNDERSTANDING_DIR"])
-from pipelines.base.analysis import run_adhoc_query_pipeline
-result = run_adhoc_query_pipeline(
+import os
+from services.run_adhoc_query import run_adhoc_query
+result = run_adhoc_query(
     question=os.environ["QUESTION"],
     retry_count=int(os.environ["RETRY_COUNT"]),
     use_global=os.environ["USE_GLOBAL"] == "1",

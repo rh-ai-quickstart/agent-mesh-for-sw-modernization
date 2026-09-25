@@ -3,27 +3,35 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-from starlette.background import BackgroundTask
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.body_limit import RequestBodyLimitMiddleware
-from starlette.requests import Request
+# Expose the project-root api/ package to the import system
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-import catalog
-import cluster
-import downloads
-import index_storage
-import indexes
-import uploads
+from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+from starlette.background import BackgroundTask  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
+from starlette.requests import Request  # noqa: E402
+
+import catalog  # noqa: E402
+import cluster  # noqa: E402
+import downloads  # noqa: E402
+import index_storage  # noqa: E402
+import indexes  # noqa: E402
+import uploads  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 MULTIPART_OVERHEAD_BYTES = 64 * 1024
+NAMESPACE_COOKIE = "cu_namespace"
 
 
 class FrameAncestorsMiddleware(BaseHTTPMiddleware):
@@ -35,6 +43,7 @@ class FrameAncestorsMiddleware(BaseHTTPMiddleware):
 
 
 app = FastAPI(title="Code Understanding console", docs_url=None, redoc_url=None)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.add_middleware(FrameAncestorsMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -47,21 +56,15 @@ app.add_middleware(
     max_body_size=index_storage.configured_max_index_bytes() + MULTIPART_OVERHEAD_BYTES,
 )
 
+from api.pipelines import router as _v2_router  # noqa: E402
+from api.queries import router as _v2_queries_router  # noqa: E402
 
-class Repo(BaseModel):
-    git_repo: str
-    git_branch: str = "main"
-
-
-class PipelineRequest(BaseModel):
-    repos: list[Repo] = Field(default_factory=list)
+app.include_router(_v2_router, prefix="/api/v2")
+app.include_router(_v2_queries_router, prefix="/api/v2")
 
 
-class QueryRequest(BaseModel):
-    question: str
-    git_repo: str = ""
-    git_branch: str = "main"
-    use_global: bool | None = None
+class NamespaceRequest(BaseModel):
+    namespace: str
 
 
 @app.get("/")
@@ -70,16 +73,42 @@ def index() -> FileResponse:
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    status = cluster.cluster_status()
+def health(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)
+) -> dict[str, str]:
+    status = cluster.cluster_status(ns=cu_namespace)
     if not status.get("ok"):
         raise HTTPException(503, status.get("message") or "cluster unavailable")
     return {"status": "ok", "namespace": status["namespace"]}
 
 
 @app.get("/api/status")
-def status() -> dict[str, Any]:
-    return cluster.cluster_status()
+def status(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)
+) -> dict[str, Any]:
+    return cluster.cluster_status(ns=cu_namespace)
+
+
+@app.get("/api/namespaces")
+def get_namespaces(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)
+) -> dict[str, Any]:
+    return {
+        "namespaces": cluster.available_namespaces(),
+        "current": cluster.current_namespace(cu_namespace),
+    }
+
+
+@app.post("/api/namespace")
+def set_namespace(body: NamespaceRequest, response: Response) -> dict[str, str]:
+    ns = (body.namespace or "").strip()
+    if not ns:
+        raise HTTPException(400, "namespace must not be empty.")
+    available = cluster.available_namespaces()
+    if len(available) > 1 and ns not in available:
+        raise HTTPException(400, f"Namespace {ns!r} is not in the available list.")
+    response.set_cookie(key=NAMESPACE_COOKIE, value=ns, httponly=False, samesite="lax")
+    return {"namespace": ns}
 
 
 @app.get("/api/catalog")
@@ -115,7 +144,9 @@ def download_index(run_id: str) -> FileResponse:
     except indexes.IndexRunValidationError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Unable to validate MLflow index run: {exc}") from exc
+        raise HTTPException(
+            status_code=503, detail=f"Unable to validate MLflow index run: {exc}"
+        ) from exc
 
     workspace = index_storage.create_index_workspace()
     try:
@@ -131,7 +162,9 @@ def download_index(run_id: str) -> FileResponse:
             raise HTTPException(status_code=413, detail=str(exc)) from exc
         if isinstance(exc, FileNotFoundError):
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        raise HTTPException(status_code=502, detail=f"Unable to download MLflow index artifact: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Unable to download MLflow index artifact: {exc}"
+        ) from exc
 
     return FileResponse(
         path=archive_path,
@@ -191,43 +224,62 @@ def upload_index(
                 index_storage.cleanup_index_workspace(workspace)
 
 
-@app.get("/api/jobs")
-def get_jobs() -> dict[str, Any]:
-    try:
-        return {"jobs": cluster.list_recent_jobs()}
-    except Exception as exc:
-        raise HTTPException(503, str(exc)) from exc
+# ── Dead code – superseded by api/pipelines.py and api/queries.py ─────────────
+
+# class Repo(BaseModel):
+#     git_repo: str
+#     git_branch: str = "main"
+#
+#
+# class PipelineRequest(BaseModel):
+#     repos: list[Repo] = Field(default_factory=list)
+#
+#
+# class QueryRequest(BaseModel):
+#     question: str
+#     git_repo: str = ""
+#     git_branch: str = "main"
+#     use_global: bool | None = None
 
 
-@app.get("/api/jobs/{job_name}")
-def get_job(job_name: str) -> dict[str, Any]:
-    try:
-        return cluster.job_snapshot(job_name)
-    except Exception as exc:
-        raise HTTPException(404, str(exc)) from exc
-
-
-@app.post("/api/pipelines")
-def start_pipeline(body: PipelineRequest) -> dict[str, str]:
-    repos = [item.model_dump() for item in body.repos]
-    try:
-        return cluster.submit_pipeline_run(repos)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(500, str(exc)) from exc
-
-
-@app.post("/api/query")
-def start_query(body: QueryRequest) -> dict[str, str]:
-    try:
-        return cluster.submit_adhoc_query(
-            body.question,
-            git_repo=body.git_repo,
-            git_branch=body.git_branch,
-            use_global=body.use_global,
-        )
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(500, str(exc)) from exc
+# @app.get("/api/jobs")
+# def get_jobs(cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:  # noqa: E501
+#     try:
+#         return {"jobs": cluster.list_recent_jobs(runtime_ns=cu_namespace)}
+#     except Exception as exc:
+#         raise HTTPException(503, str(exc)) from exc
+#
+#
+# @app.get("/api/jobs/{job_name}")
+# def get_job(job_name: str, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, Any]:  # noqa: E501
+#     try:
+#         return cluster.job_snapshot(job_name, runtime_ns=cu_namespace)
+#     except Exception as exc:
+#         raise HTTPException(404, str(exc)) from exc
+#
+#
+# @app.post("/api/pipelines")
+# def start_pipeline(body: PipelineRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:  # noqa: E501
+#     repos = [item.model_dump() for item in body.repos]
+#     try:
+#         return cluster.submit_pipeline_run(repos, runtime_ns=cu_namespace)
+#     except ValueError as exc:
+#         raise HTTPException(400, str(exc)) from exc
+#     except Exception as exc:
+#         raise HTTPException(500, str(exc)) from exc
+#
+#
+# @app.post("/api/query")
+# def start_query(body: QueryRequest, cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None)) -> dict[str, str]:  # noqa: E501
+#     try:
+#         return cluster.submit_adhoc_query(
+#             body.question,
+#             git_repo=body.git_repo,
+#             git_branch=body.git_branch,
+#             use_global=body.use_global,
+#             runtime_ns=cu_namespace,
+#         )
+#     except ValueError as exc:
+#         raise HTTPException(400, str(exc)) from exc
+#     except Exception as exc:
+#         raise HTTPException(500, str(exc)) from exc

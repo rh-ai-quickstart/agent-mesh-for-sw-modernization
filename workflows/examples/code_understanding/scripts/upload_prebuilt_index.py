@@ -7,17 +7,15 @@ import argparse
 import hashlib
 import json
 import logging
-from pathlib import Path
 import posixpath
 import re
 import tarfile
 import tempfile
+from pathlib import Path
 from typing import Any
 
-from mlflow.tracking import MlflowClient
-
 from code_understanding.loaders.mlflow_asset_loader import MlFlowAssetLoader
-
+from mlflow.tracking import MlflowClient
 
 LOG = logging.getLogger(__name__)
 
@@ -61,8 +59,10 @@ def _member_path(member_name: str) -> str:
 
     normalized = posixpath.normpath(member_name).removesuffix("/")
     parts = normalized.split("/")
-    if normalized in {"", ".", ".."} or normalized.startswith("../") or any(
-        part in {"", ".", ".."} for part in parts
+    if (
+        normalized in {"", ".", ".."}
+        or normalized.startswith("../")
+        or any(part in {"", ".", ".."} for part in parts)
     ):
         raise ValueError("Bundle contains an unsafe member path")
     return normalized
@@ -115,8 +115,7 @@ def is_bundle_installed(
     runs = client.search_runs(
         experiment_ids=[experiment_id],
         filter_string=(
-            f'tags."bundle_sha256" = \'{digest}\' AND '
-            'tags."category" = \'indexing\''
+            f"tags.\"bundle_sha256\" = '{digest}' AND " "tags.\"category\" = 'indexing'"
         ),
         order_by=["attributes.start_time DESC"],
         max_results=100,

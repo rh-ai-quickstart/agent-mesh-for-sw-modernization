@@ -30,39 +30,11 @@
     button { cursor: pointer; }
     h1, h2, h3 { margin: 0; font-weight: 500; }
 
-    .cu-hero {
-      padding: 1.5rem 1.75rem 1.35rem;
-      color: #fff;
-      background:
-        linear-gradient(115deg, rgba(238, 0, 0, 0.28), transparent 48%),
-        var(--cu-charcoal);
-      border-top: 4px solid var(--cu-red);
-    }
-    .cu-eyebrow {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #d2d2d2;
-      margin-bottom: 0.65rem;
-    }
-    .cu-mark {
-      width: 0.6rem;
-      height: 0.6rem;
-      background: var(--cu-red);
-      transform: rotate(45deg);
-      flex: none;
-    }
-    .cu-hero h1 { font-size: 1.75rem; margin-bottom: 0.4rem; }
-    .cu-hero p { margin: 0; max-width: 46rem; color: #d2d2d2; font-size: 0.95rem; }
 
     .cu-shell {
       display: grid;
       grid-template-columns: 20.5rem minmax(0, 1fr);
-      min-height: calc(100vh - 8.5rem);
+      min-height: 100vh;
       background: var(--cu-bg);
     }
     .cu-rail {
@@ -82,6 +54,7 @@
     .cu-status.warn { border-left-color: var(--cu-gold); }
     .cu-status.checking { animation: cu-blink 1.2s ease-in-out infinite; }
     .cu-muted { color: var(--cu-gray); font-size: 0.875rem; }
+    .cu-tab-description { font-size: 1.1rem; }
     .cu-rail h2 {
       font-size: 0.8rem;
       font-weight: 700;
@@ -91,6 +64,20 @@
       margin: 1.15rem 0 0.55rem;
     }
     .cu-rail-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .cu-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 1.1rem 0.5rem 1.25rem;
+      border-bottom: 1px solid var(--cu-border);
+      margin-bottom: 0.5rem;
+      gap: 0.35rem;
+    }
+    .cu-brand-icon { margin-bottom: 0.35rem; flex-shrink: 0; }
+    .cu-brand-eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cu-gray); line-height: 1.3; }
+    .cu-brand-title { font-size: 1.05rem; font-weight: 700; color: var(--cu-text); line-height: 1.2; }
+    .cu-brand-sub { font-size: 0.75rem; color: var(--cu-gray); line-height: 1.4; }
 
     .cu-index-card {
       display: grid;
@@ -176,9 +163,35 @@
     .cu-job-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--cu-gray); }
     .cu-job-dot.Succeeded { background: var(--cu-green); }
     .cu-job-dot.Failed { background: var(--cu-red); }
-    .cu-job-dot.Running, .cu-job-dot.Pending { background: var(--cu-gold); }
+    .cu-job-dot.Running, .cu-job-dot.Pending { background: var(--cu-gold); animation: cu-blink 1.2s ease-in-out infinite; }
+    .cu-job-dot.Skipped { background: var(--cu-green); }
+    .cu-job-dot.Cancelled { background: var(--cu-red); }
     .cu-job-kind { font-size: 0.78rem; font-weight: 600; }
     .cu-job-name { font-size: 0.7rem; color: var(--cu-gray); word-break: break-all; }
+    .cu-help { position: relative; display: inline-flex; align-items: center; vertical-align: middle; margin-left: 0.3rem; }
+    .cu-help-btn { background: none; border: none; cursor: pointer; color: var(--cu-gray); padding: 0; line-height: 1; display: inline-flex; }
+    .cu-help-btn:hover { color: var(--cu-text); }
+    .cu-help-popover { display: none; position: absolute; left: 1.4rem; top: 50%; transform: translateY(-50%); z-index: 100; background: #fff; border: 1px solid var(--cu-border); border-radius: 6px; padding: 0.75rem 1rem; width: 22rem; font-size: 0.82rem; line-height: 1.5; color: var(--cu-text); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+    .cu-help:focus-within .cu-help-popover,
+    .cu-help.open .cu-help-popover { display: inline-block; }
+    .cu-runs-toggle { display: flex; justify-content: center; padding: 0.25rem 0; background: none; border: none; cursor: pointer; color: var(--cu-gray); width: 100%; }
+    .cu-runs-toggle:hover { color: var(--cu-text); }
+    .cu-run-card { display: grid; grid-template-columns: 0.55rem minmax(0,1fr) auto; gap: 0.55rem; align-items: center; background: #fff; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.55rem 0.7rem; }
+    .cu-run-card > div { min-width: 0; }
+    .cu-run-card-actions { display: flex; gap: 0.3rem; align-self: center; }
+    .cu-run-card-actions button { display: flex; align-items: center; background: none; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.2rem 0.4rem; cursor: pointer; color: var(--cu-gray); }
+    .cu-run-card-actions button:hover { color: var(--cu-text); border-color: var(--cu-text); }
+    .cu-report-viewer { margin-top: 1.5rem; border-top: 1px solid var(--cu-border); padding-top: 1rem; }
+    .cu-report-viewer h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.15rem; }
+    #report-viewer-subtitle { font-size: 0.8rem; color: var(--cu-gray); margin-bottom: 0.6rem; }
+    .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
+    .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
+    .cu-bubble-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; padding-top: 0.35rem; border-top: 1px solid #f0f0f0; }
+    .cu-bubble-dl-btn { background: none; border: none; padding: 0.15rem 0.2rem; color: #c8cacc; display: inline-flex; align-items: center; border-radius: 3px; line-height: 0; cursor: pointer; }
+    .cu-bubble-dl-btn:hover { color: var(--cu-gray); background: #f0f0f0; }
+    .cu-report-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 0.4rem 0.85rem; font-size: 0.85rem; font-weight: 600; color: var(--cu-charcoal); cursor: pointer; }
+    .cu-report-tab:hover { color: var(--cu-red); }
+    .cu-report-tab.active { border-bottom-color: var(--cu-red); color: var(--cu-red); }
 
     .cu-tabs {
       display: flex;
@@ -249,7 +262,7 @@
     }
     textarea { min-height: 4.5rem; resize: vertical; }
 
-    .cu-repo-list { border: 1px solid var(--cu-border); background: #fff; max-height: 18rem; overflow-y: auto; }
+    .cu-repo-list { border: 1px solid var(--cu-border); background: #fff; max-height: 18rem; overflow-y: auto; border-radius: 0.5rem; }
     .cu-repo {
       display: grid;
       grid-template-columns: 1.25rem minmax(0, 1fr) auto;
@@ -332,9 +345,10 @@
       font-size: 0.9rem;
     }
     #selection-note, #pipeline-selection {
-      background: #e7f1fa;
-      border-left-color: #0066cc;
+      background: none;
+      border-left-color: var(--cu-red);
     }
+    #selection-note { margin-top: 0; }
 
     .cu-thinking {
       display: flex;
@@ -452,8 +466,24 @@
       padding: 0;
       font-size: inherit;
     }
+    .cu-md-table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.9em; }
+    .cu-md-table th, .cu-md-table td { border: 1px solid var(--cu-border); padding: 0.4rem 0.75rem; text-align: left; }
+    .cu-md-table th { background: #f0f4f8; font-weight: 600; }
+    .cu-md-table tr:nth-child(even) td { background: #f9fbfd; }
+    .cu-md pre.mermaid { background: transparent; color: inherit; padding: 0; }
+    .gridjs-td { vertical-align: top; }
+    .cu-row-fail td.gridjs-td { background-color: #fff0f0 !important; }
+    .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
+    .cu-pipeline-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+    .cu-pipeline-row .cu-note { margin: 0; flex: 1; }
+    .cu-pipeline-row .cu-btn { flex-shrink: 0; }
     .hidden { display: none !important; }
     .cu-form-label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
+
+    .cu-ns-row { margin-bottom: 0.75rem; }
+    .cu-ns-combo { display: block; }
+    .cu-ns-combo input { border-radius: 1rem; width: 100%; box-sizing: border-box; }
+    .cu-ns-combo input::-webkit-calendar-picker-indicator { opacity: 1; cursor: pointer; }
 
     @media (max-width: 900px) {
       .cu-shell, .cu-custom, .cu-composer { grid-template-columns: 1fr; }
@@ -461,19 +491,42 @@
       .cu-chips { grid-column: 2; justify-content: flex-start; margin-top: 0.25rem; }
     }
   </style>
+  <link rel="stylesheet" href="/static/vendor/gridjs.min.css"/>
+  <script src="/static/vendor/mermaid.min.js"></script>
+  <script src="/static/vendor/gridjs.umd.js"></script>
 </head>
 <body>
-  <header class="cu-hero">
-    <div class="cu-eyebrow"><span class="cu-mark"></span>Agent Mesh for Software Engineering</div>
-    <h1>Code Understanding</h1>
-    <p>Knowledge graph-based analysis for legacy codebases. <br/>
-        Select code repositories, generate analysis reports, and ask questions
-        about the code.</p>
-  </header>
   <div class="cu-shell">
     <aside class="cu-rail">
+      <div class="cu-brand">
+        <svg class="cu-brand-icon" width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="3" y="27" width="7" height="12" rx="1.5" fill="#ee0000" opacity="0.7"/>
+          <rect x="13" y="20" width="7" height="19" rx="1.5" fill="#ee0000" opacity="0.85"/>
+          <rect x="23" y="13" width="7" height="26" rx="1.5" fill="#ee0000"/>
+          <rect x="33" y="18" width="6" height="21" rx="1.5" fill="#ee0000" opacity="0.6"/>
+          <polyline points="6.5,25 16.5,17 26.5,11 36,16" stroke="#ee0000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="6.5" cy="25" r="2.5" fill="#ee0000"/>
+          <circle cx="16.5" cy="17" r="2.5" fill="#ee0000"/>
+          <circle cx="26.5" cy="11" r="2.5" fill="#ee0000"/>
+          <circle cx="36" cy="16" r="2.5" fill="#ee0000"/>
+        </svg>
+        <span class="cu-brand-eyebrow">Agent Mesh for Software Modernization</span>
+        <span class="cu-brand-title">Code Understanding</span>
+        <span class="cu-brand-sub">Knowledge graph-based analysis for legacy codebases</span>
+      </div>
+      <div id="ns-row" class="cu-ns-row hidden">
+        <div class="cu-ns-combo">
+          <input class="cu-field" id="ns-select" list="ns-list" autocomplete="off"
+                 placeholder="Namespace" style="font-size:0.875rem;min-height:2rem;">
+          <datalist id="ns-list"></datalist>
+        </div>
+      </div>
       <div id="status" class="cu-status warn checking">Checking cluster access…</div>
-      <h2>Indexed repositories</h2>
+      <h2>Recent Runs</h2>
+      <div id="runs" class="cu-rail-list"></div>
+      <!-- <h2>Recent jobs</h2>
+      <div id="jobs" class="cu-rail-list"></div> -->
+      <!-- <h2>Indexed repositories</h2>
       <div id="indexes" class="cu-rail-list"></div>
       <div class="cu-index-upload">
         <input id="index-upload-file" type="file" accept=".tar.gz,application/gzip,application/x-gzip" hidden />
@@ -481,9 +534,7 @@
         <p id="index-upload-status" class="cu-muted cu-index-upload-status" role="status" aria-live="polite">
           Upload a .tar.gz index bundle.
         </p>
-      </div>
-      <h2>Recent jobs</h2>
-      <div id="jobs" class="cu-rail-list"></div>
+      </div> -->
     </aside>
     <main class="cu-main">
       <div id="thinking-bar" class="cu-thinking hidden" role="status" aria-live="polite">
@@ -503,10 +554,13 @@
         <button type="button" data-tab="chat">Chat</button>
       </div>
       <section id="tab-repos" class="cu-card">
-        <p class="cu-muted">Select 1 repository for focused analysis,
-            or multiple for cross-repository comparative analysis.<br/>
+        <h2>Repositories</h2>
+          <p class="cu-muted">
+              Select <strong>1</strong> repository
+              for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.<br/>
             </p>
         <div class="cu-actions">
+          <div class="cu-note hidden" id="selection-note">0 selected</div>
           <button type="button" class="cu-btn cu-btn-secondary" id="select-all">Select all</button>
           <button type="button" class="cu-btn cu-btn-link" id="clear">Clear</button>
           <!--<button type="button" class="cu-btn cu-btn-link" id="refresh">Refresh indexes</button>-->
@@ -517,27 +571,43 @@
           <input class="cu-field" id="custom-branch" value="main" />
           <button type="button" class="cu-btn cu-btn-secondary" id="add-custom">Add repository</button>
         </div>
-        <div class="cu-note hidden" id="selection-note">0 selected</div>
       </section>
       <section id="tab-pipelines" class="cu-card hidden">
-        <p class="cu-muted">
-            Generate a code analysis report for the selected repository or
-            repositories.<br/>
-            <strong>Note:</strong> <br/>
-            &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong>
-            process which involves the generation of a knowledge graph index,
-            and may take up to 30 minutes or more to complete.<br/>
-            &bullet;&nbsp;Any pre-existing index for this selection will be <strong>
-            overwritten.</strong><br/><br/>
-        </p>
-        <div class="cu-note hidden" id="pipeline-selection"></div>
-        <br/>
-        <p><button type="button" class="cu-btn cu-btn-primary" id="run-pipeline">Run Code Understanding</button></p>
+        <h2>Analysis</h2>
+        <p class="cu-muted">Generate a code analysis report for the selected repository or repositories.<span class="cu-help" id="help-pipelines">
+          <button type="button" class="cu-help-btn" aria-label="Help" id="help-pipelines-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+          <span class="cu-help-popover" role="tooltip">
+            Select a repository (or group of repositories) to analyze, then click "Run Analysis".<br/>
+            <strong>Note:</strong><br/>
+            &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong> process which involves the generation of a knowledge graph index, and may take up to 30 minutes or more to complete.<br/>
+            &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
+          </span>
+        </span></p>
+        <div class="cu-pipeline-row">
+          <div class="cu-note hidden" id="pipeline-selection"></div>
+          <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Analysis</button>
+        </div>
+        <div id="report-viewer" class="cu-report-viewer hidden">
+          <h3 id="report-viewer-title"></h3>
+          <div id="report-viewer-subtitle"></div>
+          <div class="cu-report-tabs">
+            <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
+            <button type="button" class="cu-report-tab" data-report="evaluation">Analysis Evaluation</button>
+          </div>
+          <div class="cu-report-viewer-body">
+            <div id="report-viewer-content" class="cu-md"></div>
+          </div>
+        </div>
       </section>
       <section id="tab-chat" class="cu-card hidden">
-        <p class="cu-muted">Ask questions about the indexed repositories below.<br/> <strong>NOTE:</strong> Only
-          indexed repositories are shown. If your repository (or group of repositories) is missing,
-          it means it hasn't been indexed yet.<br/> Fix this by running Code Understanding on the <strong>Analysis</strong> tab.</p>
+        <h2>Chat</h2>
+        <p class="cu-muted">Ask questions about the indexed repositories below.<span class="cu-help" id="help-chat">
+          <button type="button" class="cu-help-btn" aria-label="Help" id="help-chat-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+          <span class="cu-help-popover" role="tooltip">
+            Submit queries about a repository (or group of repositories).<br/>
+            <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
+          </span>
+        </span></p>
         <p id="chat-repo-row" class="hidden">
           <label class="cu-form-label" for="chat-repo">Select repository</label>
           <select class="cu-select" id="chat-repo"></select>
@@ -552,9 +622,31 @@
     </main>
   </div>
   <script>
+    if (typeof mermaid !== "undefined") {
+      mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    }
+
+    function runMermaid(container) {
+      if (typeof mermaid === "undefined") return;
+      const nodes = Array.from(container.querySelectorAll("pre.mermaid")).filter(n => !n.dataset.processed);
+      if (!nodes.length) return;
+      // Render one diagram per event-loop tick so a slow/broken diagram cannot
+      // freeze the UI or block other diagrams from rendering.
+      (async () => {
+        for (const node of nodes) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          try {
+            const result = mermaid.run({ nodes: [node] });
+            if (result && typeof result.then === "function") await result.catch(() => {});
+          } catch (e) { /* leave raw diagram text visible */ }
+        }
+      })();
+    }
+
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
+      animateLatest: false,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -582,11 +674,27 @@
       return text.replace(/%%C(\d+)%%/g, (_, i) => codes[Number(i)]);
     }
 
+    function parseTableRow(line) {
+      const inner = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+      return inner.split("|").map(c => c.trim());
+    }
+
     function renderMarkdown(src) {
       const fences = [];
       let text = String(src ?? "").replace(/\r\n/g, "\n");
-      text = text.replace(/```[\w+-]*\n?([\s\S]*?)```/g, (_, code) => {
-        fences.push(`<pre><code>${esc(code.replace(/\n$/, ""))}</code></pre>`);
+      text = text.replace(/```([\w+-]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+        const content = code.replace(/\n$/, "");
+        if (lang.toLowerCase() === "mermaid") {
+          const sanitized = content
+            .split("\n").map(l => {
+              if (/^\s*%(?!%)/.test(l)) return l.replace(/^(\s*)%/, "$1%%"); // lone % → %%
+              return l.replace(/\s*%%.*$/, "");  // strip ALL %% comments (standalone and inline)
+            }).join("\n")
+            .replace(/\[([^\]"]+)\]/g, (m, label) => /[()]/.test(label) ? `["${label}"]` : m);
+          fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
+        } else {
+          fences.push(`<pre><code>${esc(content)}</code></pre>`);
+        }
         return `\n\n%%FENCE${fences.length - 1}%%\n\n`;
       });
       const lines = text.split("\n");
@@ -597,6 +705,8 @@
       const isOl = (line) => /^\d+\. /.test(line);
       const isHeading = (line) => /^#{1,3} /.test(line);
       const isStep = (line) => /^\*\*\d+\.\s+.+\*\*$/.test(line.trim());
+      const isTableRow = (line) => /\|/.test(line.trim()) && line.trim().length > 1;
+      const isTableSep = (line) => /^\s*\|?(\s*:?-{2,}:?\s*\|)+(\s*:?-{2,}:?\s*)?\s*$/.test(line.trim());
       while (i < lines.length) {
         const line = lines[i];
         const fence = isFence(line);
@@ -630,6 +740,23 @@
           html.push("</ol>");
           continue;
         }
+        if (isTableRow(line) && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+          const headers = parseTableRow(line);
+          i += 2;
+          let tbl = `<table class="cu-md-table"><thead><tr>`;
+          headers.forEach(h => { tbl += `<th>${inlineMd(h)}</th>`; });
+          tbl += `</tr></thead><tbody>`;
+          while (i < lines.length && isTableRow(lines[i])) {
+            const cells = parseTableRow(lines[i]);
+            tbl += `<tr>`;
+            cells.forEach(c => { tbl += `<td>${inlineMd(c)}</td>`; });
+            tbl += `</tr>`;
+            i += 1;
+          }
+          tbl += `</tbody></table>`;
+          html.push(tbl);
+          continue;
+        }
         const para = [];
         while (
           i < lines.length &&
@@ -639,6 +766,7 @@
           !isOl(lines[i]) &&
           !isFence(lines[i]) &&
           !isStep(lines[i]) &&
+          !isTableRow(lines[i]) &&
           !/^---+$/.test(lines[i].trim())
         ) {
           para.push(lines[i]);
@@ -647,6 +775,58 @@
         html.push(`<p>${inlineMd(para.join(" "))}</p>`);
       }
       return `<div class="cu-md">${html.join("")}</div>`;
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [], field = "", inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { field += ch; }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+          } else if (ch === ',') {
+            row.push(field.trim()); field = "";
+          } else if (ch === '\r' && text[i + 1] === '\n') {
+            row.push(field.trim()); field = "";
+            if (row.some(f => f !== "")) rows.push(row);
+            row = []; i++;
+          } else if (ch === '\n') {
+            row.push(field.trim()); field = "";
+            if (row.some(f => f !== "")) rows.push(row);
+            row = [];
+          } else {
+            field += ch;
+          }
+        }
+      }
+      row.push(field.trim());
+      if (row.some(f => f !== "")) rows.push(row);
+      return rows;
+    }
+
+    let _typewriterTimer = null;
+
+    function typewriter(el, fullText, onDone) {
+      if (_typewriterTimer) { clearInterval(_typewriterTimer); _typewriterTimer = null; }
+      const tokens = fullText.split(/(\s+)/);
+      const chunkSize = Math.max(1, Math.ceil(tokens.length / 80));
+      let idx = 0;
+      _typewriterTimer = setInterval(() => {
+        idx = Math.min(idx + chunkSize, tokens.length);
+        el.innerHTML = renderMarkdown(tokens.slice(0, idx).join(""));
+        $("chat-log").scrollTop = $("chat-log").scrollHeight;
+        if (idx >= tokens.length) {
+          clearInterval(_typewriterTimer);
+          _typewriterTimer = null;
+          runMermaid(el);
+          if (onDone) onDone();
+        }
+      }, 30);
     }
 
     const banner = (msg, danger) => {
@@ -694,6 +874,24 @@
         return `${url}-${branch}`;
       }
     }
+    function prettyRelativeDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+      const now = new Date();
+      const isToday = d.getFullYear() === now.getFullYear()
+        && d.getMonth() === now.getMonth()
+        && d.getDate() === now.getDate();
+      if (isToday) {
+        const diffMs = now - d;
+        const hours = Math.floor(diffMs / 3600000);
+        const mins = Math.floor(diffMs / 60000);
+        if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+        if (mins >= 1) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+        return "just now";
+      }
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
     function prettyDate(iso) {
       if (!iso) return "";
       const d = new Date(iso);
@@ -717,7 +915,7 @@
         return `<article class="cu-index-card multi">
           <span class="cu-index-dot"></span>
           <div>
-            <div class="cu-index-title">Combined multi-repo index</div>
+            <div class="cu-index-title">Combined repos</div>
             <div class="cu-index-meta">
               <span class="cu-chip indexed">ready</span>
               ${item.uploaded ? '<span class="cu-chip uploaded">uploaded</span>' : ""}
@@ -750,7 +948,7 @@
     }
 
     function bindDownloadButtons() {
-      $("indexes").querySelectorAll("[data-index-download]").forEach((button) => {
+      $("indexes")?.querySelectorAll("[data-index-download]").forEach((button) => {
         button.addEventListener("click", () => downloadIndex(button.dataset.indexDownload, button));
       });
     }
@@ -857,6 +1055,170 @@
       }
     }
 
+    const iconExpand = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="11" y1="9" x2="8" y2="9"/></svg>`;
+    const iconDownload = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
+    function runCard(run) {
+      const succeeded = run.status === "Succeeded" || run.status === "Skipped";
+      const isMulti = (run.name || "").startsWith("multi_repo");
+      const title = isMulti
+        ? "Combined repos"
+        : run.git_repo ? shortName(run.git_repo).replace(/\.git$/, "") : (run.git_slug || run.name);
+      const startChip = run.start_time
+        ? `<span class="cu-chip">${esc(prettyRelativeDate(run.start_time))}</span>`
+        : "";
+      const actions = succeeded
+        ? `<div class="cu-run-card-actions">
+            <button type="button" class="cu-run-expand" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" title="View analysis report">${iconExpand}</button>
+            <button type="button" class="cu-run-download" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" title="Download analysis report">${iconDownload}</button>
+          </div>`
+        : "";
+      return `<article class="cu-run-card">
+        <span class="cu-job-dot ${esc(run.status)}"></span>
+        <div>
+          <div class="cu-index-title">${esc(title)}</div>
+          <div class="cu-index-meta">
+            ${run.name ? `<span class="cu-index-owner">${esc(run.name)}</span>` : ""}
+            <span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span>
+            ${startChip}
+          </div>
+        </div>
+        ${actions}
+      </article>`;
+    }
+
+    function bindRunCards() {
+      $("runs").querySelectorAll(".cu-run-expand").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
+            const gitRepo = btn.dataset.gitRepo;
+            const gitBranch = btn.dataset.gitBranch;
+            $("report-viewer-title").textContent = gitRepo
+              ? `${shortName(gitRepo).replace(/\.git$/, "")} @ ${gitBranch}`
+              : "Combined repos";
+            $("report-viewer-subtitle").textContent = btn.dataset.runName;
+
+            const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
+
+            function appendReportDl(rawContent, filename) {
+              const mime = filename.endsWith(".csv") ? "text/csv" : "text/markdown";
+              const footer = document.createElement("div");
+              footer.className = "cu-bubble-footer";
+              footer.innerHTML = `<button class="cu-bubble-dl-btn" title="Download report" aria-label="Download report">${iconDownload}</button>`;
+              footer.querySelector("button").onclick = () => {
+                const blob = new Blob([rawContent], { type: mime });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+              };
+              $("report-viewer-content").appendChild(footer);
+            }
+
+            function showReport(type) {
+              $("report-viewer").querySelectorAll(".cu-report-tab").forEach((t) => {
+                t.classList.toggle("active", t.dataset.report === type);
+              });
+              const content = reports[type];
+              if (type === "evaluation") {
+                $("report-viewer-content").innerHTML = "";
+                if (!content) {
+                  $("report-viewer-content").innerHTML = `<p class="cu-muted">No evaluation report available.</p>`;
+                } else {
+                  const csvRows = parseCsv(content);
+                  if (csvRows.length < 2) {
+                    $("report-viewer-content").innerHTML = `<p class="cu-muted">No evaluation data.</p>`;
+                  } else {
+                    const ANALYSIS_EVALUATION_THRESHOLD = 4;
+                    const headers = csvRows[0];
+                    const scoreColIndices = headers.reduce((acc, h, i) => {
+                      if (h.includes("/v1/score")) acc.push(i);
+                      return acc;
+                    }, []);
+                    const gridContainer = document.createElement("div");
+                    $("report-viewer-content").appendChild(gridContainer);
+                    new gridjs.Grid({
+                      columns: headers.map((h, colIdx) => {
+                        const maxLen = csvRows.reduce((max, row) => Math.max(max, (row[colIdx] || "").length), 0);
+                        return {
+                          name: h,
+                          resizable: true,
+                          width: `${Math.max(80, Math.min(800, maxLen * 8))}px`,
+                          formatter: (cell) => {
+                            const str = cell == null ? "" : String(cell);
+                            if (str.length <= 1200) return str;
+                            return gridjs.html(
+                              `<span>` +
+                              `${esc(str.slice(0, 1200))}` +
+                              `<span class="cu-cell-rest" style="display:none">${esc(str.slice(1200))}</span>` +
+                              `<a href="#" class="cu-cell-toggle" onclick="` +
+                                `var r=this.previousElementSibling;` +
+                                `if(r.style.display==='none'){r.style.display='inline';this.textContent='Less';}` +
+                                `else{r.style.display='none';this.textContent='More';}` +
+                                `return false">More</a>` +
+                              `</span>`
+                            );
+                          },
+                        };
+                      }),
+                      data: csvRows.slice(1),
+                      sort: true,
+                      search: true,
+                      pagination: { limit: 20 },
+                      style: { table: { fontSize: "0.875rem" } },
+                      className: {
+                        tr: (row) => scoreColIndices.some(i => parseFloat(row[i]) < ANALYSIS_EVALUATION_THRESHOLD)
+                          ? "cu-row-fail"
+                          : "",
+                      },
+                    }).render(gridContainer);
+                    appendReportDl(content, `${btn.dataset.runName || "report"}_evaluation_report.csv`);
+                  }
+                }
+              } else {
+                $("report-viewer-content").innerHTML = content
+                  ? renderMarkdown(content)
+                  : `<p class="cu-muted">No analysis report available.</p>`;
+                runMermaid($("report-viewer-content"));
+                if (content) appendReportDl(content, `${btn.dataset.runName || "report"}_analysis_report.md`);
+              }
+            }
+
+            $("report-viewer").querySelectorAll(".cu-report-tab").forEach((tab) => {
+              tab.onclick = () => showReport(tab.dataset.report);
+            });
+
+            showReport("analysis");
+            $("report-viewer").classList.remove("hidden");
+            showTab("pipelines");
+          } catch (e) {
+            banner(String(e.message || e), true);
+          }
+        });
+      });
+      $("runs").querySelectorAll(".cu-run-download").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
+            const report = snap.analysis_report;
+            if (!report) { banner("No analysis report available.", true); return; }
+            const blob = new Blob([report], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${btn.dataset.runName || btn.dataset.runId}_analysis_report.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            banner(String(e.message || e), true);
+          }
+        });
+      });
+    }
+
     function jobCard(job) {
       const kind = (job.name || "").startsWith("cu-query-") ? "Query" : "Pipeline";
       return `<article class="cu-job-card">
@@ -865,7 +1227,7 @@
           <div class="cu-job-kind">${esc(kind)}</div>
           <div class="cu-job-name">${esc(job.name)}</div>
         </div>
-        <span class="cu-chip ${job.status === "Succeeded" ? "indexed" : ""}">${esc(job.status)}</span>
+        <span class="cu-chip ${job.status === "Succeeded" || job.status === "Skipped" ? "indexed" : ""}">${esc(job.status)}</span>
       </article>`;
     }
 
@@ -927,41 +1289,96 @@
         $("chat-log").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => sendQuestion(b.dataset.q)));
         return;
       }
-      const messages = state.chat.map((m) => m.role === "assistant"
-        ? `<div class="cu-bubble assistant">${renderMarkdown(m.content)}</div>`
-        : `<div class="cu-bubble user">${esc(m.content)}</div>`
-      );
+      const animate = state.animateLatest;
+      state.animateLatest = false;
+      let lastAssistantIdx = -1;
+      if (animate) {
+        for (let i = state.chat.length - 1; i >= 0; i--) {
+          if (state.chat[i].role === "assistant") { lastAssistantIdx = i; break; }
+        }
+      }
+      const dlFooter = (idx) =>
+        `<div class="cu-bubble-footer"><button class="cu-bubble-dl-btn" data-chat-dl="${idx}" title="Download response" aria-label="Download response">${iconDownload}</button></div>`;
+      const messages = state.chat.map((m, idx) => {
+        if (idx === lastAssistantIdx) {
+          return `<div class="cu-bubble assistant" id="cu-animating-bubble"></div>`;
+        }
+        return m.role === "assistant"
+          ? `<div class="cu-bubble assistant">${renderMarkdown(m.content)}${dlFooter(idx)}</div>`
+          : `<div class="cu-bubble user">${esc(m.content)}</div>`;
+      });
       if (state.thinking && state.thinking.kind === "query") {
         messages.push(`<div class="cu-bubble assistant thinking-msg">
           <span class="cu-spinner" aria-hidden="true"></span>
-          Analyzing indexed code${state.thinking.status ? " · " + esc(state.thinking.status) : ""}
+          Running query${state.thinking.status ? " · " + esc(state.thinking.status) : ""}
         </div>`);
       }
       $("chat-log").innerHTML = messages.join("");
+      runMermaid($("chat-log"));
       $("chat-log").scrollTop = $("chat-log").scrollHeight;
+      if (lastAssistantIdx >= 0) {
+        const el = document.getElementById("cu-animating-bubble");
+        if (el) typewriter(el, state.chat[lastAssistantIdx].content, () => {
+          el.removeAttribute("id");
+          const footer = document.createElement("div");
+          footer.className = "cu-bubble-footer";
+          footer.innerHTML = `<button class="cu-bubble-dl-btn" data-chat-dl="${lastAssistantIdx}" title="Download response" aria-label="Download response">${iconDownload}</button>`;
+          el.appendChild(footer);
+        });
+      }
     }
 
     async function load() {
       try {
-        const [status, catalog, indexes, jobs] = await Promise.all([
-          api("/api/status"), api("/api/catalog"), api("/api/indexes"), api("/api/jobs"),
+        /* const [status, catalog, indexes, jobs] = await Promise.all([
+          api("/api/status"), api("/api/catalog"), api("/api/indexes"), api("/api/jobs")).catch(() => ({ jobs: [] })),
+        ]); */
+        const [status, catalog, indexes, v2runs, nsData] = await Promise.all([
+          api("/api/status"), api("/api/catalog"), api("/api/indexes"),
+          api("/api/v2/pipelines/runs").catch(() => ({ runs: [] })),
+          api("/api/namespaces").catch(() => ({ namespaces: [], current: "" })),
         ]);
         $("status").className = "cu-status" + (status.ok ? "" : " warn");
-        $("status").innerHTML = `<strong>${status.ok ? "Connected" : "Not connected"}</strong><div></div>
-          <div>${status.ok ? "" : esc(status.message || "")}</div>
-          <div class="cu-muted">Namespace: <b>${esc(status.namespace || "")}</b></div>`;
+        $("status").innerHTML = `<div style="font-size:0.75rem">${status.ok ? "Connected" : "Not connected"}</div><div></div>
+          <div>${status.ok ? "" : esc(status.message || "")}</div>`;
+        const nsList = nsData.namespaces || [];
+        const nsCurrent = nsData.current || status.namespace || "";
+        if (nsList.length > 0) {
+          $("ns-list").innerHTML = nsList.map((ns) => `<option value="${esc(ns)}"></option>`).join("");
+          $("ns-select").value = nsCurrent;
+          $("ns-row").classList.remove("hidden");
+        } else {
+          $("ns-row").classList.add("hidden");
+        }
+
         state.repos = catalog.repos || [];
         state.defaultKey = catalog.default_key;
         if (!state.selected.size && state.defaultKey) state.selected.add(state.defaultKey);
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
-        $("indexes").innerHTML = state.indexes.length
-          ? state.indexes.map(indexCard).join("")
-          : `<p class="cu-muted">${esc(indexes.message || "No indexes yet.")}</p>`;
-        bindDownloadButtons();
-        $("jobs").innerHTML = (jobs.jobs || []).length
-          ? jobs.jobs.map(jobCard).join("")
-          : `<p class="cu-muted">No jobs yet.</p>`;
+        if ($("indexes")) {
+          $("indexes").innerHTML = state.indexes.length
+            ? state.indexes.map(indexCard).join("")
+            : `<p class="cu-muted">${esc(indexes.message || "No indexes yet.")}</p>`;
+          bindDownloadButtons();
+        }
+        const allRuns = [...(v2runs.runs || [])];
+        const chevronDown = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const chevronUp = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        const renderRuns = (expanded) => {
+          const shown = expanded ? allRuns : allRuns.slice(0, 3);
+          const toggle = allRuns.length > 3
+            ? `<button type="button" class="cu-runs-toggle" id="runs-toggle">${expanded ? chevronUp : chevronDown}</button>`
+            : "";
+          $("runs").innerHTML = shown.length
+            ? shown.map(runCard).join("") + toggle
+            : `<p class="cu-muted">No runs yet.</p>`;
+          if (allRuns.length > 3) {
+            $("runs-toggle").onclick = () => renderRuns(!expanded);
+          }
+          bindRunCards();
+        };
+        renderRuns(false);
         $("selection-note").classList.remove("hidden");
         $("pipeline-selection").classList.remove("hidden");
         $("chat-loading").classList.add("hidden");
@@ -1007,6 +1424,77 @@
       state.poll = setInterval(tick, 4000);
     }
 
+    function pollQuery(queryId) {
+      const POLL_INTERVAL_MS = 3000;
+      const MAX_POLLS = 200; // 10 minutes
+      let polls = 0;
+      const interval = setInterval(async () => {
+        polls += 1;
+        if (polls > MAX_POLLS) {
+          clearInterval(interval);
+          setThinking(null);
+          renderChat();
+          banner("Query timed out. The analysis is taking longer than expected.", true);
+          return;
+        }
+        try {
+          const snap = await api(`/api/v2/queries/${queryId}`);
+          if (snap.status === "succeeded") {
+            clearInterval(interval);
+            state.chat.push({ role: "assistant", content: snap.result || "" });
+            setThinking(null);
+            state.animateLatest = true;
+            renderChat();
+          } else if (snap.status === "failed") {
+            clearInterval(interval);
+            setThinking(null);
+            renderChat();
+            banner(snap.error || "Query failed.", true);
+          }
+        } catch (e) {
+          clearInterval(interval);
+          setThinking(null);
+          renderChat();
+          banner(String(e.message || e), true);
+        }
+      }, POLL_INTERVAL_MS);
+    }
+
+    async function pollV2(runId) {
+      if (state.poll) clearInterval(state.poll);
+      const tick = async () => {
+        try {
+          const snap = await api(`/api/v2/pipelines/runs/${runId}`);
+          if (state.thinking) {
+            setThinking({
+              ...state.thinking,
+              status: `${snap.status} · ${runId}`,
+            });
+          }
+          load();
+          if (["succeeded", "skipped", "failed", "cancelled", "running"].includes(snap.status)) {
+            clearInterval(state.poll);
+            state.poll = null;
+            setThinking(null);
+            if (snap.status === "succeeded" || snap.status === "skipped") {
+              banner("Pipeline completed successfully.");
+            } else if (snap.status === "running") {
+              banner(`Pipeline running.`);
+            } else {
+              banner(`Pipeline ${snap.status}`, true);
+            }
+          }
+        } catch (e) {
+          clearInterval(state.poll);
+          state.poll = null;
+          setThinking(null);
+          banner(String(e.message || e), true);
+        }
+      };
+      tick();
+      state.poll = setInterval(tick, 4000);
+    }
+
     async function sendQuestion(text) {
       const question = (text || "").trim();
       if (!question || state.thinking) return;
@@ -1015,25 +1503,25 @@
         $("banner").dataset.reason = "no-chat-repo";
         return;
       }
+      banner("");
       const option = state.queryable.find((o) => o.key === $("chat-repo").value) || {};
       state.chat.push({ role: "user", content: question });
       $("question").value = "";
       showTab("chat");
-      setThinking({ kind: "query", label: "Thinking", status: "Submitting your question…" });
+      setThinking({ kind: "query", label: "Thinking", status: "Analyzing indexed code…" });
       renderChat();
       try {
-        const result = await api("/api/query", {
+        const result = await api("/api/v2/queries", {
           method: "POST",
           body: JSON.stringify({
             question,
             git_repo: option.git_repo || "",
             git_branch: option.git_branch || "main",
             use_global: option.use_global || false,
+            multi_repo: option.multi_repo || false,
           }),
         });
-        setThinking({ kind: "query", label: "Thinking", status: `Job ${result.job_name} started` });
-        renderChat();
-        poll(result.job_name, "query");
+        pollQuery(result.query_id);
       } catch (e) {
         setThinking(null);
         renderChat();
@@ -1047,10 +1535,10 @@
     $("select-all").onclick = () => { state.repos.forEach((r) => state.selected.add(repoKey(r))); renderRepos(); };
     $("clear").onclick = () => { state.selected.clear(); renderRepos(); };
     //$("refresh").onclick = load;
-    $("upload-index").onclick = () => $("index-upload-file").click();
-    $("index-upload-file").addEventListener("change", (event) => {
-      uploadIndex(event.target.files[0]);
-    });
+    // $("upload-index").onclick = () => $("index-upload-file").click();
+    // $("index-upload-file").addEventListener("change", (event) => {
+    //   uploadIndex(event.target.files[0]);
+    // });
     $("add-custom").onclick = () => {
       const git_repo = $("custom-url").value.trim();
       const git_branch = $("custom-branch").value.trim() || "main";
@@ -1073,11 +1561,20 @@
         $("banner").dataset.reason = "no-selection";
         return;
       }
+      $("report-viewer").classList.add("hidden");
+      $("report-viewer-title").textContent = "";
+      $("report-viewer-subtitle").textContent = "";
+      $("report-viewer-content").innerHTML = "";
       setThinking({ kind: "pipeline", label: "Running pipeline", status: "Submitting indexing job…" });
       try {
-        const result = await api("/api/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos() }) });
+        /*
+        const result = await api("/api/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos() }) }); // v1
         setThinking({ kind: "pipeline", label: "Running pipeline", status: `Job ${result.job_name} started` });
         poll(result.job_name, "pipeline");
+         */
+        const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos()}) });
+        setThinking({ kind: "pipeline", label: "Running pipeline", status: `KFP run ${result.job_id} started` });
+        pollV2(result.job_id);
       } catch (e) {
         setThinking(null);
         banner(String(e.message || e), true);
@@ -1089,6 +1586,32 @@
         delete $("banner").dataset.reason;
       }
     });
+    async function commitNamespace() {
+      const ns = $("ns-select").value.trim();
+      if (!ns) return;
+      try {
+        await api("/api/namespace", { method: "POST", body: JSON.stringify({ namespace: ns }) });
+        load();
+      } catch (e) {
+        banner(String(e.message || e), true);
+        load(); // revert displayed value to server state
+      }
+    }
+    $("ns-select").addEventListener("change", commitNamespace);
+    $("ns-select").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); commitNamespace(); } });
+    $("chat-log").addEventListener("click", (e) => {
+      const btn = e.target.closest(".cu-bubble-dl-btn");
+      if (!btn || btn.dataset.chatDl === undefined) return;
+      const msg = state.chat[Number(btn.dataset.chatDl)];
+      if (!msg) return;
+      const blob = new Blob([msg.content], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chat_response_${Number(btn.dataset.chatDl) + 1}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
     $("send").onclick = () => sendQuestion($("question").value);
     $("question").addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -1096,6 +1619,27 @@
         sendQuestion($("question").value);
       }
     });
+    // Help popovers: show on hover or click, close on mouse-leave or outside click
+    document.querySelectorAll(".cu-help").forEach((wrap) => {
+      let leaveTimer;
+      wrap.addEventListener("mouseenter", () => {
+        clearTimeout(leaveTimer);
+        wrap.classList.add("open");
+      });
+      wrap.addEventListener("mouseleave", () => {
+        leaveTimer = setTimeout(() => wrap.classList.remove("open"), 120);
+      });
+      wrap.querySelector(".cu-help-btn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = wrap.classList.contains("open");
+        document.querySelectorAll(".cu-help.open").forEach((el) => el.classList.remove("open"));
+        if (!isOpen) wrap.classList.add("open");
+      });
+    });
+    document.addEventListener("click", () => {
+      document.querySelectorAll(".cu-help.open").forEach((el) => el.classList.remove("open"));
+    });
+
     load();
   </script>
 </body>

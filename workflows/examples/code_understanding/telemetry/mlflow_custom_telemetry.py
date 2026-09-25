@@ -6,7 +6,7 @@ import mlflow
 
 from .custom_telemetry import CustomTelemetry
 
-logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 class MlFlowCustomTelemetry(CustomTelemetry):
@@ -23,11 +23,13 @@ class MlFlowCustomTelemetry(CustomTelemetry):
             MlFlowCustomTelemetry._DEFAULT_EXPERIMENT_NAME = self._get_default_experiment_name()
 
         logging.info(
-            f"MlFlowCustomTelemetry: default experiment resolved to '{self._DEFAULT_EXPERIMENT_NAME}'"
+            "MlFlowCustomTelemetry: default experiment resolved to "
+            f"'{self._DEFAULT_EXPERIMENT_NAME}'"
         )
 
     def track(self):
         import litellm
+
         from .telemetry_litellm.mlflow_token_logger import MlflowTokenLogger
 
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
@@ -53,6 +55,7 @@ class MlFlowCustomTelemetry(CustomTelemetry):
     @staticmethod
     def get_token_usage(kfp_run_id: str) -> dict:
         from mlflow.tracking import MlflowClient
+
         try:
             client = MlflowClient()
             experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "AIP-default")

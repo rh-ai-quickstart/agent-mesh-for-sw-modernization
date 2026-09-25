@@ -8,17 +8,19 @@ from .mlflow_asset_loader import MlFlowAssetLoader
 class DefaultAssetLoader(AssetLoader):
     """Delegates to LocalAssetLoader or MlFlowAssetLoader based on the ASSET_LOADER env var."""
 
-    def __init__(self):
+    def __init__(self, namespace: str = None):
 
         if os.getenv("ASSET_LOADER") == "mlflow":
 
-            self._loader = MlFlowAssetLoader()
+            self._loader = MlFlowAssetLoader(namespace=namespace)
 
         else:
 
             self._loader = LocalAssetLoader()
 
-    def download(self, asset_file_path: str, download_dir: str = None, experiment_name=None, asset_tags=None):
+    def download(
+        self, asset_file_path: str, download_dir: str = None, experiment_name=None, asset_tags=None
+    ):
 
         if isinstance(self._loader, MlFlowAssetLoader):
             kwargs = {}
@@ -29,7 +31,9 @@ class DefaultAssetLoader(AssetLoader):
             return self._loader.download(asset_file_path, download_dir, **kwargs)
         return self._loader.download(asset_file_path, download_dir)
 
-    def download_dir(self, asset_dir_path: str, download_dir: str, experiment_name=None, asset_tags=None):
+    def download_dir(
+        self, asset_dir_path: str, download_dir: str, experiment_name=None, asset_tags=None
+    ):
 
         if isinstance(self._loader, MlFlowAssetLoader):
             kwargs = {}
@@ -40,10 +44,17 @@ class DefaultAssetLoader(AssetLoader):
             return self._loader.download_dir(asset_dir_path, download_dir, **kwargs)
         return self._loader.download_dir(asset_dir_path, download_dir)
 
-    def log_results(self, results_path: str, artifact_path: str = None, tags: dict = None,
-                    content: str = None):
+    def log_results(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
 
         return self._loader.log_results(results_path, artifact_path, tags, content)
+
+    def log_static_asset(
+        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    ):
+
+        return self._loader.log_static_asset(results_path, artifact_path, tags, content)
 
     def upload_all_assets(self, assets_dir: str):
 
