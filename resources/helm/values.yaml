@@ -23,7 +23,14 @@ minio:
   bucket: demo
   region: us-east-1
   image: "quay.io/minio/minio:latest"
-  mcImage: "quay.io/minio/mc:latest"
+  # The bucket Job downloads a pinned mcli release into /tmp at runtime.
+  # This Red Hat base image supplies sh, curl, tar, and sha256sum.
+  mcImage: "registry.access.redhat.com/ubi9/ubi:9.7"
+  mcRelease: "RELEASE.2026-09-16T00-00-00Z"
+  mcArchiveVersion: "20260916000000.0.0"
+  mcArchiveSha256:
+    amd64: "4ba2814fd5507fbe6b4d237c359750b9119d28d7217495fa5b48002fcbd397ef"
+    arm64: "b7008ca2a1bc5735b6585981c59a3640a0daa152dc789df3d1a0d0438787de82"
 
 dataGeneration:
   image:
