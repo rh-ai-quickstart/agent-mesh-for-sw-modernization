@@ -6,8 +6,11 @@
 
 ENV_FILE            	?= ./.env
 WORKBENCH_IMAGESTREAM_NAMESPACE ?= redhat-ods-applications
-GIT_REPO_URL        	:= $(shell git remote get-url origin 2>/dev/null | sed 's|^git@\([^:]*\):\(.*\)$$|https://\1/\2|')
-GIT_REPO_BRANCH     	:= $(shell git branch --show-current 2>/dev/null)
+# Fall back to origin and the local branch when no upstream is configured.
+GIT_LOCAL_BRANCH    	:= $(shell git branch --show-current 2>/dev/null)
+GIT_REPO_REMOTE     	:= $(or $(shell git config --get "branch.$(GIT_LOCAL_BRANCH).remote" 2>/dev/null),origin)
+GIT_REPO_URL        	:= $(shell git remote get-url "$(GIT_REPO_REMOTE)" 2>/dev/null | sed 's|^git@\([^:]*\):\(.*\)$$|https://\1/\2|')
+GIT_REPO_BRANCH     	:= $(or $(shell git config --get "branch.$(GIT_LOCAL_BRANCH).merge" 2>/dev/null | sed 's|^refs/heads/||'),$(GIT_LOCAL_BRANCH))
 CLUSTER_DOMAIN      	:= $(shell oc get ingress.config cluster -o jsonpath='{.spec.domain}' 2>/dev/null)
 GATEWAY_HOST        	:= $(shell oc get gateway data-science-gateway -n openshift-ingress -o jsonpath='{.status.addresses[0].value}' 2>/dev/null)
 PIPELINE_GIT_REPO   	?=
@@ -15,25 +18,59 @@ PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
 DEPLOY_EMBEDDING_MODEL ?= false
 DEPLOY_OTEL            ?= false
+
+# Image build/push settings. CI sets REGISTRY and VERSION for its build; when
+# unset, recipes use KFP_IMAGE_REGISTRY and the per-image tags below.
 # Local development uses Podman by default. GitHub Actions sets CI=true and
 # provides Docker Buildx; callers can override this with CONTAINER_ENGINE.
 CONTAINER_ENGINE      ?= $(if $(CI),docker,podman)
 REGISTRY              ?=
 VERSION               ?=
-# Image names used by the build/push targets invoked by the CI Docker workflow.
+
+# Defaults for values omitted from .env. Sourcing .env in each recipe lets
+# configured values override these defaults.
+AWS_ACCESS_KEY_ID                  ?= minioadmin
+AWS_SECRET_ACCESS_KEY              ?= minioadmin123
+AWS_S3_BUCKET                      ?= data
+MINIO_IMAGE                        ?= quay.io/minio/minio:latest
+GIT_REPO                           ?= https://github.com/agapebondservant/tic-tac-toe-sample
+GIT_BRANCH                         ?= main
+GIT_REPO_LIST                      ?= workflows/examples/code_understanding/assets/repos/repo_list.json
+KFP_IMAGE_REGISTRY                 ?= quay.io/rh-ai-quickstart
 KFP_DATA_GENERATION_BASE_IMAGE_NAME ?= agent-mesh-for-sw-modernization-data-generation
 KFP_INDEXING_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_ANALYSIS_BASE_IMAGE_NAME         ?= agent-mesh-for-sw-modernization-data-indexing
 KFP_PIPELINE_TOOLS_IMAGE_NAME        ?= agent-mesh-for-sw-modernization-pipeline-tools
 CONSOLE_APP_IMAGE_NAME               ?= agent-mesh-for-sw-modernization-console-app
 CONSOLE_PLUGIN_IMAGE_NAME            ?= agent-mesh-for-sw-modernization-console-plugin
+# Shared fallback for image tags omitted from .env. VERSION overrides these
+# tags for build/push only.
+BASE_VERSION                         := v0.1.1
+KFP_DATA_GENERATION_BASE_IMAGE_TAG   ?= $(BASE_VERSION)
+KFP_INDEXING_BASE_IMAGE_TAG          ?= $(BASE_VERSION)
+KFP_ANALYSIS_BASE_IMAGE_TAG          ?= $(BASE_VERSION)
+KFP_PIPELINE_TOOLS_IMAGE_TAG         ?= $(BASE_VERSION)
+CONSOLE_IMAGE_TAG                    ?= $(BASE_VERSION)
+ASSET_LOADER                        ?= mlflow
+INSTALL_PREBUILT_INDEX              ?= true
+CUSTOM_EVALUATOR                    ?= mlflow
+OTEL_SERVICE_NAME                   ?= code-understanding
+OTEL_EXPORTER                       ?= otlp_http
+MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT ?= true
+OTEL_SEMCONV_STABILITY_OPT_IN       ?= genai
 
-export KFP_DATA_GENERATION_BASE_IMAGE_NAME \
-	KFP_INDEXING_BASE_IMAGE_NAME \
-	KFP_ANALYSIS_BASE_IMAGE_NAME \
-	KFP_PIPELINE_TOOLS_IMAGE_NAME \
-	CONSOLE_APP_IMAGE_NAME \
-	CONSOLE_PLUGIN_IMAGE_NAME
+DEFAULTED_ENV_VARS := \
+	AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_S3_BUCKET MINIO_IMAGE \
+	GIT_REPO GIT_BRANCH GIT_REPO_LIST KFP_IMAGE_REGISTRY \
+	KFP_DATA_GENERATION_BASE_IMAGE_NAME KFP_INDEXING_BASE_IMAGE_NAME \
+	KFP_ANALYSIS_BASE_IMAGE_NAME KFP_PIPELINE_TOOLS_IMAGE_NAME \
+	CONSOLE_APP_IMAGE_NAME CONSOLE_PLUGIN_IMAGE_NAME \
+	KFP_DATA_GENERATION_BASE_IMAGE_TAG KFP_INDEXING_BASE_IMAGE_TAG \
+	KFP_ANALYSIS_BASE_IMAGE_TAG KFP_PIPELINE_TOOLS_IMAGE_TAG CONSOLE_IMAGE_TAG \
+	ASSET_LOADER INSTALL_PREBUILT_INDEX CUSTOM_EVALUATOR \
+	OTEL_SERVICE_NAME OTEL_NAMESPACE OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER \
+	MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT OTEL_SEMCONV_STABILITY_OPT_IN
+export $(DEFAULTED_ENV_VARS)
 
 # ============================================================================
 # Container engine
@@ -150,11 +187,12 @@ help-all:
 	@echo ""
 	@echo "Container image build overrides (used by CI):"
 	@echo "  CONTAINER_ENGINE            Image tool: podman locally, docker in CI"
-	@echo "  REGISTRY                    Override the image registry"
-	@echo "  VERSION                     Override the image tag"
+	@echo "  REGISTRY                    Build/push registry (default: KFP_IMAGE_REGISTRY)"
+	@echo "  VERSION                     Tag for all images in this build/push run"
 	@echo ""
 	@echo "Common runtime overrides (not exhaustive):"
 	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
+	@echo "  BASE_VERSION                Fallback for omitted image tags (default: v0.1.1)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
 	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
@@ -171,12 +209,13 @@ help-all:
 
 install:
 	@set -e; set -a; . $(ENV_FILE); set +a; \
+	OTEL_NAMESPACE=$${OTEL_NAMESPACE:-$$KFP_NAMESPACE}; \
 	\
 	echo "==> Creating namespaces..." && \
 	set -- agent-mesh-for-sw resources/helm \
 		--set "namespace=$$KFP_NAMESPACE" \
 		--set "requester=$$(oc whoami)"; \
-	if [ "$(DEPLOY_OTEL)" = "true" ] && [ -n "$${OTEL_NAMESPACE:-}" ]; then \
+	if [ "$(DEPLOY_OTEL)" = "true" ] && [ "$$OTEL_NAMESPACE" != "$$KFP_NAMESPACE" ]; then \
 		set -- "$$@" --set "otel.namespace=$$OTEL_NAMESPACE"; \
 	fi; \
 	helm template "$$@" -s templates/namespace.yaml | oc apply -f - && \
@@ -191,6 +230,7 @@ install:
 	$(MAKE) apply-secrets
 	@set -e; set -a; . $(ENV_FILE); set +a; \
 	: "$${KFP_IMAGE_REGISTRY:?KFP_IMAGE_REGISTRY must be set in $(ENV_FILE)}"; \
+	OTEL_NAMESPACE=$${OTEL_NAMESPACE:-$$KFP_NAMESPACE}; \
 	OTEL_ENABLED=false; \
 	set -- agent-mesh-for-sw resources/helm \
 		--namespace "$$KFP_NAMESPACE" \
@@ -269,6 +309,7 @@ uninstall:
 	@set -eu; \
 	set -a; . "$(ENV_FILE)"; set +a; \
 	: "$${KFP_NAMESPACE:?KFP_NAMESPACE must be set in $(ENV_FILE)}"; \
+	OTEL_NAMESPACE=$${OTEL_NAMESPACE:-$$KFP_NAMESPACE}; \
 	case "$$KFP_NAMESPACE" in default|kube-*|openshift-*|redhat-ods-applications) \
 		echo "Error: refusing to uninstall from protected namespace: $$KFP_NAMESPACE" >&2; exit 1;; \
 	esac; \
@@ -385,6 +426,9 @@ deploy-notebooks: prepare-workbench-images
 
 apply-secrets:
 	@set -a && . $(ENV_FILE) && set +a && \
+	OTEL_NAMESPACE=$${OTEL_NAMESPACE:-$$KFP_NAMESPACE} && \
+	OTEL_EXPORTER_OTLP_ENDPOINT=$${OTEL_EXPORTER_OTLP_ENDPOINT:-http://$$OTEL_SERVICE_NAME-collector.$$OTEL_NAMESPACE.svc.cluster.local:4318} && \
+	export OTEL_NAMESPACE OTEL_EXPORTER_OTLP_ENDPOINT && \
 	if [ "$(DEPLOY_EMBEDDING_MODEL)" = "true" ]; then \
 		: "$${EMBED_LLM_TOKEN:=dummy}"; \
 		: "$${EMBED_LLM_API_BASE:=http://e5-mistral:8000/v1}"; \
@@ -401,8 +445,17 @@ apply-secrets:
 		-n $$KFP_NAMESPACE --dry-run=client -o yaml | oc apply -f - && \
 	\
 	echo "==> Recreating secret code-understanding-env..." && \
+	DEFAULTED_ENV_FILE=$$(mktemp) && \
+	trap 'rm -f "$$DEFAULTED_ENV_FILE"' 0 && \
+	cp "$(ENV_FILE)" "$$DEFAULTED_ENV_FILE" && \
+	printf '\n' >> "$$DEFAULTED_ENV_FILE" && \
+	for key in $(DEFAULTED_ENV_VARS); do \
+		if ! grep -q "^$$key=" "$(ENV_FILE)"; then \
+			printf '%s=%s\n' "$$key" "$$(printenv "$$key")" >> "$$DEFAULTED_ENV_FILE"; \
+		fi; \
+	done && \
 	oc delete secret code-understanding-env -n $$KFP_NAMESPACE --ignore-not-found=true && \
-	oc create secret generic code-understanding-env --from-env-file $(ENV_FILE) -n $$KFP_NAMESPACE && \
+	oc create secret generic code-understanding-env --from-env-file "$$DEFAULTED_ENV_FILE" -n $$KFP_NAMESPACE && \
 	\
 	REPO_LIST="$$GIT_REPO_LIST" && \
 	if [ -n "$$PIPELINE_GIT_REPO_LIST" ] && [ -f "$$PIPELINE_GIT_REPO_LIST" ]; then \
@@ -590,6 +643,8 @@ run-adhoc-query:
 	@[ -z "$(QUESTION_FILE)" ] && { echo "Error: QUESTION_FILE is required: generate it via wrappers/adhoc.sh." >&2; exit 1; } || true
 	@set -a && . $(ENV_FILE) && set +a && \
 	JOB_ID="$$(date +%Y%m%d%H%M%S)$$(printf '%04x' $$((RANDOM)))" && \
+	USE_GLOBAL=1 && \
+	if [ -n "$$GIT_REPO" ]; then USE_GLOBAL=0; fi && \
 	\
 	echo "==> Storing query parameters (job: $$JOB_ID)..." && \
 	oc create configmap adhoc-query-$$JOB_ID \
@@ -603,9 +658,9 @@ run-adhoc-query:
 		--set repoRef="$(GIT_REPO_BRANCH)" \
 		--set adhocQuery.run=true \
 		--set-string adhocQuery.jobId="$$JOB_ID" \
-		--set-string adhocQuery.useGlobal="$(if $(GIT_REPO),0,1)" \
-		--set-string adhocQuery.gitRepo="$(GIT_REPO)" \
-		--set-string adhocQuery.gitBranch="$(GIT_BRANCH)" \
+		--set-string adhocQuery.useGlobal="$$USE_GLOBAL" \
+		--set-string adhocQuery.gitRepo="$$GIT_REPO" \
+		--set-string adhocQuery.gitBranch="$$GIT_BRANCH" \
 		--set-string adhocQuery.retryCount="$${RETRY_COUNT:-3}" \
 		--set analysis.image.registry="$$KFP_IMAGE_REGISTRY" \
 		--set analysis.image.name="$$KFP_ANALYSIS_BASE_IMAGE_NAME" \
@@ -652,6 +707,7 @@ run-pipelines:
 
 deploy-otel:
 	@set -a && . $(ENV_FILE) && set +a && \
+	OTEL_NAMESPACE=$${OTEL_NAMESPACE:-$$KFP_NAMESPACE} && \
 	\
 	[ -n "$$OTEL_SERVICE_NAME" ] || { echo "Error: OTEL_SERVICE_NAME is not set in $(ENV_FILE)."; exit 1; } && \
 	[ -n "$$OTEL_NAMESPACE" ] || { echo "Error: OTEL_NAMESPACE is not set in $(ENV_FILE)."; exit 1; } && \
@@ -668,8 +724,10 @@ deploy-otel:
 		exit 0; \
 	fi && \
 	\
-	echo "==> Creating OTel namespace $$OTEL_NAMESPACE..." && \
-	oc create namespace $$OTEL_NAMESPACE --dry-run=client -o yaml | oc apply -f - && \
+	if [ "$$OTEL_NAMESPACE" != "$$KFP_NAMESPACE" ]; then \
+		echo "==> Creating OTel namespace $$OTEL_NAMESPACE..."; \
+		oc create namespace $$OTEL_NAMESPACE --dry-run=client -o yaml | oc apply -f -; \
+	fi && \
 	\
 	echo "==> Waiting for MinIO to be ready..." && \
 	oc wait deployment/minio -n $$KFP_NAMESPACE --for=condition=Available --timeout=120s && \
