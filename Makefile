@@ -14,6 +14,7 @@ PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
 DEPLOY_EMBEDDING_MODEL ?= false
+DEPLOY_OTEL            ?= false
 # Local development uses Podman by default. GitHub Actions sets CI=true and
 # provides Docker Buildx; callers can override this with CONTAINER_ENGINE.
 CONTAINER_ENGINE      ?= $(if $(CI),docker,podman)
@@ -145,6 +146,7 @@ help-all:
 	@echo "Common runtime overrides (not exhaustive):"
 	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
+	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
@@ -164,7 +166,7 @@ install:
 	set -- agent-mesh-for-sw resources/helm \
 		--set "namespace=$$KFP_NAMESPACE" \
 		--set "requester=$$(oc whoami)"; \
-	if [ -n "$${OTEL_NAMESPACE:-}" ]; then \
+	if [ "$(DEPLOY_OTEL)" = "true" ] && [ -n "$${OTEL_NAMESPACE:-}" ]; then \
 		set -- "$$@" --set "otel.namespace=$$OTEL_NAMESPACE"; \
 	fi; \
 	helm template "$$@" -s templates/namespace.yaml | oc apply -f - && \
@@ -210,7 +212,8 @@ install:
 		--set imageStreams.enabled=false \
 		--set deployNotebooks=true \
 		--set otel.enabled=false; \
-	if [ -n "$${OTEL_NAMESPACE:-}" ] && [ -n "$${OTEL_SERVICE_NAME:-}" ] && \
+	if [ "$(DEPLOY_OTEL)" = "true" ] && \
+	   [ -n "$${OTEL_NAMESPACE:-}" ] && [ -n "$${OTEL_SERVICE_NAME:-}" ] && \
 	   oc get crd opentelemetrycollectors.opentelemetry.io >/dev/null 2>&1 && \
 	   oc get crd tempostacks.tempo.grafana.com >/dev/null 2>&1; then \
 		OTEL_ENABLED=true; \

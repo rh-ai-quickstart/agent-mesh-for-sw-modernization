@@ -78,6 +78,9 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
 (**NOTE**: To deploy the local `e5-mistral` embedding model as part of installation, run:
    `make install DEPLOY_EMBEDDING_MODEL=true`)
 
+OpenTelemetry and Tempo are optional and disabled by default. To deploy them as
+part of installation, run `make install DEPLOY_OTEL=true`.
+
 ### Uninstalling
 
 Run:
