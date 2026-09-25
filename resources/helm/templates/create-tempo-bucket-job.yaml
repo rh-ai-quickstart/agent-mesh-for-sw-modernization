@@ -14,18 +14,43 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: mc
-          image: {{ .Values.minio.mcImage }}
+          image: {{ .Values.minio.mcImage | quote }}
           command:
-            - sh
+            - /bin/sh
             - -c
             - |
-              until mc alias set minio {{ .Values.minio.endpoint }} "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY"; do
+              set -eu
+              case "$(uname -m)" in
+                x86_64)
+                  arch=amd64
+                  checksum={{ .Values.minio.mcArchiveSha256.amd64 | quote }}
+                  ;;
+                aarch64)
+                  arch=arm64
+                  checksum={{ .Values.minio.mcArchiveSha256.arm64 | quote }}
+                  ;;
+                *)
+                  echo "Unsupported architecture: $(uname -m)" >&2
+                  exit 1
+                  ;;
+              esac
+              archive="mcli_{{ .Values.minio.mcArchiveVersion }}_linux_${arch}.tar.gz"
+              url="https://github.com/pgsty/mc/releases/download/{{ .Values.minio.mcRelease }}/${archive}"
+              curl --fail --location --silent --show-error --retry 3 --output /tmp/mcli.tar.gz "$url"
+              printf '%s  %s\n' "$checksum" /tmp/mcli.tar.gz | sha256sum -c -
+              tar -xzf /tmp/mcli.tar.gz -C /tmp mcli
+              chmod 0755 /tmp/mcli
+              until /tmp/mcli alias set minio "$MINIO_ENDPOINT" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY"; do
                 echo "MinIO not ready, retrying in 5s..."; sleep 5;
               done
-              mc mb --ignore-existing minio/{{ .Values.otel.tempo.bucket }}
+              /tmp/mcli mb --ignore-existing "minio/$TEMPO_BUCKET"
           env:
             - name: MC_CONFIG_DIR
-              value: /tmp
+              value: /tmp/mc
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.minio.endpoint | quote }}
+            - name: TEMPO_BUCKET
+              value: {{ .Values.otel.tempo.bucket | quote }}
             - name: AWS_ACCESS_KEY_ID
               value: {{ .Values.minio.rootUser | quote }}
             - name: AWS_SECRET_ACCESS_KEY
