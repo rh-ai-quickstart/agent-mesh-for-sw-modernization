@@ -163,6 +163,7 @@ def get_parsed_code_metadata(df, language, config=False):
     from datetime import datetime
 
     from datasets import Dataset
+    from flows.flow_extensions import CustomDeleteColumnsBlock  # noqa: F401
     from loaders.default_asset_loader import DefaultAssetLoader
     from sdg_hub.core.flow import Flow
 
