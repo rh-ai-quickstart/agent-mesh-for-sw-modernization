@@ -281,6 +281,15 @@ uninstall:
 	helm uninstall agent-mesh-for-sw -n "$$KFP_NAMESPACE" \
 		--ignore-not-found --cascade foreground --wait --timeout 2m; \
 	echo "==> Removing non-Helm resources..."; \
+	oc delete \
+		deployment/code-understanding-console-plugin \
+		deployment/code-understanding-plugin-api \
+		service/code-understanding-console-plugin \
+		service/code-understanding-plugin-api \
+		route.route.openshift.io/code-understanding-plugin-api \
+		configmap/code-understanding-console-plugin-config \
+		configmap/code-understanding-job-scripts \
+		-n "$$KFP_NAMESPACE" --ignore-not-found; \
 	oc delete imagestream -n "$(WORKBENCH_IMAGESTREAM_NAMESPACE)" \
 		-l "app.kubernetes.io/part-of=agent-mesh-for-sw,agent-mesh.redhat.com/owner-namespace=$$KFP_NAMESPACE" \
 		--ignore-not-found; \
