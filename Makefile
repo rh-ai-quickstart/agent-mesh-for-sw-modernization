@@ -270,12 +270,14 @@ uninstall:
 				oc delete "$$resource" -n "$$KFP_NAMESPACE" --ignore-not-found;; \
 		esac; \
 	done; \
-	if oc get workflows.argoproj.io -n "$$KFP_NAMESPACE" >/dev/null 2>&1; then \
-		echo "==> Removing Kubeflow pipeline runs..."; \
-		oc delete workflows.argoproj.io -n "$$KFP_NAMESPACE" \
-			-l pipeline/runid --ignore-not-found \
-			--cascade=foreground --wait=true --timeout=2m; \
-	fi; \
+	echo "==> Removing Agent Mesh Kubeflow pipeline runs..."; \
+	for workflow in $$(oc get workflows.argoproj.io -n "$$KFP_NAMESPACE" -o name 2>/dev/null || true); do \
+		case "$${workflow#*/}" in \
+			single-repo-pipeline-*|multi-repo-pipeline-*) \
+				oc delete "$$workflow" -n "$$KFP_NAMESPACE" \
+					--cascade=foreground --wait=true --timeout=2m;; \
+		esac; \
+	done; \
 	echo "==> Removing Helm releases..."; \
 	helm uninstall e5-mistral -n "$$KFP_NAMESPACE" \
 		--ignore-not-found --cascade foreground --wait --timeout 2m; \
