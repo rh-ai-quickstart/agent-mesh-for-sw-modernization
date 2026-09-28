@@ -194,12 +194,7 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 20
           resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+            {{- toYaml .Values.rhoaiMcp.resources | nindent 12 }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

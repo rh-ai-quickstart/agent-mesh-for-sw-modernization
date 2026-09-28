@@ -94,6 +94,13 @@ rhoaiMcp:
   readOnly: false
   oidc:
     enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
 
 console:
   enabled: false
