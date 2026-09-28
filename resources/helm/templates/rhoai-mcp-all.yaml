@@ -143,7 +143,6 @@ spec:
       serviceAccountName: rhoai-mcp
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1001
         seccompProfile:
           type: RuntimeDefault
       containers:
