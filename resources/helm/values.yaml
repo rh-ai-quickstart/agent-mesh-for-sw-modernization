@@ -94,7 +94,7 @@ rhoaiMcp:
   logLevel: INFO
   readOnly: false
   oidc:
-    enabled: false
+    enabled: true
   resources:
     requests:
       cpu: 50m

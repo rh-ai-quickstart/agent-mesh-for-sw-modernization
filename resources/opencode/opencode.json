@@ -82,11 +82,11 @@
       }
     }
   },
-  "model": "vllm/google/gemma-4-31b-it",
+  "model": "openrouter/meta/muse-glimmer-30b",
   "mcp": {
     "rhoai-mcp": {
       "type": "remote",
-      "url": "{env:RHOAI_MCP_URL}",
+      "url": "{env:RHOAI_MCP_URL}/mcp",
       "enabled": true,
       "timeout": 30000,
       "headers": {
