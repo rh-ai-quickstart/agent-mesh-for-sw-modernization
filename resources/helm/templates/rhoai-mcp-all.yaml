@@ -1,0 +1,342 @@
+{{- if .Values.rhoaiMcp.enabled }}
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# ServiceAccount
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rhoai-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# ClusterRole
+#
+# Two modes depending on whether OIDC is enabled:
+#
+#   oidc.enabled=true  — minimal permissions: the SA only validates tokens and
+#                        checks RBAC on behalf of the caller. All RHOAI resource
+#                        access uses the caller's own bearer token (user-token
+#                        strategy), so the SA itself needs no RHOAI permissions.
+#
+#   oidc.enabled=false — full permissions: the SA acts directly on RHOAI
+#                        resources for all callers (single-user / trusted env).
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rhoai-mcp-{{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+rules:
+  {{- if .Values.rhoaiMcp.oidc.enabled }}
+  # Validate caller bearer tokens via the Kubernetes TokenReview API
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  # Pre-flight RBAC filtering — check caller permissions before executing tools
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+  # Fetch OpenShift group memberships for the caller
+  - apiGroups: ["user.openshift.io"]
+    resources: ["users"]
+    verbs: ["get"]
+  {{- else }}
+  # Read-only core resources
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "events", "nodes"]
+    verbs: ["get", "list", "watch"]
+  # Namespace management (Data Science Projects)
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  # Data connections and storage
+  - apiGroups: [""]
+    resources: ["secrets", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  # Kubeflow Notebooks (workbenches)
+  - apiGroups: ["kubeflow.org"]
+    resources: ["notebooks"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  # Kubeflow Training Operator v2
+  - apiGroups: ["trainer.kubeflow.org"]
+    resources: ["trainjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["trainer.kubeflow.org"]
+    resources: ["trainingruntimes", "clustertrainingruntimes"]
+    verbs: ["get", "list", "watch"]
+  # Data Science Pipelines
+  - apiGroups: ["datasciencepipelinesapplications.opendatahub.io"]
+    resources: ["datasciencepipelinesapplications"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  # Model serving (KServe)
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["inferenceservices"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["servingruntimes"]
+    verbs: ["get", "list", "watch", "create"]
+  # Storage class discovery
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["list"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rhoai-mcp-{{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+subjects:
+  - kind: ServiceAccount
+    name: rhoai-mcp
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: rhoai-mcp-{{ .Values.namespace }}
+  apiGroup: rbac.authorization.k8s.io
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# SCC binding — explicitly pins the pod to restricted-v2, the most restrictive
+# built-in OpenShift SCC. Without this the pod inherits the namespace default,
+# which may be permissive if other workloads have relaxed it.
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rhoai-mcp-scc-{{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+subjects:
+  - kind: ServiceAccount
+    name: rhoai-mcp
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: system:openshift:scc:restricted-v2
+  apiGroup: rbac.authorization.k8s.io
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Deployment
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rhoai-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rhoai-mcp
+  template:
+    metadata:
+      labels:
+        app: rhoai-mcp
+    spec:
+      serviceAccountName: rhoai-mcp
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: rhoai-mcp
+          image: {{ required "rhoaiMcp.image is required when rhoaiMcp.enabled=true" .Values.rhoaiMcp.image | quote }}
+          imagePullPolicy: {{ .Values.rhoaiMcp.imagePullPolicy | default "IfNotPresent" }}
+          args:
+            - "--transport"
+            - "streamable-http"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8000"
+            - "--auth-mode"
+            - "auto"
+            - "--log-level"
+            - {{ .Values.rhoaiMcp.logLevel | default "INFO" | quote }}
+            {{- if .Values.rhoaiMcp.readOnly }}
+            - "--read-only"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          {{- if .Values.rhoaiMcp.oidc.enabled }}
+          env:
+            - name: RHOAI_MCP_OIDC_ENABLED
+              value: "true"
+            - name: RHOAI_MCP_OIDC_TOKEN_MODE
+              value: "token-review"
+            - name: RHOAI_MCP_OIDC_KUBE_AUTH_STRATEGY
+              value: "user-token"
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Service
+# rhoai-mcp serves plain HTTP only — it has no native TLS support.
+# In-cluster traffic is HTTP on port 8000, protected by NetworkPolicy (same
+# namespace only) and OIDC per-request auth. External traffic is encrypted by
+# the Route (edge TLS termination). A sidecar proxy would be required for
+# end-to-end in-cluster TLS if that becomes a requirement.
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: rhoai-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+spec:
+  selector:
+    app: rhoai-mcp
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# NetworkPolicy — Ingress
+# Only pods in the same namespace (agents) can reach the MCP server.
+# All other ingress is denied by default.
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rhoai-mcp-ingress
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+spec:
+  podSelector:
+    matchLabels:
+      app: rhoai-mcp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Agents in the same namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+        # OpenShift HAProxy Router — lives in openshift-ingress and must be
+        # permitted or all Route traffic returns 503
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+      ports:
+        - port: 8000
+          protocol: TCP
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# NetworkPolicy — Egress
+# Restricts outbound traffic to only what rhoai-mcp legitimately needs:
+#   - DNS for service name resolution
+#   - Kubernetes/OpenShift API server for TokenReview, SAR, and RHOAI CRDs
+#   - Same namespace for in-cluster RHOAI service calls
+# All other egress (internet, other namespaces) is denied.
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rhoai-mcp-egress
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+spec:
+  podSelector:
+    matchLabels:
+      app: rhoai-mcp
+  policyTypes:
+    - Egress
+  egress:
+    # DNS — restricted to the openshift-dns namespace where CoreDNS pods run
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Kubernetes and OpenShift API server (exposed as 'kubernetes' service in
+    # the default namespace) — needed for TokenReview, SAR, and all RHOAI CRD
+    # operations
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - port: 443
+          protocol: TCP
+    # Same namespace — RHOAI services (pipelines, model serving, notebooks).
+    # Port restriction is intentionally omitted: RHOAI services use a range of
+    # ports (8443, 8080, 8000) and enumerating them would break future services.
+    # The namespace selector alone is the appropriate boundary here.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Route — edge TLS termination, consistent with console-app.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: rhoai-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rhoai-mcp
+  annotations:
+    haproxy.router.openshift.io/timeout: 30m
+spec:
+  to:
+    kind: Service
+    name: rhoai-mcp
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+{{- end }}

@@ -3,15 +3,16 @@
   "instructions": [
     "docs/custom-guidelines.md"
   ],
+  "plugin": [
+    "./plugins/rhoai-mcp-env.js"
+  ],
   "autoupdate": false,
   "agent": {
     "default": {
-      "steps": 15
+      "steps": 15,
+      "model": "openrouter/meta/muse-glimmer-30b"
     }
   },
-  "plugin": [
-    "opencode-plugin-openspec"
-  ],
   "provider": {
     "vllm": {
       "npm": "@ai-sdk/openai-compatible",
@@ -74,21 +75,23 @@
             "reasoningEffort": "high",
             "reasoningSummary": "auto"
           }
+        },
+        "meta/muse-glimmer-30b": {
+          "name": "meta/muse-glimmer-30b"
         }
       }
     }
   },
   "model": "vllm/google/gemma-4-31b-it",
   "mcp": {
-    "rhoai": {
-      "type": "local",
-      "command": [
-        "podman", "run", "--rm", "-i",
-        "-v", "{env:HOME}/.kube:/opt/app-root/.kube:ro",
-        "-e", "RHOAI_MCP_AUTH_MODE=kubeconfig",
-        "{env:MCP_WORKFLOW_NAVIGATOR_BASE_IMAGE_REGISTRY}/{env:MCP_WORKFLOW_NAVIGATOR_BASE_IMAGE_NAME}:{env:MCP_WORKFLOW_NAVIGATOR_BASE_IMAGE_TAG}"
-      ],
-      "enabled": true
+    "rhoai-mcp": {
+      "type": "remote",
+      "url": "{env:RHOAI_MCP_URL}",
+      "enabled": true,
+      "timeout": 30000,
+      "headers": {
+        "Authorization": "Bearer {env:OCP_TOKEN}"
+      }
     }
   }
 }

@@ -200,7 +200,9 @@ install:
 		--set pipelineTools.image.tag="$$KFP_PIPELINE_TOOLS_IMAGE_TAG" \
 		--set clusterDomain="$(CLUSTER_DOMAIN)" \
 		--set mlflowGatewayHost="$(GATEWAY_HOST)" \
-		--set console.enabled=false
+		--set console.enabled=false \
+		--set rhoaiMcp.enabled=$${RHOAI_MCP_ENABLED:-false} \
+		--set rhoaiMcp.image="$${RHOAI_MCP_IMAGE:-}"
 	@if [ "$(DEPLOY_EMBEDDING_MODEL)" = "true" ]; then \
 		$(MAKE) deploy-embedding-model; \
 	fi
