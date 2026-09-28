@@ -292,14 +292,10 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
-    # Kubernetes and OpenShift API server (exposed as 'kubernetes' service in
-    # the default namespace) — needed for TokenReview, SAR, and all RHOAI CRD
-    # operations
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: default
-      ports:
+    # Kubernetes and OpenShift API server — port 443 unrestricted because
+    # OVN-Kubernetes evaluates NetworkPolicy before ClusterIP DNAT, making
+    # namespace-selector rules ineffective for service IPs.
+    - ports:
         - port: 443
           protocol: TCP
     # Same namespace — RHOAI services (pipelines, model serving, notebooks).
