@@ -90,6 +90,7 @@ rhoaiMcp:
   enabled: false
   image: ""
   imagePullPolicy: IfNotPresent
+  authMode: auto
   logLevel: INFO
   readOnly: false
   oidc:

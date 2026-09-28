@@ -157,7 +157,7 @@ spec:
             - "--port"
             - "8000"
             - "--auth-mode"
-            - {{ if .Values.rhoaiMcp.oidc.enabled }}"auto"{{ else }}"token"{{ end }}
+            - {{ .Values.rhoaiMcp.authMode | default "auto" | quote }}
             - "--log-level"
             - {{ .Values.rhoaiMcp.logLevel | default "INFO" | quote }}
             {{- if .Values.rhoaiMcp.readOnly }}
