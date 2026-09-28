@@ -292,10 +292,13 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
-    # Kubernetes and OpenShift API server — port 443 unrestricted because
-    # OVN-Kubernetes evaluates NetworkPolicy before ClusterIP DNAT, making
-    # namespace-selector rules ineffective for service IPs.
-    - ports:
+    # Kubernetes and OpenShift API server — explicit ipBlock required because
+    # OVN-Kubernetes does not apply rules without a 'to:' selector to service
+    # ClusterIPs; 0.0.0.0/0 covers pod IPs, ClusterIPs, and host IPs.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
         - port: 443
           protocol: TCP
     # Same namespace — RHOAI services (pipelines, model serving, notebooks).
