@@ -181,15 +181,18 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          startupProbe:
+            tcpSocket:
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 20
             periodSeconds: 20
           resources:
             {{- toYaml .Values.rhoaiMcp.resources | nindent 12 }}
