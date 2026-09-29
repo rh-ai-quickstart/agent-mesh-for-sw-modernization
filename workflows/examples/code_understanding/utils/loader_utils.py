@@ -5,7 +5,11 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
 def download_result_directory(
-    git_slug: str, download_dir: str, results_prefix: str, multi_repo: bool, asset_tags: dict,
+    git_slug: str,
+    download_dir: str,
+    results_prefix: str,
+    multi_repo: bool,
+    asset_tags: dict,
     namespace: str | None = None,
 ):
     """Downloads a single repo's assets from the backing store to download_dir."""
