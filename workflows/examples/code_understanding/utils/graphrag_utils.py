@@ -418,7 +418,11 @@ class DependencyAnalyzer:
 
     @staticmethod
     def download_graphrag_directory(
-        download_dir: str, git_slug: str, multi_repo: bool, git_repo: str = ""
+        download_dir: str,
+        git_slug: str,
+        multi_repo: bool,
+        git_repo: str = "",
+        namespace: str | None = None,
     ):
         """Downloads GraphRAG index artifacts and prepares settings.
 
@@ -451,6 +455,7 @@ class DependencyAnalyzer:
                     "multi_repo": multi_repo,
                     "category": "indexing",
                 },
+                namespace=namespace,
             )
         except Exception:
             logging.debug(traceback.format_exc())
