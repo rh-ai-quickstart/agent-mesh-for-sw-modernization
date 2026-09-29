@@ -86,6 +86,7 @@ class AnalysisPipeline:
         git_repo: str = "",
         git_branch: str = "main",
         multi_repo: bool = False,
+        namespace: str | None = None,
     ):
         """Queries the GraphRAG index with an LLM and returns the result."""
         import asyncio
@@ -113,6 +114,7 @@ class AnalysisPipeline:
                 git_slug=git_slug,
                 multi_repo=use_multi_repo,
                 git_repo=git_repo,
+                namespace=namespace,
             )
         except Exception:
             msg = (
@@ -155,7 +157,7 @@ class AnalysisPipeline:
 
         result_file = f"adhoc_query_{timestamp}.txt"
 
-        DefaultAssetLoader().log_results(
+        DefaultAssetLoader(namespace=namespace).log_results(
             result_file,
             artifact_path=(
                 DefaultAssetLoader.get_log_results_artifact_path(

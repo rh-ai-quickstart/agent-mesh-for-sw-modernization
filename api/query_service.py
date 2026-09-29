@@ -59,6 +59,7 @@ def submit_query(
                 git_repo=git_repo,
                 git_branch=git_branch,
                 multi_repo=multi_repo,
+                namespace=namespace,
             )
             _jobs[query_id] = {"status": "succeeded", "result": result, "error": None}
         except Exception as exc:

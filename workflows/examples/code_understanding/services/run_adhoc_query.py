@@ -10,6 +10,7 @@ def run_adhoc_query(
     git_repo: str = "",
     git_branch: str = "main",
     multi_repo: bool = False,
+    namespace: str | None = None,
 ) -> str:
     """Query the GraphRAG index with an LLM and return the result."""
     from pipelines.base.analysis import run_adhoc_query_pipeline
@@ -21,4 +22,5 @@ def run_adhoc_query(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
+        namespace=namespace,
     )
