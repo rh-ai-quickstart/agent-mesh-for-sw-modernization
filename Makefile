@@ -169,6 +169,8 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 	helm-template \
 	verify-secrets \
 	verify-deploy \
+	test-ui \
+	test-workflows \
 	test-all \
 	format \
 	lint \
@@ -620,9 +622,16 @@ verify-deploy: verify-secrets
 	fi; \
 	echo "verify-deploy: PASS namespace=$$VERIFY_NAMESPACE release=$(RELEASE)"
 
-test-all:
+test-ui:
 	@echo "==> Running UI tests..."
 	uv run --project ui --frozen pytest ui/tests
+
+test-workflows:
+	@echo "==> Running workflow pipeline tests..."
+	uv run --project workflows/examples/code_understanding --group test --frozen \
+		pytest tests/workflows
+
+test-all: test-ui test-workflows
 
 # ============================================================================
 # Utility commands
