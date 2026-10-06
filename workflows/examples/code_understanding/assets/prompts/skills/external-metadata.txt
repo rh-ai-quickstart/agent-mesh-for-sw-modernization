@@ -13,7 +13,7 @@ metadata:
   - name: rhel10-code-compat
     source: repo
     repo: https://github.com/agapebondservant/swe-mesh-skills
-    enabled: false
+    enabled: true
     blocking: false
     target_dir: .code_metadata
 ---

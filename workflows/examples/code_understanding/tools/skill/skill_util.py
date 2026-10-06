@@ -155,7 +155,7 @@ def run_composite_skill(
         f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}, blocking={s.blocking}"
         for s in enabled_skills
     )
-    instructions = f"{body}\n\nEnabled skills:\n{skills_desc}"
+    instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
 
     skill_tool = get_run_skill_tool(repo_dir, use_rhoai_mcp)
