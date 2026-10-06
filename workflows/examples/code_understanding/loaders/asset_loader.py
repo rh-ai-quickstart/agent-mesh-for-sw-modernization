@@ -16,6 +16,17 @@ class AssetLoader(ABC):
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
 
+    @abstractmethod
+    def load_skill(self, name: str) -> tuple[str, dict]:
+        """Load a skill file by name.
+
+        Args:
+            name: Skill name, matching the file stem and the SKILL.md ``name`` field.
+
+        Returns:
+            Tuple of (body string, frontmatter metadata dict).
+        """
+
     @staticmethod
     def _get_prompt_body_and_metadata(raw: str) -> tuple[str, dict]:
         """Parses YAML frontmatter from a prompt string, returning (body, metadata)."""

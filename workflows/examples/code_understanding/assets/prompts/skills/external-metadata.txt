@@ -1,0 +1,20 @@
+---
+name: external-metadata
+description: >
+  Composite skill that enriches code metadata produced during the data-generation
+  pipeline by invoking the run_composite_skill tool, which executes each skill
+  listed under metadata.skills in series against the target repository.
+  Add skills to metadata.skills to extend the enrichment.
+license: Apache-2.0
+compatibility: Requires git, Python 3.11+, read_file, write_file, list_files tools.
+metadata:
+  version: "1.0"
+  skills:
+  - name: rhel10-code-compat
+    source: repo
+    repo: https://github.com/agapebondservant/swe-mesh-skills
+    enabled: false
+    blocking: false
+    target_dir: .code_metadata
+---
+Use the run_skill tool to execute each skill in the enabled skills list against the target repository.

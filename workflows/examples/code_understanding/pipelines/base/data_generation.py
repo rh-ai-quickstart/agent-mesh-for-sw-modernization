@@ -212,15 +212,37 @@ def get_parsed_code_metadata(df, language, config=False):
         raise e
 
 
-def load_external_data(source_path: str) -> dict:
-    """Loads and merges all JSON files from source_path/.code_metadata/ into a single dict."""
+def load_external_metadata(
+    source_path: str,
+    skills: list[str] | None = None,
+) -> list[dict]:
+    """Loads all JSON files from source_path/.code_metadata/ and returns them as a list of dicts.
+
+    Each JSON file may contain a single object (appended as one record) or a top-level
+    array (each element appended as its own record), mirroring JSONL semantics.
+
+    Args:
+        source_path:    Path to the repository root.
+        skills:         Composite skill names to invoke before loading. When provided,
+                        each skill is run first; subskills whose report already exists
+                        in target_dir are skipped. Defaults to None (load only).
+    """
     import json
+    import logging
     import os
 
     from utils import code_utils
 
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+    if skills:
+        from tools.skill.skill_util import run_composite_skill
+
+        for skill in skills:
+            run_composite_skill(source_path, skill)
+
     code_metadata_dir = os.path.join(source_path, code_utils.CODE_METADATA_DIR)
-    result = {}
+    result = []
 
     if not os.path.isdir(code_metadata_dir):
         return result
@@ -230,11 +252,10 @@ def load_external_data(source_path: str) -> dict:
             try:
                 with open(os.path.join(root, filename), "r", encoding="utf-8") as f:
                     data = json.load(f)
-                for key, value in data.items():
-                    if isinstance(value, list) and isinstance(result.get(key), list):
-                        result[key].extend(value)
-                    else:
-                        result[key] = value
+                if isinstance(data, dict):
+                    result.append(data)
+                else:
+                    logging.warning(f"Skipping {filename} in external metadata processing: expected a JSON object, got {type(data).__name__}")
             except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
 
@@ -380,7 +401,7 @@ def save_code_and_metadata_files(
     git_slug: str,
     language: str,
     config=False,
-    external_metadata: dict = None,
+    external_metadata: list[dict] | None = None,
 ):
     """Writes annotated code and flattened metadata files to target_path."""
     import logging
@@ -423,12 +444,14 @@ def save_code_and_metadata_files(
 
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
+            record = next((m for m in (external_metadata or []) if m.get("file_path") == rel_file_path), {})
+
             code_header_comment = (
                 generate_code_comment(
                     metadata=metadata,
                     file_path=rel_file_path,
                     config=config,
-                    external_metadata=external_metadata,
+                    external_metadata=record,
                 )
                 or ""
             )
@@ -464,7 +487,7 @@ def generate_code_and_meta(
     target_path: str,
     config: bool = False,
     multi_repo: bool = False,
-    external_metadata: dict = None,
+    external_metadata: list[dict] | None = None,
 ):
     """Generates and saves code metadata for one language/config combination."""
     import json
@@ -619,7 +642,7 @@ class DataGenerationPipeline:
 
             languages = detect_languages(source_path)
 
-            external_metadata = load_external_data(source_path)
+            external_metadata = load_external_metadata(source_path)
 
             for language in languages:
 

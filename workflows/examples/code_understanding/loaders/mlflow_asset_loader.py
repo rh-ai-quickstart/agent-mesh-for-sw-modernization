@@ -332,6 +332,33 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
+    def load_skill(self, name: str) -> tuple[str, dict]:
+        """Loads a skill from the MLflow prompt registry.
+
+        The skill must have been uploaded first via ``upload_all_assets``.
+
+        Args:
+            name: Skill name (must match the file stem under assets/prompts/skills/).
+
+        Returns:
+            Tuple of (body string, frontmatter metadata dict).
+        """
+        try:
+
+            prompt_name = self.get_prompt_name(f"skills/{name}")
+
+            prompt = mlflow.load_prompt(prompt_name)
+
+            body, meta = self._get_prompt_body_and_metadata(prompt.template)
+
+            return body, meta
+
+        except Exception as e:
+
+            logging.error(f"Error loading skill {name}: {e}")
+
+            raise e
+
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
         """Loads a prompt from the MLflow prompt registry and renders it with the provided
         variables."""

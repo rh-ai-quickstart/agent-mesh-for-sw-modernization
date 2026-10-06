@@ -64,6 +64,10 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.upload_prompt(prompt_path)
 
+    def load_skill(self, name: str) -> tuple[str, dict]:
+
+        return self._loader.load_skill(name)
+
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
 
         return self._loader.download_prompt(prompt_path, **kwargs)

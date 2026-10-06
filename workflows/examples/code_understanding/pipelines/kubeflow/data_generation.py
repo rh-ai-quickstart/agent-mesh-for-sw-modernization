@@ -82,9 +82,9 @@ def generate_code_and_meta_op(
 
         try:
 
-            from pipelines.base.data_generation import load_external_data
+            from pipelines.base.data_generation import load_external_metadata
 
-            external_metadata = load_external_data(tmp_source)
+            external_metadata = load_external_metadata(tmp_source)
 
             languages = detect_languages(tmp_source)
 

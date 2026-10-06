@@ -100,6 +100,20 @@ class LocalAssetLoader(AssetLoader):
         """No-op. Local prompts are read directly from disk."""
         pass
 
+    def load_skill(self, name: str) -> tuple[str, dict]:
+        """Loads a skill from assets/prompts/skills/<name>.txt."""
+        skill_path = os.path.join(self._PROMPTS_DIR, "skills", f"{name}.txt")
+
+        if not os.path.exists(skill_path):
+
+            raise FileNotFoundError(f"Skill not found: {skill_path}")
+
+        with open(skill_path) as f:
+
+            raw = f.read()
+
+        return self._get_prompt_body_and_metadata(raw)
+
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
         """Reads a prompt template from the local assets directory and renders it with Jinja2."""
         from jinja2 import Template
