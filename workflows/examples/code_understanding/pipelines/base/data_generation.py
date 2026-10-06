@@ -402,7 +402,9 @@ def save_metadata_file(
     merged = {**metadata, **{k: v for k, v in (external_metadata or {}).items()
                               if v not in (None, "", [], {})}}
 
-    logging.info(f"Merged metadata: {merged} Metadata: {metadata} External: {external_metadata}")
+    logging.debug(f"Merged metadata: {merged}"
+                  f" Metadata: {metadata} "
+                  f" External: {external_metadata}")
 
     with open(metadata_file_path, "w", encoding="utf-8") as f:
         f.write(json_utils.flatten_code_metadata(merged, schema))
@@ -459,7 +461,8 @@ def save_code_and_metadata_files(
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
             record = next(
-                (m for m in (external_metadata or []) if m.get("file_path") == rel_file_path),
+                (m for m in (external_metadata or [])
+                 if "file_path" not in m or m.get("file_path") == rel_file_path),
                 {},
             )
 
