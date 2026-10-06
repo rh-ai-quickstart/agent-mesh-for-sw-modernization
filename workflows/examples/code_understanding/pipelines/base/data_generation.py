@@ -387,6 +387,9 @@ def save_metadata_file(
     from loaders.default_asset_loader import DefaultAssetLoader
     from utils import json_utils
 
+    import logging
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
     if schema is None:
         schema = DefaultAssetLoader().download("schemas/code_metadata_schema.json")
 
@@ -398,6 +401,8 @@ def save_metadata_file(
 
     merged = {**metadata, **{k: v for k, v in (external_metadata or {}).items()
                               if v not in (None, "", [], {})}}
+
+    logging.info(f"Merged metadata: {merged}")
 
     with open(metadata_file_path, "w", encoding="utf-8") as f:
         f.write(json_utils.flatten_code_metadata(merged, schema))
