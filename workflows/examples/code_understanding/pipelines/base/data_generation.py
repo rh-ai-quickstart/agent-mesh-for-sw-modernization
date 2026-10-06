@@ -402,7 +402,7 @@ def save_metadata_file(
     merged = {**metadata, **{k: v for k, v in (external_metadata or {}).items()
                               if v not in (None, "", [], {})}}
 
-    logging.info(f"Merged metadata: {merged}")
+    logging.info(f"Merged metadata: {merged} Metadata: {metadata} External: {external_metadata}")
 
     with open(metadata_file_path, "w", encoding="utf-8") as f:
         f.write(json_utils.flatten_code_metadata(merged, schema))
