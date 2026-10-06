@@ -126,6 +126,13 @@ def run_skill(
     else:
         asyncio.run(coro)
 
+    all_files = [
+        os.path.relpath(os.path.join(root, f), repo_dir)
+        for root, _, files in os.walk(repo_dir)
+        for f in files
+    ]
+    logging.info(f"[{skill.name}] files in repo_dir after agent run:\n" + "\n".join(all_files))
+
     for ext in ("json", "txt", "md"):
         candidate = os.path.join(repo_dir, f"{skill.name}-report.{ext}")
         if os.path.exists(candidate):
