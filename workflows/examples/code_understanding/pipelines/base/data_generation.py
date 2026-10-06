@@ -481,8 +481,8 @@ def save_code_and_metadata_files(
             with open(target_file_path, "w", encoding="utf-8") as f:
                 f.write(f"{code_header_comment}\n{code}")
 
-            logging.info(f"External metadata: {str(external_metadata)} "
-                         f"{rel_file_path} {metadata.get('file_path')}")
+            logging.debug(f"External metadata: {str(external_metadata)} "
+                         f"({rel_file_path}, {metadata.get('file_path')})")
 
             save_metadata_file(
                 metadata,
