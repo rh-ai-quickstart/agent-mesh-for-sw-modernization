@@ -473,7 +473,7 @@ def save_code_and_metadata_files(
                 f.write(f"{code_header_comment}\n{code}")
 
             save_metadata_file(
-                metadata,
+                record,
                 target_path,
                 rel_file_path,
                 git_repo=git_repo,
