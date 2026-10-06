@@ -14,7 +14,6 @@ metadata:
     source: repo
     repo: https://github.com/agapebondservant/swe-mesh-skills
     enabled: true
-    blocking: false
     target_dir: .code_metadata
 ---
 Use the run_skill tool to execute each skill in the enabled skills list against the target repository.

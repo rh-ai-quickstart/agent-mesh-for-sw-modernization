@@ -15,7 +15,6 @@ class SkillConfig:
     name: str
     repo: str
     enabled: bool = True
-    blocking: bool = False
     target_dir: str | None = None
 
 
@@ -29,7 +28,6 @@ def fetch_skills(name: str) -> list[SkillConfig]:
             name=entry["name"],
             repo=entry["repo"],
             enabled=entry.get("enabled", True),
-            blocking=entry.get("blocking", False),
             target_dir=entry.get("target_dir"),
         )
         for entry in ((frontmatter.get("metadata") or {}).get("skills") or [])
@@ -152,7 +150,7 @@ def run_composite_skill(
     body, _ = DefaultAssetLoader().load_skill(composite_skill)
     enabled_skills = [s for s in fetch_skills(composite_skill) if s.enabled]
     skills_desc = "\n".join(
-        f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}, blocking={s.blocking}"
+        f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}"
         for s in enabled_skills
     )
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
