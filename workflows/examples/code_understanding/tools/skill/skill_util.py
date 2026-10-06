@@ -90,13 +90,13 @@ async def _run_as_agent(
             ) as client:
                 all_tools = tools + client.get_tools()
                 agent = create_tool_calling_agent(llm, all_tools, prompt)
-                await AgentExecutor(agent=agent, tools=all_tools).ainvoke({"input": instructions})
+                await AgentExecutor(agent=agent, tools=all_tools, verbose=True).ainvoke({"input": instructions})
                 return
         except Exception as exc:
             logging.warning("Could not load rhoai-mcp tools: %s", exc)
 
     agent = create_tool_calling_agent(llm, tools, prompt)
-    await AgentExecutor(agent=agent, tools=tools).ainvoke({"input": instructions})
+    await AgentExecutor(agent=agent, tools=tools, verbose=True).ainvoke({"input": instructions})
 
 
 def run_skill(
@@ -114,6 +114,7 @@ def run_skill(
         f"{load_skill_instructions(skill.name, skill.repo)}"
         f"\n\nWrite your output report to: {output_filename} at the root of the repository."
     )
+    logging.info(f"[{skill.name}] running with instructions:\n{instructions}")
     coro = _run_as_agent(repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp)
     try:
         loop = asyncio.get_running_loop()
@@ -125,13 +126,6 @@ def run_skill(
             pool.submit(asyncio.run, coro).result()
     else:
         asyncio.run(coro)
-
-    all_files = [
-        os.path.relpath(os.path.join(root, f), repo_dir)
-        for root, _, files in os.walk(repo_dir)
-        for f in files
-    ]
-    logging.info(f"[{skill.name}] files in repo_dir after agent run:\n" + "\n".join(all_files))
 
     for ext in ("json", "txt", "md"):
         candidate = os.path.join(repo_dir, f"{skill.name}-report.{ext}")
