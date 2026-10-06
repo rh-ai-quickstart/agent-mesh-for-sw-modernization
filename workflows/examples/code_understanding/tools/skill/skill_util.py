@@ -109,11 +109,12 @@ def run_skill(
 
     Returns the path to the generated report file, or None if no report was written.
     """
-    coro = _run_as_agent(
-        repo_dir,
-        load_skill_instructions(skill.name, skill.repo),
-        use_rhoai_mcp=use_rhoai_mcp,
+    output_filename = f"{skill.name}-report.json"
+    instructions = (
+        f"{load_skill_instructions(skill.name, skill.repo)}"
+        f"\n\nWrite your output report to: {output_filename} at the root of the repository."
     )
+    coro = _run_as_agent(repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp)
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
