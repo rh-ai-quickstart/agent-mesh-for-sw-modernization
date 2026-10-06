@@ -449,6 +449,9 @@ def save_code_and_metadata_files(
 
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
+            logging.info(f"External metadata: {str(external_metadata)} "
+                         f"{rel_file_path} {m.get("file_path")}")
+
             record = next(
                 (m for m in (external_metadata or []) if m.get("file_path") == rel_file_path),
                 {},
