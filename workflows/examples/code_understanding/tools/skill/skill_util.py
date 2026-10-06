@@ -3,6 +3,7 @@ import concurrent.futures
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -127,6 +128,11 @@ def run_skill(
     for ext in ("json", "txt", "md"):
         candidate = os.path.join(repo_dir, f"{skill.name}-report.{ext}")
         if os.path.exists(candidate):
+            dest = os.path.join(repo_dir, skill.target_dir) if skill.target_dir else repo_dir
+            shutil.move(candidate, dest)
+            candidate = os.path.join(dest, os.path.basename(candidate))
+            with open(candidate, "r", encoding="utf-8") as f:
+                logging.info(f"[{skill.name}] report content:\n{f.read()}")
             return candidate
     return None
 

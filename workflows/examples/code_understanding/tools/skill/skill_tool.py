@@ -1,6 +1,5 @@
 import logging
 import os
-import shutil
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -23,25 +22,26 @@ def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
         from tools.skill.skill_util import SkillConfig
         from tools.skill.skill_util import run_skill as _run_skill
 
-        if target_dir:
-            dest = os.path.join(repo_dir, target_dir)
-            existing = next(
-                (os.path.join(dest, f"{skill_name}-report.{ext}")
-                 for ext in ("json", "txt", "md")
-                 if os.path.exists(os.path.join(dest, f"{skill_name}-report.{ext}"))),
-                None,
-            )
-            if existing:
-                return f"[{skill_name}] skipped - report already exists at {existing}"
+        dest = os.path.join(repo_dir, target_dir) if target_dir else repo_dir
+        os.makedirs(dest, exist_ok=True)
+
+        existing = next(
+            (os.path.join(dest, f"{skill_name}-report.{ext}")
+             for ext in ("json", "txt", "md")
+             if os.path.exists(os.path.join(dest, f"{skill_name}-report.{ext}"))),
+            None,
+        )
+        if existing:
+            msg = f"[{skill_name}] skipped - report already exists at {existing}"
+            logging.info(msg)
+            return msg
 
         try:
             skill = SkillConfig(name=skill_name, repo=repo, target_dir=target_dir)
-            report_path = _run_skill(skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp)
-            if report_path and target_dir:
-                dest = os.path.join(repo_dir, target_dir)
-                os.makedirs(dest, exist_ok=True)
-                shutil.copy2(report_path, dest)
-            return f"[{skill_name}] completed. report={report_path or '(none)'}"
+            skill_output_path = _run_skill(skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp)
+            msg = f"[{skill_name}] completed. report={skill_output_path or '(none)'}"
+            logging.info(msg)
+            return msg
         except Exception as exc:
             raise RuntimeError(f"Skill '{skill_name}' failed: {exc}") from exc
 
