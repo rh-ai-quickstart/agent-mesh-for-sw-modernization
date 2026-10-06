@@ -378,6 +378,7 @@ def save_metadata_file(
     git_slug: str,
     language: str,
     schema: dict = None,
+    external_metadata: dict | None = None,
 ):
     """Writes a flattened metadata YAML file for a single source file to target_path."""
     import os
@@ -395,8 +396,11 @@ def save_metadata_file(
 
     os.makedirs(os.path.dirname(metadata_file_path), exist_ok=True)
 
+    merged = {**metadata, **{k: v for k, v in (external_metadata or {}).items()
+                              if v not in (None, "", [], {})}}
+
     with open(metadata_file_path, "w", encoding="utf-8") as f:
-        f.write(json_utils.flatten_code_metadata(metadata, schema))
+        f.write(json_utils.flatten_code_metadata(merged, schema))
 
 
 def save_code_and_metadata_files(
@@ -449,9 +453,6 @@ def save_code_and_metadata_files(
 
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
-            logging.info(f"External metadata: {str(external_metadata)} "
-                         f"{rel_file_path} {metadata.get('file_path')}")
-
             record = next(
                 (m for m in (external_metadata or []) if m.get("file_path") == rel_file_path),
                 {},
@@ -472,14 +473,18 @@ def save_code_and_metadata_files(
             with open(target_file_path, "w", encoding="utf-8") as f:
                 f.write(f"{code_header_comment}\n{code}")
 
+            logging.info(f"External metadata: {str(external_metadata)} "
+                         f"{rel_file_path} {metadata.get('file_path')}")
+
             save_metadata_file(
-                record,
+                metadata,
                 target_path,
                 rel_file_path,
                 git_repo=git_repo,
                 git_slug=git_slug,
                 language=language,
                 schema=schema,
+                external_metadata=record,
             )
 
     except Exception as e:
