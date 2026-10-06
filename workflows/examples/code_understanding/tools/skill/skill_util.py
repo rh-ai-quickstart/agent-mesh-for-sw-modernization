@@ -147,6 +147,8 @@ def run_composite_skill(
     from loaders.default_asset_loader import DefaultAssetLoader
     from tools.skill.skill_tool import get_run_skill_tool
 
+    logging.info("Running composite skill: %s", composite_skill)
+
     body, _ = DefaultAssetLoader().load_skill(composite_skill)
     enabled_skills = [s for s in fetch_skills(composite_skill) if s.enabled]
     skills_desc = "\n".join(
@@ -154,6 +156,7 @@ def run_composite_skill(
         for s in enabled_skills
     )
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc}"
+    logging.info("Composite skill instructions:\n%s", instructions)
 
     skill_tool = get_run_skill_tool(repo_dir, use_rhoai_mcp)
     coro = _run_as_agent(

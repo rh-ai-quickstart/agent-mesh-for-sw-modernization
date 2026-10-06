@@ -214,7 +214,7 @@ def get_parsed_code_metadata(df, language, config=False):
 
 def load_external_metadata(
     source_path: str,
-    skills: list[str] | None = None,
+    skill: str = "external-metadata",
 ) -> list[dict]:
     """Loads all JSON files from source_path/.code_metadata/ and returns them as a list of dicts.
 
@@ -223,9 +223,9 @@ def load_external_metadata(
 
     Args:
         source_path:    Path to the repository root.
-        skills:         Composite skill names to invoke before loading. When provided,
-                        each skill is run first; subskills whose report already exists
-                        in target_dir are skipped. Defaults to None (load only).
+        skill:          Composite skill name to invoke before loading. The skill is run
+                        first; if its report already exists in target_dir it is skipped.
+                        Defaults to "external-metadata".
     """
     import json
     import logging
@@ -235,11 +235,13 @@ def load_external_metadata(
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
-    if skills:
+    logging.info("Loading external metadata...")
+    logging.info(f"Using skill: {skill}")
+
+    if skill:
         from tools.skill.skill_util import run_composite_skill
 
-        for skill in skills:
-            run_composite_skill(source_path, skill)
+        run_composite_skill(source_path, skill)
 
     code_metadata_dir = os.path.join(source_path, code_utils.CODE_METADATA_DIR)
     result = []
@@ -255,7 +257,10 @@ def load_external_metadata(
                 if isinstance(data, dict):
                     result.append(data)
                 else:
-                    logging.warning(f"Skipping {filename} in external metadata processing: expected a JSON object, got {type(data).__name__}")
+                    logging.warning(
+                        f"Skipping {filename} in external metadata processing: "
+                        f"expected a JSON object, got {type(data).__name__}"
+                    )
             except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
 
@@ -444,7 +449,10 @@ def save_code_and_metadata_files(
 
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
-            record = next((m for m in (external_metadata or []) if m.get("file_path") == rel_file_path), {})
+            record = next(
+                (m for m in (external_metadata or []) if m.get("file_path") == rel_file_path),
+                {},
+            )
 
             code_header_comment = (
                 generate_code_comment(
