@@ -75,22 +75,31 @@ async def _run_as_agent(
     ).get_tools()
     if extra_tools:
         tools = tools + extra_tools
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant."),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant."),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ]
+    )
 
     if use_rhoai_mcp:
         try:
             from langchain_mcp_adapters.client import MultiServerMCPClient
 
             async with MultiServerMCPClient(
-                {"rhoai-mcp": {"url": os.environ["RHOAI_MCP_BASE_URL"] + "/sse", "transport": "sse"}}
+                {
+                    "rhoai-mcp": {
+                        "url": os.environ["RHOAI_MCP_BASE_URL"] + "/sse",
+                        "transport": "sse",
+                    }
+                }
             ) as client:
                 all_tools = tools + client.get_tools()
                 agent = create_tool_calling_agent(llm, all_tools, prompt)
-                await AgentExecutor(agent=agent, tools=all_tools, verbose=True).ainvoke({"input": instructions})
+                await AgentExecutor(agent=agent, tools=all_tools, verbose=True).ainvoke(
+                    {"input": instructions}
+                )
                 return
         except Exception as exc:
             logging.warning("Could not load rhoai-mcp tools: %s", exc)
@@ -153,8 +162,7 @@ def run_composite_skill(
     body, _ = DefaultAssetLoader().load_skill(composite_skill)
     enabled_skills = [s for s in fetch_skills(composite_skill) if s.enabled]
     skills_desc = "\n".join(
-        f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}"
-        for s in enabled_skills
+        f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}" for s in enabled_skills
     )
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)

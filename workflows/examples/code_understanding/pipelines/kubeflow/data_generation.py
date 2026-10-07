@@ -83,8 +83,15 @@ def generate_code_and_meta_op(
         try:
 
             from pipelines.base.data_generation import load_external_metadata
+            from utils import code_utils
 
-            external_metadata = load_external_metadata(tmp_source)
+            git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
+
+            external_metadata = load_external_metadata(
+                git_slug=git_slug,
+                multi_repo=multi_repo,
+                source_path=tmp_source,
+            )
 
             languages = detect_languages(tmp_source)
 

@@ -13,6 +13,7 @@ class AssetLoader(ABC):
     RESULTS_PATH_PREFIX_PIPELINES = "results/pipelines"
     RESULTS_PATH_PREFIX_ADHOC_QUERIES = "results/adhoc_queries"
     RESULTS_PATH_PREFIX_METADATA = "results/metadata"
+    RESULTS_PATH_PREFIX_ENRICHMENTS = "results/enrichments"
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
 
@@ -78,7 +79,12 @@ class AssetLoader(ABC):
 
     @abstractmethod
     def log_results(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
+        prefetch: bool = False,
     ):
         """Logs pipeline output artifacts for the current run.
 
@@ -88,6 +94,9 @@ class AssetLoader(ABC):
                 results under.
             tags: Optional key-value tags to attach to the run.
             content: Optional string content to write to results_path before logging.
+            prefetch: If True, attempt to download any prior upload for artifact_path first,
+                merge results_path on top (new content wins), and log the merged result.
+                Falls back to default behavior if no prior upload exists.
         """
 
     @abstractmethod

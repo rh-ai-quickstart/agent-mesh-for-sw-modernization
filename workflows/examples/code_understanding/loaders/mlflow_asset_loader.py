@@ -201,7 +201,12 @@ class MlFlowAssetLoader(AssetLoader):
             raise e
 
     def log_results(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
+        prefetch: bool = False,
     ):
         """Logs pipeline output artifacts to a new MLflow run."""
         try:

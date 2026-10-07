@@ -14,6 +14,7 @@ from loaders.default_asset_loader import DefaultAssetLoader  # noqa: E402
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 CODE_METADATA_DIR = ".code_metadata"
+ENRICHMENTS_DIR = ".enrichments"
 
 
 def _load_mappings():
@@ -107,7 +108,7 @@ def get_exclude_dirs_for_language(language):
     if language not in mappings:
         raise ValueError(f"Language={language} has not been mapped")
 
-    return set(mappings[language]) | {CODE_METADATA_DIR}
+    return set(mappings[language]) | {CODE_METADATA_DIR, ENRICHMENTS_DIR}
 
 
 def get_comment_delimiters_for_language(language):

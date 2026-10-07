@@ -26,9 +26,11 @@ def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
         os.makedirs(dest, exist_ok=True)
 
         existing = next(
-            (os.path.join(dest, f"{skill_name}-report.{ext}")
-             for ext in ("json", "txt", "md")
-             if os.path.exists(os.path.join(dest, f"{skill_name}-report.{ext}"))),
+            (
+                os.path.join(dest, f"{skill_name}-report.{ext}")
+                for ext in ("json", "txt", "md")
+                if os.path.exists(os.path.join(dest, f"{skill_name}-report.{ext}"))
+            ),
             None,
         )
         if existing:

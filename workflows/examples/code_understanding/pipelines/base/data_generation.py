@@ -213,6 +213,8 @@ def get_parsed_code_metadata(df, language, config=False):
 
 
 def load_external_metadata(
+    git_slug: str,
+    multi_repo: bool,
     source_path: str,
     skill: str = "external-metadata",
 ) -> list[dict]:
@@ -222,6 +224,8 @@ def load_external_metadata(
     array (each element appended as its own record), mirroring JSONL semantics.
 
     Args:
+        git_slug:       Repository slug (e.g. "open-sdg-sdg-data-canada").
+        multi_repo:     Whether the repository is a multi-repo.
         source_path:    Path to the repository root.
         skill:          Composite skill name to invoke before loading. The skill is run
                         first; if its report already exists in target_dir it is skipped.
@@ -230,7 +234,9 @@ def load_external_metadata(
     import json
     import logging
     import os
+    import shutil
 
+    from loaders.default_asset_loader import DefaultAssetLoader
     from utils import code_utils
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -238,16 +244,20 @@ def load_external_metadata(
     logging.info("Loading external metadata...")
     logging.info(f"Using skill: {skill}")
 
+    parent_dir = os.path.join(source_path, code_utils.ENRICHMENTS_DIR)
+    code_metadata_dir = os.path.join(parent_dir, code_utils.CODE_METADATA_DIR)
+    os.makedirs(code_metadata_dir, exist_ok=True)
+
     if skill:
         from tools.skill.skill_util import run_composite_skill
 
         run_composite_skill(source_path, skill)
 
-    code_metadata_dir = os.path.join(source_path, code_utils.CODE_METADATA_DIR)
-    result = []
+    skill_output_dir = os.path.join(source_path, code_utils.CODE_METADATA_DIR)
+    if os.path.isdir(skill_output_dir):
+        shutil.copytree(skill_output_dir, code_metadata_dir, dirs_exist_ok=True)
 
-    if not os.path.isdir(code_metadata_dir):
-        return result
+    result = []
 
     for root, _, files in os.walk(code_metadata_dir):
         for filename in files:
@@ -263,6 +273,22 @@ def load_external_metadata(
                     )
             except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
+
+    DefaultAssetLoader().log_results(
+        parent_dir,
+        artifact_path=DefaultAssetLoader.get_log_results_artifact_path(
+            DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
+            git_slug=git_slug,
+            multi_repo=multi_repo,
+        ),
+        tags={
+            "git_slug": git_slug,
+            "category": "data-generation",
+            "code-metadata": True,
+            "multi_repo": multi_repo,
+        },
+        prefetch=True,
+    )
 
     return result
 
@@ -381,13 +407,13 @@ def save_metadata_file(
     external_metadata: dict | None = None,
 ):
     """Writes a flattened metadata YAML file for a single source file to target_path."""
+    import logging
     import os
     from pathlib import Path
 
     from loaders.default_asset_loader import DefaultAssetLoader
     from utils import json_utils
 
-    import logging
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     if schema is None:
@@ -399,12 +425,14 @@ def save_metadata_file(
 
     os.makedirs(os.path.dirname(metadata_file_path), exist_ok=True)
 
-    merged = {**metadata, **{k: v for k, v in (external_metadata or {}).items()
-                              if v not in (None, "", [], {})}}
+    merged = {
+        **metadata,
+        **{k: v for k, v in (external_metadata or {}).items() if v not in (None, "", [], {})},
+    }
 
-    logging.debug(f"Merged metadata: {merged}"
-                  f" Metadata: {metadata} "
-                  f" External: {external_metadata}")
+    logging.debug(
+        f"Merged metadata: {merged}" f" Metadata: {metadata} " f" External: {external_metadata}"
+    )
 
     with open(metadata_file_path, "w", encoding="utf-8") as f:
         f.write(json_utils.flatten_code_metadata(merged, schema))
@@ -461,8 +489,11 @@ def save_code_and_metadata_files(
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
             record = next(
-                (m for m in (external_metadata or [])
-                 if "file_path" not in m or m.get("file_path") == rel_file_path),
+                (
+                    m
+                    for m in (external_metadata or [])
+                    if "file_path" not in m or m.get("file_path") == rel_file_path
+                ),
                 {},
             )
 
@@ -481,8 +512,10 @@ def save_code_and_metadata_files(
             with open(target_file_path, "w", encoding="utf-8") as f:
                 f.write(f"{code_header_comment}\n{code}")
 
-            logging.debug(f"External metadata: {str(external_metadata)} "
-                         f"({rel_file_path}, {metadata.get('file_path')})")
+            logging.debug(
+                f"External metadata: {str(external_metadata)} "
+                f"({rel_file_path}, {metadata.get('file_path')})"
+            )
 
             save_metadata_file(
                 metadata,
@@ -624,7 +657,7 @@ def detect_languages(source_path: str) -> list:
     languages = code_utils.get_detected_languages_for_repo(source_path)
 
     if not languages:
-        raise Exception(f"No languages detected in source_path='{source_path}'.")
+        raise Exception(f"No supported languages detected in source_path=" f"'{source_path}'.")
 
     return languages
 
@@ -666,7 +699,11 @@ class DataGenerationPipeline:
 
             languages = detect_languages(source_path)
 
-            external_metadata = load_external_metadata(source_path)
+            external_metadata = load_external_metadata(
+                git_slug=git_slug,
+                multi_repo=multi_repo,
+                source_path=source_path,
+            )
 
             for language in languages:
 
