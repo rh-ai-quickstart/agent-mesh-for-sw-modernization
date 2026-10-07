@@ -25,6 +25,7 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 ##############################################################################
 
 
+@inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
@@ -89,7 +90,6 @@ def generate_code_and_meta_op(
 
             external_metadata = load_external_metadata(
                 git_slug=git_slug,
-                multi_repo=multi_repo,
                 source_path=tmp_source,
             )
 

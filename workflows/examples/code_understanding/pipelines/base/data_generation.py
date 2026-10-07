@@ -54,6 +54,9 @@ def prepare_environment(source_path: str, target_path: str, git_repo: str, git_b
     import logging
     import os
 
+    from loaders.default_asset_loader import DefaultAssetLoader
+    from utils import code_utils
+
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     logging.info("Preparing the environment for pipeline run...")
@@ -69,6 +72,17 @@ def prepare_environment(source_path: str, target_path: str, git_repo: str, git_b
         logging.error(f"Error preparing environment: {e}")
 
         raise e
+
+    git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
+
+    DefaultAssetLoader().load_results(
+        download_dir=os.path.join(source_path, code_utils.ENRICHMENTS_DIR),
+        artifact_path=DefaultAssetLoader.get_log_results_artifact_path(
+            DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
+            git_slug=git_slug,
+        ),
+        tags={"git_slug": git_slug, "category": "data-generation"},
+    )
 
 
 def generate_raw_dataset(
@@ -214,18 +228,17 @@ def get_parsed_code_metadata(df, language, config=False):
 
 def load_external_metadata(
     git_slug: str,
-    multi_repo: bool,
     source_path: str,
     skill: str = "external-metadata",
 ) -> list[dict]:
-    """Loads all JSON files from source_path/.code_metadata/ and returns them as a list of dicts.
+    """Loads all JSON files from source_path/.enrichments/.code_metadata/ and returns them as a
+    list of dicts.
 
     Each JSON file may contain a single object (appended as one record) or a top-level
     array (each element appended as its own record), mirroring JSONL semantics.
 
     Args:
         git_slug:       Repository slug (e.g. "open-sdg-sdg-data-canada").
-        multi_repo:     Whether the repository is a multi-repo.
         source_path:    Path to the repository root.
         skill:          Composite skill name to invoke before loading. The skill is run
                         first; if its report already exists in target_dir it is skipped.
@@ -248,14 +261,17 @@ def load_external_metadata(
     code_metadata_dir = os.path.join(parent_dir, code_utils.CODE_METADATA_DIR)
     os.makedirs(code_metadata_dir, exist_ok=True)
 
+    repo_code_metadata_dir = os.path.join(source_path, code_utils.CODE_METADATA_DIR)
+    if os.path.isdir(repo_code_metadata_dir):
+        shutil.copytree(repo_code_metadata_dir, code_metadata_dir, dirs_exist_ok=True)
+
     if skill:
         from tools.skill.skill_util import run_composite_skill
 
         run_composite_skill(source_path, skill)
 
-    skill_output_dir = os.path.join(source_path, code_utils.CODE_METADATA_DIR)
-    if os.path.isdir(skill_output_dir):
-        shutil.copytree(skill_output_dir, code_metadata_dir, dirs_exist_ok=True)
+        if os.path.isdir(repo_code_metadata_dir):
+            shutil.copytree(repo_code_metadata_dir, code_metadata_dir, dirs_exist_ok=True)
 
     result = []
 
@@ -279,15 +295,8 @@ def load_external_metadata(
         artifact_path=DefaultAssetLoader.get_log_results_artifact_path(
             DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
             git_slug=git_slug,
-            multi_repo=multi_repo,
         ),
-        tags={
-            "git_slug": git_slug,
-            "category": "data-generation",
-            "code-metadata": True,
-            "multi_repo": multi_repo,
-        },
-        prefetch=True,
+        tags={"git_slug": git_slug, "category": "data-generation"},
     )
 
     return result
@@ -701,7 +710,6 @@ class DataGenerationPipeline:
 
             external_metadata = load_external_metadata(
                 git_slug=git_slug,
-                multi_repo=multi_repo,
                 source_path=source_path,
             )
 

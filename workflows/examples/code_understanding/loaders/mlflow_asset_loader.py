@@ -200,13 +200,28 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+        """Downloads a previously logged result directory from MLflow to download_dir.
+
+        Silently skips if no prior results exist (e.g. on first run).
+        """
+        try:
+            self.download_dir(
+                artifact_path,
+                download_dir,
+                experiment_name=self.RESULT_DIRECTORY_ASSET_EXPERIMENT,
+                asset_tags=tags,
+            )
+            logging.info("Loaded prior results from %s to %s", artifact_path, download_dir)
+        except Exception as e:
+            logging.info("No prior results to load from %s: %s", artifact_path, e)
+
     def log_results(
         self,
         results_path: str,
         artifact_path: str = None,
         tags: dict = None,
         content: str = None,
-        prefetch: bool = False,
     ):
         """Logs pipeline output artifacts to a new MLflow run."""
         try:

@@ -78,13 +78,16 @@ class LocalAssetLoader(AssetLoader):
 
             raise e
 
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+        """No-op. Local results are already on disk and require no download step."""
+        pass
+
     def log_results(
         self,
         results_path: str,
         artifact_path: str = None,
         tags: dict = None,
         content: str = None,
-        prefetch: bool = False,
     ):
         """Writes content to results_path if provided. No remote logging step."""
         if content is not None and not os.path.isdir(results_path):

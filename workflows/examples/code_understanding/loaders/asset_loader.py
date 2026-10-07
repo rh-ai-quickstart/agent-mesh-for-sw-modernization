@@ -78,13 +78,22 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+        """Downloads previously logged results to download_dir.
+
+        Args:
+            download_dir: Local directory path to download results into.
+            artifact_path: Subdirectory within the run's artifact store to download from.
+            tags: Optional key-value tags to filter which run to download from.
+        """
+
+    @abstractmethod
     def log_results(
         self,
         results_path: str,
         artifact_path: str = None,
         tags: dict = None,
         content: str = None,
-        prefetch: bool = False,
     ):
         """Logs pipeline output artifacts for the current run.
 
@@ -94,9 +103,6 @@ class AssetLoader(ABC):
                 results under.
             tags: Optional key-value tags to attach to the run.
             content: Optional string content to write to results_path before logging.
-            prefetch: If True, attempt to download any prior upload for artifact_path first,
-                merge results_path on top (new content wins), and log the merged result.
-                Falls back to default behavior if no prior upload exists.
         """
 
     @abstractmethod

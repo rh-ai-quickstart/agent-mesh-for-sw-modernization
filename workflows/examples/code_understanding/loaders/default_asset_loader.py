@@ -1,7 +1,4 @@
-import logging
 import os
-import shutil
-import tempfile
 
 from .asset_loader import AssetLoader
 from .local_asset_loader import LocalAssetLoader
@@ -47,36 +44,17 @@ class DefaultAssetLoader(AssetLoader):
             return self._loader.download_dir(asset_dir_path, download_dir, **kwargs)
         return self._loader.download_dir(asset_dir_path, download_dir)
 
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+
+        return self._loader.load_results(download_dir, artifact_path, tags)
+
     def log_results(
         self,
         results_path: str,
         artifact_path: str = None,
         tags: dict = None,
         content: str = None,
-        prefetch: bool = False,
     ):
-        if prefetch and artifact_path:
-            from mlflow.exceptions import MlflowException
-
-            with tempfile.TemporaryDirectory(prefix="log_results_prefetch_") as merge_dir:
-                try:
-                    self.download_dir(
-                        artifact_path,
-                        merge_dir,
-                        experiment_name=getattr(
-                            self._loader, "RESULT_DIRECTORY_ASSET_EXPERIMENT", None
-                        ),
-                        asset_tags=tags,
-                    )
-                    logging.info("Prefetched existing artifacts from %s", artifact_path)
-                    shutil.copytree(results_path, merge_dir, dirs_exist_ok=True)
-                    return self._loader.log_results(merge_dir, artifact_path, tags, content)
-                except (FileNotFoundError, MlflowException) as exc:
-                    logging.info(
-                        "No existing artifacts to prefetch from %s (%s); logging as-is",
-                        artifact_path,
-                        exc,
-                    )
 
         return self._loader.log_results(results_path, artifact_path, tags, content)
 
