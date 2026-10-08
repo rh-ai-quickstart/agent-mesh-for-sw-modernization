@@ -15,6 +15,7 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 CODE_METADATA_DIR = ".code_metadata"
 ENRICHMENTS_DIR = ".enrichments"
+LANGUAGE_MAPPINGS_ASSET_PATH = f"{ENRICHMENTS_DIR}/.assets/mappings/language_mappings.json"
 
 
 def _load_mappings():

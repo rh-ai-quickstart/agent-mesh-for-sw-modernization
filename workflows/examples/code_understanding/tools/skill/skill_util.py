@@ -14,43 +14,9 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 @dataclass
 class SkillConfig:
     name: str
-    repo: str
+    repo: str | None = None
     enabled: bool = True
     target_dir: str | None = None
-
-
-def fetch_skills(name: str) -> list[SkillConfig]:
-    """Load the skills list from a composite skill's frontmatter metadata."""
-    from loaders.default_asset_loader import DefaultAssetLoader
-
-    _, frontmatter = DefaultAssetLoader().load_skill(name)
-    return [
-        SkillConfig(
-            name=entry["name"],
-            repo=entry["repo"],
-            enabled=entry.get("enabled", True),
-            target_dir=entry.get("target_dir"),
-        )
-        for entry in ((frontmatter.get("metadata") or {}).get("skills") or [])
-    ]
-
-
-def load_skill_instructions(name: str, repo: str) -> str:
-    """Clone a skills repo and return the SKILL.md body for the named skill."""
-    with tempfile.TemporaryDirectory(prefix=f"skill-{name}-") as skills_dir:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", repo, skills_dir],
-            check=True,
-            capture_output=True,
-        )
-        skill_md = os.path.join(skills_dir, name, "SKILL.md")
-        if not os.path.exists(skill_md):
-            raise FileNotFoundError(f"{name}/SKILL.md not found in {repo}")
-        with open(skill_md) as f:
-            content = f.read()
-
-    match = re.match(r"^---\n.*?\n---\n(.*)", content, re.DOTALL)
-    return match.group(1).strip() if match else content.strip()
 
 
 async def _run_as_agent(
@@ -106,6 +72,70 @@ async def _run_as_agent(
 
     agent = create_tool_calling_agent(llm, tools, prompt)
     await AgentExecutor(agent=agent, tools=tools, verbose=True).ainvoke({"input": instructions})
+
+
+def fetch_skills(name: str) -> list[SkillConfig]:
+    """Load the skills list from a composite skill's frontmatter metadata."""
+    from loaders.default_asset_loader import DefaultAssetLoader
+
+    _, frontmatter = DefaultAssetLoader().load_skill(name)
+    return [
+        SkillConfig(
+            name=entry["name"],
+            repo=entry.get("repo"),
+            enabled=entry.get("enabled", True),
+            target_dir=entry.get("target_dir"),
+        )
+        for entry in ((frontmatter.get("metadata") or {}).get("skills") or [])
+    ]
+
+
+def load_external_skill_instructions(name: str, repo: str) -> str:
+    """Clone a skills repo and return the SKILL.md body for the named skill."""
+    with tempfile.TemporaryDirectory(prefix=f"skill-{name}-") as skills_dir:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", repo, skills_dir],
+            check=True,
+            capture_output=True,
+        )
+        skill_md = os.path.join(skills_dir, name, "SKILL.md")
+        if not os.path.exists(skill_md):
+            raise FileNotFoundError(f"{name}/SKILL.md not found in {repo}")
+        with open(skill_md) as f:
+            content = f.read()
+
+    match = re.match(r"^---\n.*?\n---\n(.*)", content, re.DOTALL)
+    return match.group(1).strip() if match else content.strip()
+
+
+def load_skill_instructions(name: str, repo: str | None = None) -> str:
+    """Return the body of the named skill.
+
+    When repo is None the skill is loaded from the asset loader.
+    When repo is provided the skill repo is cloned and SKILL.md is read.
+    """
+    if repo is None:
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        body, _ = DefaultAssetLoader().load_skill(name)
+        return body
+
+    return load_external_skill_instructions(name, repo)
+
+
+def run_skill_by_name(
+    skill_name: str,
+    repo_dir: str,
+    use_rhoai_mcp: bool = False,
+) -> str | None:
+    """
+    Run a skill by name against repo_dir.
+
+    Constructs a SkillConfig from skill_name (loading instructions from the asset loader)
+    and delegates to run_skill.
+    Returns the path to the generated report file, or None if no report was written.
+    """
+    return run_skill(SkillConfig(name=skill_name), repo_dir, use_rhoai_mcp)
 
 
 def run_skill(

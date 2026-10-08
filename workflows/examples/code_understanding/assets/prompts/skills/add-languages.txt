@@ -1,0 +1,98 @@
+---
+name: add-languages
+description: >
+  For programming languages found in the repository that are not currently supported by the
+  code-understanding pipeline, generates: (1) incremental language mapping entries for
+  language_mappings.json and (2) additive updates to the GraphRAG extract_graph.txt
+  configuration. Outputs are written under .enrichments/.assets/ so they can be
+  uploaded and applied by downstream pipeline stages.
+license: Apache-2.0
+compatibility: Requires list_directory, read_file, write_file tools.
+metadata:
+  version: "1.0"
+  skills: []
+---
+
+You are a software tooling assistant helping to extend language support in a code-understanding pipeline.
+
+## Step 1 — Identify unsupported languages
+
+Use list_directory to scan the files in this repository and identify the programming languages present based on file extensions and file contents where needed.
+
+The following languages are already supported and require no action:
+java, python, c++, c, javascript, sql, ruby, shell, ansible, terraform, cloudformation, puppet,
+jsp, freemarker, velocity, xslt, django, jinja2, handlebars, pug, ejs, nunjucks, mustache, erb,
+liquid, twig, blade
+
+Focus only on languages NOT in the list above. If no unsupported languages are found, stop here and write no output files.
+
+## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
+
+For each unsupported language identified in Step 1, generate entries for all six sections below. Use your knowledge of the language to produce accurate values. The output JSON must contain ONLY the new entries — do not repeat already-supported languages.
+
+**pygments_mappings**
+Map each Pygments lexer name (lowercase) that corresponds to this language to the canonical key you are introducing (e.g. `"c#": "csharp"`). Include all common Pygments lexer aliases for the language.
+
+**file_extensions**
+List the file extensions used for this language's source files (e.g. `[".cs", ".csx"]`). Source files only — not config or build files.
+
+**config_file_extensions**
+List file extensions for configuration and build files typically used in projects of this language (e.g. `[".xml", ".json", ".yaml", ".yml", ".csproj"]`).
+
+**comment_delimiters_by_extension**
+For each config file extension listed above that is NOT already present in the following already-mapped set, provide `[open_delimiter, close_delimiter]`. Use `""` as the close delimiter for single-line styles with no closing token.
+Already-mapped extensions (omit these): .xml, .gradle, .properties, .yaml, .yml, .json, .cfg, .toml, .ini, .txt, .cmake, .mk, .gemspec, .env, .conf
+
+**exclude_dirs**
+List directory names to exclude when scanning repositories of this language (build output dirs, package manager caches, IDE metadata, generated code, etc.). Always include "vendor", "node_modules", ".git".
+
+**comment_delimiters_by_language**
+Provide `[open_delimiter, close_delimiter]` for block/multi-line comments in the language's source files (e.g. `["/*", "*/"]` for C-style, `["\"\"\"", "\"\"\""]` for Python-style docstrings).
+
+Example output for Fortran and Ada:
+
+```json
+{
+  "pygments_mappings": {
+    "fortran":      "fortran",
+    "f90":          "fortran",
+    "fortranfixed": "fortran",
+    "ada":          "ada"
+  },
+  "file_extensions": {
+    "fortran": [".f", ".f90", ".f95", ".f03", ".f08", ".for", ".ftn"],
+    "ada":     [".adb", ".ads", ".ada"]
+  },
+  "config_file_extensions": {
+    "fortran": [".nml"],
+    "ada":     [".gpr"]
+  },
+  "comment_delimiters_by_extension": {
+    ".nml": ["!", ""],
+    ".gpr": ["--", ""]
+  },
+  "exclude_dirs": {
+    "fortran": ["vendor", "node_modules", ".git", "build", "cmake-build-debug"],
+    "ada":     ["vendor", "node_modules", ".git", "obj", ".obj"]
+  },
+  "comment_delimiters_by_language": {
+    "fortran": ["!", ""],
+    "ada":     ["--", ""]
+  }
+}
+```
+
+**Important:** The output file must contain pure JSON only — no markdown fencing, no prose, and no comments outside the JSON structure.
+
+Write the complete result as a single valid JSON object to:
+  .enrichments/.assets/mappings/language_mappings.json
+
+## Step 3 — Write .enrichments/.assets/graphrag/extract_graph.txt
+
+Review the Microsoft GraphRAG configuration file at workflows/examples/code_understanding/assets/graphrag/extract_graph.txt.
+Assume that the chat model used is gpt-oss-120b.
+Given this, update extract_graph.txt so that it also supports the languages identified in Step 1.
+The changes should be additive where possible, and try to keep them concise.
+
+Write the complete updated file to:
+  .enrichments/.assets/graphrag/extract_graph.txt

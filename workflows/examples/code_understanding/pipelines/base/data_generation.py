@@ -54,9 +54,6 @@ def prepare_environment(source_path: str, target_path: str, git_repo: str, git_b
     import logging
     import os
 
-    from loaders.default_asset_loader import DefaultAssetLoader
-    from utils import code_utils
-
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     logging.info("Preparing the environment for pipeline run...")
@@ -72,6 +69,16 @@ def prepare_environment(source_path: str, target_path: str, git_repo: str, git_b
         logging.error(f"Error preparing environment: {e}")
 
         raise e
+
+    prepare_enrichments(source_path, git_repo, git_branch)
+
+
+def prepare_enrichments(source_path: str, git_repo: str, git_branch: str):
+    """Downloads any previously logged enrichments into the source tree."""
+    import os
+
+    from loaders.default_asset_loader import DefaultAssetLoader
+    from utils import code_utils
 
     git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
 
@@ -268,7 +275,10 @@ def load_external_metadata(
     if skill:
         from tools.skill.skill_util import run_composite_skill
 
-        run_composite_skill(source_path, skill)
+        try:
+            run_composite_skill(source_path, skill)
+        except Exception:
+            logging.error("Composite skill '%s' failed", skill, exc_info=True)
 
         if os.path.isdir(repo_code_metadata_dir):
             shutil.copytree(repo_code_metadata_dir, code_metadata_dir, dirs_exist_ok=True)
@@ -661,12 +671,40 @@ def generate_git_slug(git_repo: str, git_branch: str) -> str:
 
 def detect_languages(source_path: str) -> list:
     """Returns the list of programming languages detected in source_path."""
+    import logging
+
+    from tools.skill.skill_util import run_skill_by_name
     from utils import code_utils
+
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     languages = code_utils.get_detected_languages_for_repo(source_path)
 
     if not languages:
-        raise Exception(f"No supported languages detected in source_path=" f"'{source_path}'.")
+
+        if os.getenv("ALLOW_DYNAMIC_LANGUAGE_SUPPORT", "false").lower() == "true":
+
+            logging.info(
+                "No preconfigured languages detected; Falling back to dynamic language detection"
+            )
+
+            try:
+                run_skill_by_name("add-languages", source_path)
+            except Exception:
+                logging.error("add-languages skill failed", exc_info=True)
+
+            mappings_path = os.path.join(source_path, code_utils.LANGUAGE_MAPPINGS_ASSET_PATH)
+
+            if os.path.exists(mappings_path):
+
+                import json
+
+                with open(mappings_path) as f:
+                    languages = list(json.load(f).get("file_extensions", {}).keys())
+
+        if not languages:
+
+            raise Exception(f"No supported languages detected in source_path=" f"'{source_path}'.")
 
     return languages
 
