@@ -63,15 +63,17 @@ async def _run_as_agent(
             ) as client:
                 all_tools = tools + client.get_tools()
                 agent = create_tool_calling_agent(llm, all_tools, prompt)
-                await AgentExecutor(agent=agent, tools=all_tools, verbose=True).ainvoke(
-                    {"input": instructions}
-                )
+                await AgentExecutor(
+                    agent=agent, tools=all_tools, verbose=True, max_iterations=50
+                ).ainvoke({"input": instructions})
                 return
         except Exception as exc:
             logging.warning("Could not load rhoai-mcp tools: %s", exc)
 
     agent = create_tool_calling_agent(llm, tools, prompt)
-    await AgentExecutor(agent=agent, tools=tools, verbose=True).ainvoke({"input": instructions})
+    await AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=50).ainvoke(
+        {"input": instructions}
+    )
 
 
 def fetch_skills(name: str) -> list[SkillConfig]:
