@@ -6,7 +6,7 @@ description: >
   listed under metadata.skills in series against the target repository.
   Add skills to metadata.skills to extend the enrichment.
 license: Apache-2.0
-compatibility: Requires git, Python 3.11+, read_file, write_file, list_files tools.
+compatibility: Requires git, Python 3.11+, read_file, write_file, list_files, log_enrichments tools.
 metadata:
   version: "1.0"
   skills:
@@ -14,6 +14,10 @@ metadata:
     source: repo
     repo: https://github.com/agapebondservant/swe-mesh-skills
     enabled: true
-    target_dir: .code_metadata
+    target_dir: .enrichments/.code_metadata
 ---
 Use the run_skill tool to execute each skill in the enabled skills list against the target repository.
+
+Once all skills have been executed, call log_enrichments to persist all files written under
+.enrichments/ to the pipeline asset store so they are available on future pipeline runs.
+No arguments are required.

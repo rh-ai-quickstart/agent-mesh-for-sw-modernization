@@ -256,7 +256,6 @@ def load_external_metadata(
     import os
     import shutil
 
-    from loaders.default_asset_loader import DefaultAssetLoader
     from utils import code_utils
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -276,12 +275,9 @@ def load_external_metadata(
         from tools.skill.skill_util import run_composite_skill
 
         try:
-            run_composite_skill(source_path, skill)
+            run_composite_skill(source_path, skill, git_slug=git_slug)
         except Exception:
             logging.error("Composite skill '%s' failed", skill, exc_info=True)
-
-        if os.path.isdir(repo_code_metadata_dir):
-            shutil.copytree(repo_code_metadata_dir, code_metadata_dir, dirs_exist_ok=True)
 
     result = []
 
@@ -299,15 +295,6 @@ def load_external_metadata(
                     )
             except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
-
-    DefaultAssetLoader().log_results(
-        parent_dir,
-        artifact_path=DefaultAssetLoader.get_log_results_artifact_path(
-            DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
-            git_slug=git_slug,
-        ),
-        tags={"git_slug": git_slug, "category": "data-generation"},
-    )
 
     return result
 
@@ -669,7 +656,7 @@ def generate_git_slug(git_repo: str, git_branch: str) -> str:
     return code_utils.generate_slug_from_repo(git_repo, git_branch)
 
 
-def detect_languages(source_path: str) -> list:
+def detect_languages(source_path: str, git_slug: str | None = None) -> list:
     """Returns the list of programming languages detected in source_path."""
     import logging
 
@@ -689,7 +676,7 @@ def detect_languages(source_path: str) -> list:
             )
 
             try:
-                run_local_skill("add-languages", source_path)
+                run_local_skill("add-languages", source_path, git_slug=git_slug)
             except Exception:
                 logging.error("add-languages skill failed", exc_info=True)
 
@@ -744,7 +731,7 @@ class DataGenerationPipeline:
                 git_branch=git_branch,
             )
 
-            languages = detect_languages(source_path)
+            languages = detect_languages(source_path, git_slug=git_slug)
 
             external_metadata = load_external_metadata(
                 git_slug=git_slug,

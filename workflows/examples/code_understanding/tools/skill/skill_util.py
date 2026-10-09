@@ -129,6 +129,7 @@ def run_local_skill(
     skill_name: str,
     repo_dir: str,
     use_rhoai_mcp: bool = False,
+    git_slug: str | None = None,
 ) -> str | None:
     """
     Run a local skill by name against repo_dir.
@@ -137,25 +138,31 @@ def run_local_skill(
     and delegates to run_skill.
     Returns the path to the generated report file, or None if no report was written.
     """
-    return run_skill(SkillConfig(name=skill_name), repo_dir, use_rhoai_mcp)
+    return run_skill(SkillConfig(name=skill_name), repo_dir, use_rhoai_mcp, git_slug=git_slug)
 
 
 def run_skill(
     skill: SkillConfig,
     repo_dir: str,
     use_rhoai_mcp: bool = False,
+    git_slug: str | None = None,
 ) -> str | None:
     """
     Run a single skill against repo_dir.
 
     Returns the path to the generated report file, or None if no report was written.
     """
-    from utils.tool_utils import get_read_asset_tool
+    from utils import code_utils
+    from utils.tool_utils import get_log_enrichments_tool, get_read_asset_tool
 
     logging.info("Running skill: %s", skill.name)
 
     instructions = load_skill_instructions(skill.name, skill.repo)
-    extra_tools = [get_read_asset_tool()] if skill.repo is None else None
+    if skill.repo is None:
+        enrichments_dir = os.path.join(repo_dir, code_utils.ENRICHMENTS_DIR)
+        extra_tools = [get_read_asset_tool(), get_log_enrichments_tool(enrichments_dir, git_slug)]
+    else:
+        extra_tools = None
     coro = _run_as_agent(
         repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp, extra_tools=extra_tools
     )
@@ -186,6 +193,7 @@ def run_composite_skill(
     repo_dir: str,
     composite_skill: str,
     use_rhoai_mcp: bool = False,
+    git_slug: str | None = None,
 ) -> None:
     """
     Run a composite skill against repo_dir using the autonomous agent pattern.
@@ -195,6 +203,8 @@ def run_composite_skill(
     """
     from loaders.default_asset_loader import DefaultAssetLoader
     from tools.skill.skill_tool import get_run_skill_tool
+    from utils import code_utils
+    from utils.tool_utils import get_log_enrichments_tool
 
     logging.info("Running composite skill: %s", composite_skill)
 
@@ -206,12 +216,14 @@ def run_composite_skill(
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
 
+    enrichments_dir = os.path.join(repo_dir, code_utils.ENRICHMENTS_DIR)
     skill_tool = get_run_skill_tool(repo_dir, use_rhoai_mcp)
+    log_enrichments_tool = get_log_enrichments_tool(enrichments_dir, git_slug)
     coro = _run_as_agent(
         repo_dir,
         instructions,
         use_rhoai_mcp=use_rhoai_mcp,
-        extra_tools=[skill_tool],
+        extra_tools=[skill_tool, log_enrichments_tool],
     )
     try:
         loop = asyncio.get_running_loop()

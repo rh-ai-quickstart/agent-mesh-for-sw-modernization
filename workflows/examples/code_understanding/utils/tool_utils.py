@@ -38,6 +38,45 @@ class SafeFileManagementToolkit:
         return self._patch_tools(tools)
 
 
+def get_log_enrichments_tool(enrichments_dir: str, git_slug: str | None = None):
+    """Return a LangChain tool that logs the enrichments directory to the pipeline asset store.
+
+    The returned tool is a no-argument callable suitable for injection into a skill agent or
+    direct invocation. It mirrors the log_results call made by load_external_metadata so that
+    skill outputs written under .enrichments/ persist across pipeline runs.
+
+    Args:
+        enrichments_dir: Absolute path to the .enrichments directory to log.
+        git_slug:        Optional repository slug used to namespace the artifact path and tags.
+    """
+    from langchain_core.tools import tool
+
+    @tool
+    def log_enrichments(note: str = "") -> str:
+        """Persist the enrichments directory to the pipeline asset store.
+
+        Call this after all output files have been written so they survive across pipeline runs.
+        The note parameter is optional and ignored.
+        """
+        import os
+
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        os.makedirs(enrichments_dir, exist_ok=True)
+
+        kwargs = {}
+        if git_slug:
+            kwargs["artifact_path"] = DefaultAssetLoader.get_log_results_artifact_path(
+                DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
+                git_slug=git_slug,
+            )
+            kwargs["tags"] = {"git_slug": git_slug, "category": "data-generation"}
+        DefaultAssetLoader().log_results(enrichments_dir, **kwargs)
+        return f"Logged enrichments from {enrichments_dir}"
+
+    return log_enrichments
+
+
 def get_read_asset_tool():
     """Return a LangChain tool that reads a file from the pipeline's asset directory."""
     from langchain_core.tools import tool
