@@ -88,7 +88,7 @@ Example output for Fortran and Ada:
 
 **Important:** The output file must contain pure JSON only — no markdown fencing, no prose, and no comments outside the JSON structure.
 
-Write the complete result as a single valid JSON object to:
+Do NOT attempt to read the output path before writing — the file will not exist yet. Use write_file to create it directly at:
   .enrichments/.assets/mappings/language_mappings.json
 
 ## Step 3 — Write .enrichments/.assets/graphrag/extract_graph.txt
@@ -98,5 +98,5 @@ Assume that the chat model used is gpt-oss-120b.
 Given this, update the configuration file so that it also supports the languages identified in Step 1.
 The changes should be additive where possible, and try to keep them concise.
 
-Write the complete updated file to:
+Do NOT attempt to read the output path before writing. Use write_file to create it directly at:
   .enrichments/.assets/graphrag/extract_graph.txt
