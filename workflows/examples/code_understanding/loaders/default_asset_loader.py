@@ -21,6 +21,9 @@ class DefaultAssetLoader(AssetLoader):
     def download(
         self, asset_file_path: str, download_dir: str = None, experiment_name=None, asset_tags=None
     ):
+        _, sep, remainder = ("/" + asset_file_path).partition("/assets/")
+        if sep:
+            asset_file_path = remainder
 
         if isinstance(self._loader, MlFlowAssetLoader):
             kwargs = {}
