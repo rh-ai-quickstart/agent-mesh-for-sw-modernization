@@ -28,7 +28,7 @@ async def _run_as_agent(
     from langchain.agents import AgentExecutor, create_tool_calling_agent
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_openai import ChatOpenAI
-    from utils.tool_utils import SafeFileManagementToolkit, get_read_asset_tool
+    from utils.tool_utils import SafeFileManagementToolkit
 
     llm = ChatOpenAI(
         model=os.environ["CODE_LLM_ID"],
@@ -38,7 +38,7 @@ async def _run_as_agent(
     tools = SafeFileManagementToolkit(
         root_dir=repo_dir,
         selected_tools=["read_file", "write_file", "list_directory"],
-    ).get_tools() + [get_read_asset_tool()]
+    ).get_tools()
     if extra_tools:
         tools = tools + extra_tools
     prompt = ChatPromptTemplate.from_messages(
@@ -123,13 +123,13 @@ def load_skill_instructions(name: str, repo: str | None = None) -> str:
     return load_external_skill_instructions(name, repo)
 
 
-def run_skill_by_name(
+def run_local_skill(
     skill_name: str,
     repo_dir: str,
     use_rhoai_mcp: bool = False,
 ) -> str | None:
     """
-    Run a skill by name against repo_dir.
+    Run a local skill by name against repo_dir.
 
     Constructs a SkillConfig from skill_name (loading instructions from the asset loader)
     and delegates to run_skill.
@@ -148,8 +148,13 @@ def run_skill(
 
     Returns the path to the generated report file, or None if no report was written.
     """
+    from utils.tool_utils import get_read_asset_tool
+
     instructions = load_skill_instructions(skill.name, skill.repo)
-    coro = _run_as_agent(repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp)
+    extra_tools = [get_read_asset_tool()] if skill.repo is None else None
+    coro = _run_as_agent(
+        repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp, extra_tools=extra_tools
+    )
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:

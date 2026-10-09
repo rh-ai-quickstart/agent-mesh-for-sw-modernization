@@ -673,7 +673,7 @@ def detect_languages(source_path: str) -> list:
     """Returns the list of programming languages detected in source_path."""
     import logging
 
-    from tools.skill.skill_util import run_skill_by_name
+    from tools.skill.skill_util import run_local_skill
     from utils import code_utils
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -689,7 +689,7 @@ def detect_languages(source_path: str) -> list:
             )
 
             try:
-                run_skill_by_name("add-languages", source_path)
+                run_local_skill("add-languages", source_path)
             except Exception:
                 logging.error("add-languages skill failed", exc_info=True)
 
@@ -704,7 +704,7 @@ def detect_languages(source_path: str) -> list:
 
         if not languages:
 
-            raise Exception(f"No supported languages detected in source_path=" f"'{source_path}'.")
+            raise Exception(f"No supported languages detected in source_path='{source_path}'.")
 
     return languages
 
