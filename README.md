@@ -20,15 +20,16 @@ Analyze legacy code with GraphRAG on Red Hat OpenShift AI to uncover dependencie
   - [3. Configure the environment](#3-configure-the-environment)
   - [4. Install on OpenShift AI](#4-install-on-openshift-ai)
   - [5. Ask a question using the prebuilt index](#5-ask-a-question-using-the-prebuilt-index)
-  - [6. Run your first code analysis](#6-run-your-first-code-analysis)
-    - [6.1 Analyze the sample repository](#61-analyze-the-sample-repository)
-    - [6.2 Review the modernization results](#62-review-the-modernization-results)
-    - [6.3 Ask questions about the code](#63-ask-questions-about-the-code)
-  - [7. Analyze multiple repositories](#7-analyze-multiple-repositories)
-  - [8. Analyze your own repositories](#8-analyze-your-own-repositories)
-  - [9. Explore the optional console](#9-explore-the-optional-console)
-  - [10. What you've accomplished](#10-what-youve-accomplished)
-  - [11. Delete](#11-delete)
+  - [6. Generate a migration report using the prebuilt index](#6-generate-a-migration-report-using-the-prebuilt-index)
+  - [7. Run your first code analysis](#7-run-your-first-code-analysis)
+    - [7.1 Analyze the sample repository](#71-analyze-the-sample-repository)
+    - [7.2 Review the modernization results](#72-review-the-modernization-results)
+    - [7.3 Ask questions about the code](#73-ask-questions-about-the-code)
+  - [8. Analyze multiple repositories](#8-analyze-multiple-repositories)
+  - [9. Analyze your own repositories](#9-analyze-your-own-repositories)
+  - [10. Explore the optional console](#10-explore-the-optional-console)
+  - [11. What you've accomplished](#11-what-youve-accomplished)
+  - [12. Delete](#12-delete)
 - [Reference](#reference)
   - [How the workflow works](#how-the-workflow-works)
   - [Configuration variables](#configuration-variables)
@@ -110,12 +111,12 @@ The architecture illustrates the path from raw source code through automated dat
 ### Minimum hardware requirements
 
 
-| Resource                   | Minimum or example                                                  | Used for                                          |
-| -------------------------- | ------------------------------------------------------------------- | ------------------------------------------------- |
-| CPU and memory             | 8+ vCPUs and 24+ GiB RAM                                            | Quickstart workloads, separate from model serving |
-| Persistent storage         | Default `StorageClass` able to provision a 50 GiB ReadWriteOnce PVC | S4-backed S3-compatible object storage             |
-| NVIDIA L40S GPU            | 1, if hosting the example `gpt-oss-120b` endpoint                   | GraphRAG chat model                               |
-| NVIDIA L40S GPU            | 1, if hosting the example `e5-mistral-7b-instruct` endpoint         | Embedding model                                   |
+| Resource           | Minimum or example                                                  | Used for                                          |
+| ------------------ | ------------------------------------------------------------------- | ------------------------------------------------- |
+| CPU and memory     | 8+ vCPUs and 24+ GiB RAM                                            | Quickstart workloads, separate from model serving |
+| Persistent storage | Default `StorageClass` able to provision a 50 GiB ReadWriteOnce PVC | S4-backed S3-compatible object storage            |
+| NVIDIA L40S GPU    | 1, if hosting the example `gpt-oss-120b` endpoint                   | GraphRAG chat model                               |
+| NVIDIA L40S GPU    | 1, if hosting the example `e5-mistral-7b-instruct` endpoint         | Embedding model                                   |
 
 
 If you use existing OpenAI-compatible model endpoints, their GPUs do not need
@@ -174,10 +175,10 @@ Provide reachable OpenAI-compatible endpoints for the chat and embedding
 roles. These model guides show example deployments:
 
 
-| Role                    | Example                            | Guide                                                                              |
-| ----------------------- | ---------------------------------- | ---------------------------------------------------------------------------------- |
-| GraphRAG chat           | `gpt-oss-120b`                     | [Deploy the chat model](resources/models/deploying-gpt-oss-120b.md)                |
-| GraphRAG embeddings     | `e5-mistral-7b-instruct`           | [Deploy the embedding model](resources/models/deploying-e5-mistral-7b-instruct.md) |
+| Role                | Example                  | Guide                                                                              |
+| ------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| GraphRAG chat       | `gpt-oss-120b`           | [Deploy the chat model](resources/models/deploying-gpt-oss-120b.md)                |
+| GraphRAG embeddings | `e5-mistral-7b-instruct` | [Deploy the embedding model](resources/models/deploying-e5-mistral-7b-instruct.md) |
 
 
 You can have `make install` deploy the bundled embedding model instead of
@@ -236,11 +237,50 @@ wrappers/adhoc.sh \
 
 The wrapper prints the answer when the query job completes.
 
-### 6. Run your first code analysis
+### 6. Generate a migration report using the prebuilt index
 
-#### 6.1 Analyze the sample repository
+You can generate a migration report from the same prebuilt Tic-Tac-Toe index
+without running data generation or indexing. Submit the single-repository
+pipeline with `--analysis-only`:
 
-To analyze the sample Tic-Tac-Toe repository, submit its single-repository pipeline:
+```sh
+make run-pipelines ARGS="--single-repo --analysis-only" \
+  PIPELINE_GIT_REPO=https://github.com/agapebondservant/tic-tac-toe-sample \
+  PIPELINE_GIT_BRANCH=main
+```
+
+The command submits an analysis-only run and prints its run ID. In your
+OpenShift AI project's **Develop & train > Pipelines > Runs** view, wait for
+the run to succeed. This run skips data generation and indexing and uses the
+existing index to produce the report.
+
+![Openshift AI analysis only pipeline](docs/images/analysis_only_pipeline.png)
+
+Once the pipeline is marked as completed, you can open the completed run in MLflow and inspect the analysis
+task's Markdown migration report.
+
+![Analysis only MLflow report](docs/images/analysis_only_mlflow_report.png)
+
+Look for the components and dependencies it
+identifies, then compare its suggested migration order with the sample source
+code. The report is also available through the optional Code Understanding
+console, where a completed run can be expanded and its analysis downloaded.
+
+The report gives you a starting point for discussion, not an automatic code
+change.
+
+**Expected outcome:** a Markdown migration report is available without
+rebuilding the prebuilt index.
+
+### 7. Run your first code analysis
+
+
+
+#### 7.1 Analyze the sample repository
+
+To analyze the sample Tic-Tac-Toe repository from scratch, submit its
+single-repository pipeline. This run generates data and builds a new index
+before producing the migration report:
 
 ```sh
 make run-pipelines ARGS="--single-repo" \
@@ -252,35 +292,27 @@ The command submits a run named `single_repo_<timestamp>` and prints its run
 ID. Submission is not pipeline completion. In your OpenShift AI project's
 Pipelines view, wait for that run to succeed before reviewing its report. You can find this by navigating to **Develop & train > Pipelines > Runs** in the Openshift AI console. 
 
-![Openshift AI Pipelines](docs/images/pipelines.png)
+![Openshift AI single repo pipeline](docs/images/single_repo_pipeline.png)
 
 This step can take a while. GraphRAG indexing is compute-intensive, and the
 run time depends on the repository size and the resources available to the
 pipeline.
 
-**Expected outcome:** the run reaches **Succeeded** after data generation,
+**Expected outcome:** the run reaches **Complete** after data generation,
 indexing, and analysis finish.
 
+#### 7.2 Review the modernization results
 
-
-#### 6.2 Review the modernization results
-
-![Openshift AI Pipelines](docs/images/mlflow_report.png)
+![Single-repo MLflow report](docs/images/single_repo_mlflow_report.png)
 
 Open the completed run in MLflow and inspect the analysis
-task's Markdown migration report. Look for the components and dependencies it
-identifies, then compare its suggested migration order with the sample source
-code. The report is also available through the optional Code Understanding
-console, where a completed run can be expanded and its analysis downloaded.
-
-The report gives you a starting point for discussion, not an automatic code
-change. If the run fails, inspect the failed pipeline task before moving to
+task's Markdown migration report. It should look similar to the one generated by the analysis-only pipeline. If the run fails, inspect the failed pipeline task before moving to
 the query step.
 
 **Expected outcome:** a Markdown migration report is available for the sample
 repository.
 
-#### 6.3 Ask questions about the code
+#### 7.3 Ask questions about the code
 
 You can use the same command as earlier to ask additional questions targeting the index you just created:
 
@@ -298,42 +330,35 @@ a multi-repository index, which may not exist yet.
 
 **Expected outcome:** the terminal prints an answer about the selected repository.
 
-### 7. Analyze multiple repositories
+### 8. Analyze multiple repositories
 
 You can run the same pipeline on multiple repositories to build a combined
 index and compare dependencies that may affect migration order.
 
-For this example, use two related Java applications: [North Pole Southern Train](https://github.com/kfrankli/northpolesouthern-train) and [North Pole Southern Timetable](https://github.com/kfrankli/northpolesouthern-timetable). The checked-in [repo_list.json](workflows/examples/code_understanding/assets/repos/repo_list.json) contains other examples, so replace its contents with these two entries. Each entry has a `git_repo` URL and a `git_branch` value.
-
-Your [repo_list.json](workflows/examples/code_understanding/assets/repos/repo_list.json) should look like this:
-```json
-[
-    {
-        "git_repo": "https://github.com/kfrankli/northpolesouthern-train",
-        "git_branch": "main"
-    },
-    {
-        "git_repo": "https://github.com/kfrankli/northpolesouthern-timetable",
-        "git_branch": "main"
-    }
-]
-```
-
-Then upload the updated list and submit the multi-repository pipeline:
+The checked-in [repo_list.json](workflows/examples/code_understanding/assets/repos/repo_list.json)
+contains two related Java applications: [North Pole Southern Train](https://github.com/kfrankli/northpolesouthern-train)
+and [North Pole Southern Timetable](https://github.com/kfrankli/northpolesouthern-timetable).
+Each entry has a `git_repo` URL and a `git_branch` value. Apply this list and
+submit the multi-repository pipeline:
 
 ```sh
 make apply-secrets
 make run-pipelines ARGS="--multi-repo"
 ```
 
-After the run succeeds, review its combined migration report. To ask a question
-across the combined index, omit the repository flags:
+After the run succeeds, review its combined migration report in MLflow.
+
+![Multi-repo migration report](docs/images/multi_repo_mlflow_report.png)
+
+To ask a question across the combined index, omit the repository flags:
 
 ```sh
 wrappers/adhoc.sh "Which repositories share dependencies that affect migration order?"
 ```
 
-### 8. Analyze your own repositories
+
+
+### 9. Analyze your own repositories
 
 For a single-repository analysis, set `GIT_REPO` and `GIT_BRANCH` in `.env` to
 your repository URL and branch. For a multi-repository analysis, edit
@@ -348,13 +373,15 @@ make run-pipelines ARGS="--single-repo" # use --multi-repo for a repository list
 ```
 
 After the run succeeds, review its Markdown migration report. To query the
-resulting index, use the single-repository command from section 6.3 or the
-multi-repository command from section 7, depending on the run. The analysis
+resulting index, use the single-repository command from section 7.3 or the
+multi-repository command from section 8, depending on the run. The analysis
 reads source code and does not modify your repositories.
 
-### 9. Explore the optional console
+### 10. Explore the optional console
 
-#### 9.1 Deploying the console
+
+
+#### 10.1 Deploying the console
 
 The standalone Code Understanding console offers a visual way to select
 repositories, start analysis, inspect reports, and ask questions. To deploy the application:
@@ -369,32 +396,32 @@ An OpenShift console plugin is also available for administrators. It requires
 OpenShift 4.21 or later and cluster-wide console permissions. Deploy it with
 `make deploy-console-plugin`; the target enables the plugin and prints its URL.
 
-#### 9.2 Console overview
+#### 10.2 Console overview
 
 ![Console repositories tab](docs/images/console_repositories.png)
 
 The **Repositories** tab shows a list of example repositories to run the analysis on. You can add your own using the input box on the bottom.
 
-#### 9.3 Running analysis and viewing reports
+#### 10.3 Running analysis and viewing reports
 
 ![Console analysis tab](docs/images/console_analysis.png)
 
 On the left-hand side, you should be able to see the run you just completed under **Recent Runs**. Clicking on the report option will bring you to the **Analysis** tab and display the generated report. You can also use this tab to run analysis on the selected repositories in the **Repositories** tab.
 
-#### 9.4 Chat interface
+#### 10.4 Chat interface
 
 ![Console chat tab](docs/images/console_chat.png)
 
 Navigating to the **Chat** tab will allow you to ask questions on repositories you have indexed to obtain GraphRAG-informed responses. Test it out with the sample queries provided, or you can bring in your own questions!
 
-### 10. What you've accomplished
+### 11. What you've accomplished
 
 You have deployed the Code Understanding workflow, run its three pipeline
 stages on a sample repository, examined a migration report, and asked a
 follow-up question grounded in the indexed code. You can now analyze your own
 repository or compare several repositories in one combined index.
 
-### 11. Delete
+### 12. Delete
 
 When you have finished, run:
 
@@ -409,6 +436,8 @@ namespaces remain. Externally stored MLflow data, externally pushed container
 images, and the optional cluster-wide OpenShift console plugin also remain.
 
 ## Reference
+
+
 
 ### How the workflow works
 
@@ -497,3 +526,4 @@ image tags in `.env` before deploying those images. Set
 - **Product:** Red Hat OpenShift AI
 - **Use case:** Application modernization, code understanding, generative AI
 - **Contributor organization:** Red Hat
+
