@@ -7,7 +7,7 @@ description: >
   configuration. Outputs are written under .enrichments/.assets/ so they can be
   uploaded and applied by downstream pipeline stages.
 license: Apache-2.0
-compatibility: Requires list_directory, read_file, write_file tools.
+compatibility: Requires list_directory, read_file, write_file, read_asset tools.
 metadata:
   version: "1.0"
   skills: []
@@ -27,6 +27,8 @@ liquid, twig, blade
 Focus only on languages NOT in the list above. If no unsupported languages are found, stop here and write no output files.
 
 ## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
+
+Use read_asset with path `mappings/language_mappings.json` to read the existing language mappings. Use it as a reference for the expected structure and to confirm which languages are already present.
 
 For each unsupported language identified in Step 1, generate entries for all six sections below. Use your knowledge of the language to produce accurate values. The output JSON must contain ONLY the new entries — do not repeat already-supported languages.
 
@@ -89,9 +91,9 @@ Write the complete result as a single valid JSON object to:
 
 ## Step 3 — Write .enrichments/.assets/graphrag/extract_graph.txt
 
-Review the Microsoft GraphRAG configuration file at workflows/examples/code_understanding/assets/graphrag/extract_graph.txt.
+Use read_asset with path `graphrag/extract_graph.txt` to read the base Microsoft GraphRAG configuration file.
 Assume that the chat model used is gpt-oss-120b.
-Given this, update extract_graph.txt so that it also supports the languages identified in Step 1.
+Given this, update the configuration file so that it also supports the languages identified in Step 1.
 The changes should be additive where possible, and try to keep them concise.
 
 Write the complete updated file to:

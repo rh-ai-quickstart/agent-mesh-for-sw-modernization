@@ -26,19 +26,19 @@ async def _run_as_agent(
     extra_tools: list | None = None,
 ) -> None:
     from langchain.agents import AgentExecutor, create_tool_calling_agent
-    from langchain_community.agent_toolkits import FileManagementToolkit
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_openai import ChatOpenAI
+    from utils.tool_utils import SafeFileManagementToolkit, get_read_asset_tool
 
     llm = ChatOpenAI(
         model=os.environ["CODE_LLM_ID"],
         base_url=os.environ["CODE_LLM_API_BASE"],
         api_key=os.environ["CODE_LLM_TOKEN"],
     )
-    tools = FileManagementToolkit(
+    tools = SafeFileManagementToolkit(
         root_dir=repo_dir,
         selected_tools=["read_file", "write_file", "list_directory"],
-    ).get_tools()
+    ).get_tools() + [get_read_asset_tool()]
     if extra_tools:
         tools = tools + extra_tools
     prompt = ChatPromptTemplate.from_messages(
