@@ -93,9 +93,12 @@ Do NOT attempt to read the output path before writing — the file will not exis
 
 ## Step 3 — Write .enrichments/.assets/graphrag/extract_graph.txt
 
-Use read_asset with path `graphrag/extract_graph.txt` to read the base Microsoft GraphRAG configuration file.
+The base GraphRAG configuration is stored in the pipeline asset store, not in the customer repository.
+Use the read_asset tool (NOT read_file) with path `graphrag/extract_graph.txt` to retrieve it.
+Do not attempt to locate this file via list_directory or read_file — it will not be found that way.
+
+Once read, update the configuration file so that it also supports the languages identified in Step 1.
 Assume that the chat model used is gpt-oss-120b.
-Given this, update the configuration file so that it also supports the languages identified in Step 1.
 The changes should be additive where possible, and try to keep them concise.
 
 Do NOT attempt to read the output path before writing. Use write_file to create it directly at:
