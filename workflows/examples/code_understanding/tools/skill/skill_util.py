@@ -150,6 +150,8 @@ def run_skill(
     """
     from utils.tool_utils import get_read_asset_tool
 
+    logging.info("Running skill: %s", skill.name)
+
     instructions = load_skill_instructions(skill.name, skill.repo)
     extra_tools = [get_read_asset_tool()] if skill.repo is None else None
     coro = _run_as_agent(

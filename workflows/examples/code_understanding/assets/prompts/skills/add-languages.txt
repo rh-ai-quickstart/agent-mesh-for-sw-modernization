@@ -24,7 +24,9 @@ java, python, c++, c, javascript, sql, ruby, shell, ansible, terraform, cloudfor
 jsp, freemarker, velocity, xslt, django, jinja2, handlebars, pug, ejs, nunjucks, mustache, erb,
 liquid, twig, blade
 
-Focus only on languages NOT in the list above. If no unsupported languages are found, stop here and write no output files.
+Check each language found strictly against the list above. Do not assume a language is supported unless it appears explicitly in the list.
+
+Once the scan is complete, produce an explicit list of unsupported languages before proceeding. If the list is empty, stop here and write no output files. Otherwise continue to Step 2.
 
 ## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
 
