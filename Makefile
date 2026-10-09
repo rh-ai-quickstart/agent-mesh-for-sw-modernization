@@ -184,6 +184,8 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 	helm-template \
 	verify-secrets \
 	verify-deploy \
+	test-ui \
+	test-workflows \
 	test-all \
 	format \
 	lint \
@@ -647,9 +649,35 @@ verify-deploy: verify-secrets
 	fi; \
 	echo "verify-deploy: PASS namespace=$$VERIFY_NAMESPACE release=$(RELEASE)"
 
-test-all:
+test-ui-unit:
 	@echo "==> Running UI tests..."
 	uv run --project ui --frozen pytest ui/tests
+
+test-workflows:
+	@echo "==> Running workflow pipeline tests..."
+	uv run --project workflows/examples/code_understanding --group test --frozen \
+		pytest tests/workflows
+
+test-all: test-ui-unit test-workflows
+
+test-ui-install:
+	@echo "==> Installing Playwright and Chromium for UI smoke tests..."
+	$(E2E_UI_INSTALL_CMD)
+
+test-ui:
+	@set -eu; \
+	KFP_NAMESPACE="$(KFP_NAMESPACE)"; export KFP_NAMESPACE; \
+	: "$${KFP_NAMESPACE:?ERROR: set KFP_NAMESPACE in the environment or pass KFP_NAMESPACE=<namespace> to make}"; \
+	echo "==> Checking deployed Code Understanding console in namespace $$KFP_NAMESPACE..."; \
+	oc get deployment code-understanding-console -n "$$KFP_NAMESPACE" >/dev/null; \
+	oc rollout status deployment/code-understanding-console -n "$$KFP_NAMESPACE" --timeout=300s; \
+	ROUTE_HOST="$$(oc get route code-understanding-console -n "$$KFP_NAMESPACE" -o jsonpath='{.spec.host}')"; \
+	if [ -z "$$ROUTE_HOST" ]; then echo "ERROR: Route code-understanding-console has no host in namespace $$KFP_NAMESPACE." >&2; exit 1; fi; \
+	if [ -z "$$UI_URL" ]; then export UI_URL="https://$$ROUTE_HOST"; fi; \
+	export KFP_NAMESPACE; \
+	echo "==> Testing console UI at $$UI_URL"; \
+	$(MAKE) test-ui-install; \
+	$(E2E_UI_TEST_CMD)
 
 # ============================================================================
 # Utility commands
@@ -1066,25 +1094,6 @@ deploy-console-app:
 port-forward-console-app:
 	@echo "==> Forwarding http://localhost:8080 -> code-understanding-console:8080" && \
 	oc port-forward svc/code-understanding-console 8080:8080 -n $(KFP_NAMESPACE)
-
-test-ui-install:
-	@echo "==> Installing Playwright and Chromium for UI smoke tests..."
-	$(E2E_UI_INSTALL_CMD)
-
-test-ui:
-	@set -eu; \
-	KFP_NAMESPACE="$(KFP_NAMESPACE)"; export KFP_NAMESPACE; \
-	: "$${KFP_NAMESPACE:?ERROR: set KFP_NAMESPACE in the environment or pass KFP_NAMESPACE=<namespace> to make}"; \
-	echo "==> Checking deployed Code Understanding console in namespace $$KFP_NAMESPACE..."; \
-	oc get deployment code-understanding-console -n "$$KFP_NAMESPACE" >/dev/null; \
-	oc rollout status deployment/code-understanding-console -n "$$KFP_NAMESPACE" --timeout=300s; \
-	ROUTE_HOST="$$(oc get route code-understanding-console -n "$$KFP_NAMESPACE" -o jsonpath='{.spec.host}')"; \
-	if [ -z "$$ROUTE_HOST" ]; then echo "ERROR: Route code-understanding-console has no host in namespace $$KFP_NAMESPACE." >&2; exit 1; fi; \
-	if [ -z "$$UI_URL" ]; then export UI_URL="https://$$ROUTE_HOST"; fi; \
-	export KFP_NAMESPACE; \
-	echo "==> Testing console UI at $$UI_URL"; \
-	$(MAKE) test-ui-install; \
-	$(E2E_UI_TEST_CMD)
 
 # ============================================================================
 # OpenShift console plugin
