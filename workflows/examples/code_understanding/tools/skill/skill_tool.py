@@ -18,7 +18,16 @@ def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
 
     @tool
     def run_skill(skill_name: str, repo: str, target_dir: str | None = None) -> str:
-        """Run a skill against the repository. Skips if a report already exists in target_dir."""
+        """Fetch a skill by name from a remote skills repository URL and run it.
+
+        Args:
+            skill_name: Name of the skill to run.
+            repo:       URL of the remote Git repository that hosts the skill (e.g.
+                        https://github.com/org/skills-repo). Must be a remote URL, not a
+                        local path.
+            target_dir: Optional subdirectory within the repository to write the report to.
+        Skips execution if a report already exists in target_dir.
+        """
         from tools.skill.skill_util import SkillConfig
         from tools.skill.skill_util import run_skill as _run_skill
 
