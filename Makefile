@@ -72,7 +72,7 @@ CONSOLE_PLUGIN_IMAGE_NAME            ?= agent-mesh-for-sw-modernization-console-
 CONSOLE_ROUTE_HOST                   ?=
 # Shared fallback for image tags omitted from .env. VERSION overrides these
 # tags for build/push only.
-BASE_VERSION                         ?= v0.1.2
+BASE_VERSION                         ?= v0.1.3
 KFP_DATA_GENERATION_BASE_IMAGE_TAG   ?= $(BASE_VERSION)
 KFP_INDEXING_BASE_IMAGE_TAG          ?= $(BASE_VERSION)
 KFP_ANALYSIS_BASE_IMAGE_TAG          ?= $(BASE_VERSION)
