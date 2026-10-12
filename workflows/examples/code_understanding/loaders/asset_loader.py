@@ -9,11 +9,13 @@ class AssetLoader(ABC):
     _ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
     _PROMPTS_DIR = os.path.join(_ASSETS_DIR, "prompts")
 
+    ENRICHMENTS_DIR = ".enrichments"
+
     RESULTS_PATH_PREFIX_EVAL = "results/evaluations"
     RESULTS_PATH_PREFIX_PIPELINES = "results/pipelines"
     RESULTS_PATH_PREFIX_ADHOC_QUERIES = "results/adhoc_queries"
     RESULTS_PATH_PREFIX_METADATA = "results/metadata"
-    RESULTS_PATH_PREFIX_ENRICHMENTS = "results/enrichments"
+    RESULTS_PATH_PREFIX_ENRICHMENTS = f"results/{ENRICHMENTS_DIR}"
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
 
@@ -78,13 +80,20 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+    def load_results(
+        self,
+        download_dir: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        git_slug: str | None = None,
+    ):
         """Downloads previously logged results to download_dir.
 
         Args:
             download_dir: Local directory path to download results into.
             artifact_path: Subdirectory within the run's artifact store to download from.
             tags: Optional key-value tags to filter which run to download from.
+            git_slug: Optional repository slug passed to the underlying download_dir call.
         """
 
     @abstractmethod

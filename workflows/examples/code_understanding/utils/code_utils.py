@@ -9,12 +9,13 @@ from pygments.util import ClassNotFound
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from loaders.asset_loader import AssetLoader  # noqa: E402
 from loaders.default_asset_loader import DefaultAssetLoader  # noqa: E402
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 CODE_METADATA_DIR = ".code_metadata"
-ENRICHMENTS_DIR = ".enrichments"
+ENRICHMENTS_DIR = AssetLoader.ENRICHMENTS_DIR
 LANGUAGE_MAPPINGS_ASSET_PATH = f"{ENRICHMENTS_DIR}/.assets/mappings/language_mappings.json"
 
 

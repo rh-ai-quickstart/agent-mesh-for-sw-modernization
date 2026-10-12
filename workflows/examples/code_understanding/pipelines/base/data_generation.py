@@ -84,11 +84,9 @@ def prepare_enrichments(source_path: str, git_repo: str, git_branch: str):
 
     DefaultAssetLoader().load_results(
         download_dir=os.path.join(source_path, code_utils.ENRICHMENTS_DIR),
-        artifact_path=DefaultAssetLoader.get_log_results_artifact_path(
-            DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
-            git_slug=git_slug,
-        ),
+        artifact_path=DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
         tags={"git_slug": git_slug, "category": "data-generation"},
+        git_slug=git_slug,
     )
 
 

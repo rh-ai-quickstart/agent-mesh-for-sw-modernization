@@ -130,11 +130,7 @@ class MlFlowAssetLoader(AssetLoader):
         asset_tags: dict | None,
     ) -> list:
         """Returns the ordered list of (path, experiment_name, tags) candidates to try."""
-        from loaders.asset_loader import AssetLoader
-
-        enrichment_path = (
-            f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}" f"/{git_slug}/.assets/{asset_path}"
-        )
+        enrichment_path = f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets/{asset_path}"
         return [
             (
                 enrichment_path,
@@ -209,6 +205,8 @@ class MlFlowAssetLoader(AssetLoader):
             asset_dir_path, git_slug, experiment_name, asset_tags
         )
 
+        parent_dir = os.path.dirname(os.path.abspath(download_dir))
+
         for path, exp_name, tags in candidates:
             try:
 
@@ -216,10 +214,9 @@ class MlFlowAssetLoader(AssetLoader):
                     path, experiment_name=exp_name, tags=tags
                 )
 
-                mlflow.artifacts.download_artifacts(
-                    artifact_uri=asset_uri,
-                    dst_path=download_dir,
-                )
+                os.makedirs(parent_dir, exist_ok=True)
+
+                mlflow.artifacts.download_artifacts(artifact_uri=asset_uri, dst_path=parent_dir)
 
                 return True
 
@@ -233,7 +230,13 @@ class MlFlowAssetLoader(AssetLoader):
 
         raise Exception(f"Asset {asset_dir_path} not found.")
 
-    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+    def load_results(
+        self,
+        download_dir: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        git_slug: str | None = None,
+    ):
         """Downloads a previously logged result directory from MLflow to download_dir.
 
         Silently skips if no prior results exist (e.g. on first run).
@@ -244,6 +247,7 @@ class MlFlowAssetLoader(AssetLoader):
                 download_dir,
                 experiment_name=self.RESULT_DIRECTORY_ASSET_EXPERIMENT,
                 asset_tags=tags,
+                git_slug=git_slug,
             )
             logging.info("Loaded prior results from %s to %s", artifact_path, download_dir)
             return result
@@ -440,10 +444,7 @@ class MlFlowAssetLoader(AssetLoader):
         os.makedirs(enrichments_dir, exist_ok=True)
         kwargs = {}
         if git_slug:
-            kwargs["artifact_path"] = self.get_log_results_artifact_path(
-                self.RESULTS_PATH_PREFIX_ENRICHMENTS,
-                git_slug=git_slug,
-            )
+            kwargs["artifact_path"] = self.RESULTS_PATH_PREFIX_ENRICHMENTS
             kwargs["tags"] = {"git_slug": git_slug, "category": "data-generation"}
         self.log_results(enrichments_dir, **kwargs)
         return f"Logged enrichments from {enrichments_dir}"

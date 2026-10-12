@@ -36,9 +36,7 @@ class DefaultAssetLoader(AssetLoader):
 
         asset_file_path = normalize_asset_path(asset_file_path)
 
-        return load_local_enrichments(
-            download_dir, asset_file_path
-        ) or self._loader.download(
+        return load_local_enrichments(download_dir, asset_file_path) or self._loader.download(
             asset_file_path,
             download_dir,
             experiment_name=experiment_name,
@@ -68,9 +66,17 @@ class DefaultAssetLoader(AssetLoader):
             git_slug=git_slug,
         )
 
-    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+    def load_results(
+        self,
+        download_dir: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        git_slug: str | None = None,
+    ):
+        if download_dir and os.path.isdir(download_dir) and os.listdir(download_dir):
+            return True
 
-        return self._loader.load_results(download_dir, artifact_path, tags)
+        return self._loader.load_results(download_dir, artifact_path, tags, git_slug)
 
     def log_results(
         self,

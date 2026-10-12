@@ -80,7 +80,13 @@ class LocalAssetLoader(AssetLoader):
 
             raise e
 
-    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+    def load_results(
+        self,
+        download_dir: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        git_slug: str | None = None,
+    ):
         """No-op. Local results are already on disk and require no download step."""
         pass
 
