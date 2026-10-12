@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import traceback
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -121,12 +122,35 @@ class MlFlowAssetLoader(AssetLoader):
 
         return client.get_experiment(client.create_experiment(name=experiment_name))
 
+    def _get_download_candidate_metadata(
+        self,
+        asset_path: str,
+        git_slug: str | None,
+        experiment_name: str | None,
+        asset_tags: dict | None,
+    ) -> list:
+        """Returns the ordered list of (path, experiment_name, tags) candidates to try."""
+        from loaders.asset_loader import AssetLoader
+
+        enrichment_path = (
+            f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}" f"/{git_slug}/.assets/{asset_path}"
+        )
+        return [
+            (
+                enrichment_path,
+                self.RESULT_DIRECTORY_ASSET_EXPERIMENT,
+                {"git_slug": git_slug, "category": "data-generation"},
+            ),
+            (asset_path, experiment_name or self.STATIC_ASSET_EXPERIMENT, asset_tags),
+        ]
+
     def download(
         self,
         asset_file_path: str,
         download_dir: str = None,
-        experiment_name=STATIC_ASSET_EXPERIMENT,
+        experiment_name=None,
         asset_tags: dict = None,
+        git_slug: str = None,
     ):
         """Downloads and returns the asset from the MLflow artifacts registry.
 
@@ -136,69 +160,78 @@ class MlFlowAssetLoader(AssetLoader):
             download_dir: Optional directory path to download the artifact to.
             experiment_name: The name of the MLflow experiment to search for the asset.
             asset_tags: Optional tags to filter the asset by.
+            git_slug: Optional repository slug for enrichments-aware resolution.
 
         Returns:
             The asset content (parsed dict for .json files, str otherwise), or None if not found.
         """
-        try:
+        candidates = self._get_download_candidate_metadata(
+            asset_file_path, git_slug, experiment_name, asset_tags
+        )
 
-            import shutil
+        for path, exp_name, tags in candidates:
 
-            asset_uri = self._get_absolute_artifact_uri(
-                asset_file_path, experiment_name=experiment_name, tags=asset_tags
-            )
+            try:
 
-            local_path = mlflow.artifacts.download_artifacts(artifact_uri=asset_uri)
+                asset_uri = self._get_absolute_artifact_uri(
+                    path, experiment_name=exp_name, tags=tags
+                )
 
-            if not os.path.exists(local_path):
+                local_path = mlflow.artifacts.download_artifacts(
+                    artifact_uri=asset_uri,
+                    dst_path=download_dir,
+                )
 
-                logging.info(f"Asset {asset_uri} not found.")
+                with open(local_path, "r") as f:
 
-                return None
+                    return json.load(f) if asset_uri.endswith(".json") else f.read()
 
-            if download_dir is not None:
+            except Exception:
 
-                os.makedirs(download_dir, exist_ok=True)
+                logging.info(
+                    "Asset %s not found, trying next candidate: %s",
+                    path,
+                    traceback.format_exc(),
+                )
 
-                shutil.copy2(local_path, os.path.join(download_dir, os.path.basename(local_path)))
-
-            with open(local_path, "r") as f:
-
-                return json.load(f) if asset_uri.endswith(".json") else f.read()
-
-        except Exception as e:
-
-            logging.error(f"Error downloading asset {asset_file_path}: {e}")
-
-            raise e
+        return None
 
     def download_dir(
         self,
         asset_dir_path: str,
         download_dir: str,
-        experiment_name=STATIC_ASSET_EXPERIMENT,
+        experiment_name=None,
         asset_tags: dict = None,
+        git_slug: str = None,
     ):
         """Downloads a directory from the MLflow artifacts registry to a local directory."""
-        try:
+        candidates = self._get_download_candidate_metadata(
+            asset_dir_path, git_slug, experiment_name, asset_tags
+        )
 
-            import shutil
+        for path, exp_name, tags in candidates:
+            try:
 
-            asset_uri = self._get_absolute_artifact_uri(
-                asset_dir_path, experiment_name=experiment_name, tags=asset_tags
-            )
+                asset_uri = self._get_absolute_artifact_uri(
+                    path, experiment_name=exp_name, tags=tags
+                )
 
-            local_path = mlflow.artifacts.download_artifacts(artifact_uri=asset_uri)
+                mlflow.artifacts.download_artifacts(
+                    artifact_uri=asset_uri,
+                    dst_path=download_dir,
+                )
 
-            os.makedirs(download_dir, exist_ok=True)
+                return True
 
-            shutil.copytree(local_path, download_dir, dirs_exist_ok=True)
+            except Exception:
 
-        except Exception as e:
+                logging.info(
+                    "Asset %s not found, trying next candidate: %s",
+                    path,
+                    traceback.format_exc(),
+                )
 
-            logging.error(f"Error downloading asset directory {asset_dir_path}: {e}")
-
-            raise e
+        raise Exception(f"Asset {asset_dir_path} not found.")
 
     def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
         """Downloads a previously logged result directory from MLflow to download_dir.
@@ -206,13 +239,14 @@ class MlFlowAssetLoader(AssetLoader):
         Silently skips if no prior results exist (e.g. on first run).
         """
         try:
-            self.download_dir(
+            result = self.download_dir(
                 artifact_path,
                 download_dir,
                 experiment_name=self.RESULT_DIRECTORY_ASSET_EXPERIMENT,
                 asset_tags=tags,
             )
             logging.info("Loaded prior results from %s to %s", artifact_path, download_dir)
+            return result
         except Exception as e:
             logging.info("No prior results to load from %s: %s", artifact_path, e)
 
@@ -399,6 +433,20 @@ class MlFlowAssetLoader(AssetLoader):
             logging.error(f"Error loading prompt {prompt_path}: {e}")
 
             raise e
+
+    def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
+        """Persists the enrichments directory to the MLflow pipeline asset store."""
+        enrichments_dir = os.path.join(repo_dir, ".enrichments")
+        os.makedirs(enrichments_dir, exist_ok=True)
+        kwargs = {}
+        if git_slug:
+            kwargs["artifact_path"] = self.get_log_results_artifact_path(
+                self.RESULTS_PATH_PREFIX_ENRICHMENTS,
+                git_slug=git_slug,
+            )
+            kwargs["tags"] = {"git_slug": git_slug, "category": "data-generation"}
+        self.log_results(enrichments_dir, **kwargs)
+        return f"Logged enrichments from {enrichments_dir}"
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of prompts in the MLflow registry matching the given prefix."""

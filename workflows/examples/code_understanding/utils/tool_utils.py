@@ -38,7 +38,7 @@ class SafeFileManagementToolkit:
         return self._patch_tools(tools)
 
 
-def get_log_enrichments_tool(enrichments_dir: str, git_slug: str | None = None):
+def get_log_enrichments_tool(repo_dir: str, git_slug: str | None = None):
     """Return a LangChain tool that logs the enrichments directory to the pipeline asset store.
 
     The returned tool is a no-argument callable suitable for injection into a skill agent or
@@ -46,8 +46,8 @@ def get_log_enrichments_tool(enrichments_dir: str, git_slug: str | None = None):
     skill outputs written under .enrichments/ persist across pipeline runs.
 
     Args:
-        enrichments_dir: Absolute path to the .enrichments directory to log.
-        git_slug:        Optional repository slug used to namespace the artifact path and tags.
+        repo_dir:  Root of the cloned repository; .enrichments/ is derived from this path.
+        git_slug:  Optional repository slug used to namespace the artifact path and tags.
     """
     from langchain_core.tools import tool
 
@@ -58,27 +58,24 @@ def get_log_enrichments_tool(enrichments_dir: str, git_slug: str | None = None):
         Call this after all output files have been written so they survive across pipeline runs.
         The note parameter is optional and ignored.
         """
-        import os
-
         from loaders.default_asset_loader import DefaultAssetLoader
 
-        os.makedirs(enrichments_dir, exist_ok=True)
-
-        kwargs = {}
-        if git_slug:
-            kwargs["artifact_path"] = DefaultAssetLoader.get_log_results_artifact_path(
-                DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
-                git_slug=git_slug,
-            )
-            kwargs["tags"] = {"git_slug": git_slug, "category": "data-generation"}
-        DefaultAssetLoader().log_results(enrichments_dir, **kwargs)
-        return f"Logged enrichments from {enrichments_dir}"
+        return DefaultAssetLoader().log_enrichments(repo_dir, git_slug)
 
     return log_enrichments
 
 
-def get_read_asset_tool():
-    """Return a LangChain tool that reads a file from the pipeline's asset directory."""
+def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None):
+    """Return a LangChain tool that reads a file from the pipeline's asset directory.
+
+    When repo_dir and/or git_slug are provided, the tool checks the local enrichments
+    folder (tier 1) and the MLflow enrichments experiment (tier 2) before falling back
+    to the static asset store (tier 3).
+
+    Args:
+        repo_dir:  Root of the cloned repository; used to locate .enrichments/.assets/.
+        git_slug:  Optional repository slug for MLflow enrichments namespacing.
+    """
     from langchain_core.tools import tool
 
     @tool
@@ -86,7 +83,7 @@ def get_read_asset_tool():
         """Read a file from the pipeline asset directory by its path relative to assets/."""
         from loaders.default_asset_loader import DefaultAssetLoader
 
-        content = DefaultAssetLoader().download(path)
+        content = DefaultAssetLoader().download(path, download_dir=repo_dir, git_slug=git_slug)
         if content is None:
             raise RuntimeError(f"Required asset not found: {path}")
         if isinstance(content, (dict, list)):

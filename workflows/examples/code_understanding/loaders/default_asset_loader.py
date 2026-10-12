@@ -6,10 +6,16 @@ from .mlflow_asset_loader import MlFlowAssetLoader
 
 
 class DefaultAssetLoader(AssetLoader):
-    """Delegates to LocalAssetLoader or MlFlowAssetLoader based on the ASSET_LOADER env var."""
+    """Delegates to LocalAssetLoader or MlFlowAssetLoader based on the ASSET_LOADER env var.
+
+    Enrichments-aware callers pass git_slug alongside download_dir (which must be the
+    repository root) to activate three-tier resolution:
+      1. Local <download_dir>/.enrichments/.assets/ — checked here before delegating.
+      2. MLflow enrichments experiment, keyed by git_slug — MlFlowAssetLoader only.
+      3. Default static-asset store — fallback for both loaders.
+    """
 
     def __init__(self, namespace: str = None):
-
         if os.getenv("ASSET_LOADER") == "mlflow":
 
             self._loader = MlFlowAssetLoader(namespace=namespace)
@@ -19,33 +25,48 @@ class DefaultAssetLoader(AssetLoader):
             self._loader = LocalAssetLoader()
 
     def download(
-        self, asset_file_path: str, download_dir: str = None, experiment_name=None, asset_tags=None
+        self,
+        asset_file_path: str,
+        download_dir: str = None,
+        experiment_name=None,
+        asset_tags=None,
+        git_slug: str | None = None,
     ):
-        _, sep, remainder = ("/" + asset_file_path).partition("/assets/")
-        if sep:
-            asset_file_path = remainder
+        from utils.loader_utils import load_local_enrichments, normalize_asset_path
 
-        if isinstance(self._loader, MlFlowAssetLoader):
-            kwargs = {}
-            if experiment_name is not None:
-                kwargs["experiment_name"] = experiment_name
-            if asset_tags is not None:
-                kwargs["asset_tags"] = asset_tags
-            return self._loader.download(asset_file_path, download_dir, **kwargs)
-        return self._loader.download(asset_file_path, download_dir)
+        asset_file_path = normalize_asset_path(asset_file_path)
+
+        return load_local_enrichments(
+            download_dir, asset_file_path
+        ) or self._loader.download(
+            asset_file_path,
+            download_dir,
+            experiment_name=experiment_name,
+            asset_tags=asset_tags,
+            git_slug=git_slug,
+        )
 
     def download_dir(
-        self, asset_dir_path: str, download_dir: str, experiment_name=None, asset_tags=None
+        self,
+        asset_dir_path: str,
+        download_dir: str,
+        experiment_name=None,
+        asset_tags=None,
+        git_slug: str | None = None,
     ):
+        from utils.loader_utils import load_local_enrichments, normalize_asset_path
 
-        if isinstance(self._loader, MlFlowAssetLoader):
-            kwargs = {}
-            if experiment_name is not None:
-                kwargs["experiment_name"] = experiment_name
-            if asset_tags is not None:
-                kwargs["asset_tags"] = asset_tags
-            return self._loader.download_dir(asset_dir_path, download_dir, **kwargs)
-        return self._loader.download_dir(asset_dir_path, download_dir)
+        asset_dir_path = normalize_asset_path(asset_dir_path)
+
+        return load_local_enrichments(
+            download_dir, asset_dir_path, is_dir=True
+        ) or self._loader.download_dir(
+            asset_dir_path,
+            download_dir,
+            experiment_name=experiment_name,
+            asset_tags=asset_tags,
+            git_slug=git_slug,
+        )
 
     def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
 
@@ -82,6 +103,10 @@ class DefaultAssetLoader(AssetLoader):
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
 
         return self._loader.download_prompt(prompt_path, **kwargs)
+
+    def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
+
+        return self._loader.log_enrichments(repo_dir, git_slug)
 
     def num_prompts(self, prompt_prefix: str) -> int:
 

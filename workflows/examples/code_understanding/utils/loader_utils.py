@@ -1,7 +1,39 @@
+import json
 import logging
 import os
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+
+def normalize_asset_path(asset_path: str) -> str:
+    """Strip a leading /assets/ prefix from asset_path if present."""
+
+    _, sep, remainder = ("/" + asset_path).partition("/assets/")
+
+    return remainder if sep else asset_path
+
+
+def load_local_enrichments(download_dir: str, asset_path: str, *, is_dir: bool = False):
+    """Tier 1: check <download_dir>/.enrichments/.assets/ on the local filesystem.
+
+    Returns resolved content (file) or True (directory) on hit, None on miss.
+    """
+    if not download_dir:
+        return None
+
+    local_path = os.path.join(download_dir, ".enrichments", ".assets", asset_path)
+
+    if is_dir and os.path.isdir(local_path):
+        logging.debug("Resolved asset dir from local enrichments: %s", local_path)
+        return True
+
+    if not is_dir and os.path.isfile(local_path):
+        logging.debug("Resolved asset from local enrichments: %s", local_path)
+        with open(local_path, "r") as f:
+            content = json.load(f) if local_path.endswith(".json") else f.read()
+        return content
+
+    return None
 
 
 def download_result_directory(

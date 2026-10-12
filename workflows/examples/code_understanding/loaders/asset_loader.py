@@ -152,6 +152,18 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
+    def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
+        """Persists the enrichments directory to the pipeline asset store.
+
+        Args:
+            repo_dir: Root of the cloned repository; .enrichments/ is derived from this path.
+            git_slug: Optional repository slug used to namespace the artifact path and tags.
+
+        Returns:
+            A message describing what was logged.
+        """
+
+    @abstractmethod
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of prompts with the given prefix.
 

@@ -72,6 +72,8 @@ class LocalAssetLoader(AssetLoader):
 
             shutil.copytree(source_dir, download_dir, dirs_exist_ok=True)
 
+            return True
+
         except Exception as e:
 
             logging.error(f"Error downloading asset directory {asset_dir_path}: {e}")
@@ -133,6 +135,12 @@ class LocalAssetLoader(AssetLoader):
 
         body, meta = self._get_prompt_body_and_metadata(raw)
         return Template(body).render(**kwargs), meta
+
+    def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
+        """Ensures the enrichments directory exists. No remote upload for local storage."""
+        enrichments_dir = os.path.join(repo_dir, ".enrichments")
+        os.makedirs(enrichments_dir, exist_ok=True)
+        return f"Logged enrichments from {enrichments_dir}"
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of .txt files directly under the prefixed prompts directory."""

@@ -152,15 +152,16 @@ def run_skill(
 
     Returns the path to the generated report file, or None if no report was written.
     """
-    from utils import code_utils
     from utils.tool_utils import get_log_enrichments_tool, get_read_asset_tool
 
     logging.info("Running skill: %s", skill.name)
 
     instructions = load_skill_instructions(skill.name, skill.repo)
     if skill.repo is None:
-        enrichments_dir = os.path.join(repo_dir, code_utils.ENRICHMENTS_DIR)
-        extra_tools = [get_read_asset_tool(), get_log_enrichments_tool(enrichments_dir, git_slug)]
+        extra_tools = [
+            get_read_asset_tool(repo_dir, git_slug),
+            get_log_enrichments_tool(repo_dir, git_slug),
+        ]
     else:
         extra_tools = None
     coro = _run_as_agent(
@@ -203,7 +204,6 @@ def run_composite_skill(
     """
     from loaders.default_asset_loader import DefaultAssetLoader
     from tools.skill.skill_tool import get_run_skill_tool
-    from utils import code_utils
     from utils.tool_utils import get_log_enrichments_tool
 
     logging.info("Running composite skill: %s", composite_skill)
@@ -216,9 +216,8 @@ def run_composite_skill(
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
 
-    enrichments_dir = os.path.join(repo_dir, code_utils.ENRICHMENTS_DIR)
     skill_tool = get_run_skill_tool(repo_dir, use_rhoai_mcp)
-    log_enrichments_tool = get_log_enrichments_tool(enrichments_dir, git_slug)
+    log_enrichments_tool = get_log_enrichments_tool(repo_dir, git_slug)
     coro = _run_as_agent(
         repo_dir,
         instructions,
