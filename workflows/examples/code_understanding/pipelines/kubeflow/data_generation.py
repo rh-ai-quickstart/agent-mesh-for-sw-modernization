@@ -93,7 +93,7 @@ def generate_code_and_meta_op(
                 source_path=tmp_source,
             )
 
-            languages = detect_languages(tmp_source)
+            languages = detect_languages(tmp_source, git_slug=git_slug)
 
             for language in languages:
 
