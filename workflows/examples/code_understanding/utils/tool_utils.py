@@ -16,7 +16,7 @@ class SafeFileManagementToolkit:
         self._toolkit = FileManagementToolkit(**kwargs)
 
     def _patch_tools(self, tools: list) -> list:
-        """Patch the write_file tool in tools to coerce non-string text to a JSON string."""
+        """Patch the write_file tool to coerce non-string text and support nested directories."""
         from pydantic import BeforeValidator
 
         for t in tools:
@@ -31,6 +31,21 @@ class SafeFileManagementToolkit:
                     ]
 
                 t.args_schema = _PatchedSchema
+
+                import os
+
+                root_dir = getattr(t, "root_dir", None) or ""
+                original_run = t._run
+
+                def _run_with_parents(*args, _original=original_run, _root=root_dir, **kwargs):
+                    file_path = args[0] if args else kwargs.get("file_path", "")
+                    parent = os.path.dirname(os.path.join(_root, file_path))
+                    if parent:
+                        os.makedirs(parent, exist_ok=True)
+                    return _original(*args, **kwargs)
+
+                t._run = _run_with_parents
+
         return tools
 
     def get_tools(self):
