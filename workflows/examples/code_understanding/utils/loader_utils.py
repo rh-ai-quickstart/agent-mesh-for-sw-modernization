@@ -5,6 +5,11 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
+def is_global_scoped_enrichment(path: str) -> bool:
+    """Returns True if the enrichment path is global-scoped (under .assets), False if repo-scoped."""
+    return ".assets" in path
+
+
 def normalize_asset_path(asset_path: str) -> str:
     """Strip a leading /assets/ prefix from asset_path if present."""
 

@@ -85,7 +85,7 @@ def prepare_enrichments(source_path: str, git_repo: str, git_branch: str):
     DefaultAssetLoader().load_results(
         download_dir=os.path.join(source_path, code_utils.ENRICHMENTS_DIR),
         artifact_path=DefaultAssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS,
-        tags={"git_slug": git_slug, "category": "data-generation"},
+        tags={"git_slug": git_slug, "category": "enrichments"},
         git_slug=git_slug,
     )
 
@@ -654,7 +654,7 @@ def generate_git_slug(git_repo: str, git_branch: str) -> str:
     return code_utils.generate_slug_from_repo(git_repo, git_branch)
 
 
-def detect_languages(source_path: str, git_slug: str | None = None) -> list:
+def detect_languages(source_path: str, git_slug: str) -> list:
     """Returns the list of programming languages detected in source_path."""
     import logging
 

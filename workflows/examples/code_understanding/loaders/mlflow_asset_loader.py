@@ -130,13 +130,17 @@ class MlFlowAssetLoader(AssetLoader):
         asset_tags: dict | None,
     ) -> list:
         """Returns the ordered list of (path, experiment_name, tags) candidates to try."""
-        enrichment_path = f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets/{asset_path}"
+        from utils.loader_utils import is_global_scoped_enrichment
+
+        enrichment_path = asset_path
+        if not enrichment_path.startswith(AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS):
+            prefix = f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
+            enrichment_path = f"{prefix}/{enrichment_path}"
+        enrichment_tags = {"category": "enrichments"}
+        if not is_global_scoped_enrichment(enrichment_path):
+            enrichment_tags["git_slug"] = git_slug
         return [
-            (
-                enrichment_path,
-                self.RESULT_DIRECTORY_ASSET_EXPERIMENT,
-                {"git_slug": git_slug, "category": "data-generation"},
-            ),
+            (enrichment_path, self.RESULT_DIRECTORY_ASSET_EXPERIMENT, enrichment_tags),
             (asset_path, experiment_name or self.STATIC_ASSET_EXPERIMENT, asset_tags),
         ]
 
@@ -442,11 +446,20 @@ class MlFlowAssetLoader(AssetLoader):
         """Persists the enrichments directory to the MLflow pipeline asset store."""
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
         os.makedirs(enrichments_dir, exist_ok=True)
-        kwargs = {}
+        tags = {"category": "enrichments"}
         if git_slug:
-            kwargs["artifact_path"] = self.RESULTS_PATH_PREFIX_ENRICHMENTS
-            kwargs["tags"] = {"git_slug": git_slug, "category": "data-generation"}
-        self.log_results(enrichments_dir, **kwargs)
+            tags["git_slug"] = git_slug
+        self.log_results(
+            enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
+        )
+        assets_dir = os.path.join(enrichments_dir, ".assets")
+        if os.path.exists(assets_dir):
+            assets_artifact_path = f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
+            self.log_results(
+                assets_dir,
+                artifact_path=assets_artifact_path,
+                tags={"category": "enrichments"},
+            )
         return f"Logged enrichments from {enrichments_dir}"
 
     def num_prompts(self, prompt_prefix: str) -> int:

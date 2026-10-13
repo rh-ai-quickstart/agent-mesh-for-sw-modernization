@@ -53,7 +53,7 @@ class SafeFileManagementToolkit:
         return self._patch_tools(tools)
 
 
-def get_log_enrichments_tool(repo_dir: str, git_slug: str | None = None):
+def get_log_enrichments_tool(repo_dir: str, git_slug: str):
     """Return a LangChain tool that logs the enrichments directory to the pipeline asset store.
 
     The returned tool is a no-argument callable suitable for injection into a skill agent or
@@ -62,7 +62,7 @@ def get_log_enrichments_tool(repo_dir: str, git_slug: str | None = None):
 
     Args:
         repo_dir:  Root of the cloned repository; .enrichments/ is derived from this path.
-        git_slug:  Optional repository slug used to namespace the artifact path and tags.
+        git_slug:  Repository slug used to namespace the artifact path and tags.
     """
     from langchain_core.tools import tool
 

@@ -4,11 +4,13 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
-def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
+def get_run_skill_tool(repo_dir: str, git_slug: str, use_rhoai_mcp: bool = False):
     """Return a LangChain tool that runs a single skill against the repository.
 
     Args:
         repo_dir:       Absolute path to the cloned repository.
+        git_slug:       Repository slug forwarded to local sub-skill agents so their
+                        log_enrichments tool can tag artifacts correctly.
         use_rhoai_mcp:  Whether to include rhoai-mcp tools in the skill agent.
 
     Returns:
@@ -49,7 +51,9 @@ def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
 
         try:
             skill = SkillConfig(name=skill_name, repo=repo, target_dir=target_dir)
-            skill_output_path = _run_skill(skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp)
+            skill_output_path = _run_skill(
+                skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp, git_slug=git_slug
+            )
             msg = f"[{skill_name}] completed. report={skill_output_path or '(none)'}"
             logging.info(msg)
             return msg

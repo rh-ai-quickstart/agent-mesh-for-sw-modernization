@@ -128,8 +128,8 @@ def load_skill_instructions(name: str, repo: str | None = None) -> str:
 def run_local_skill(
     skill_name: str,
     repo_dir: str,
+    git_slug: str,
     use_rhoai_mcp: bool = False,
-    git_slug: str | None = None,
 ) -> str | None:
     """
     Run a local skill by name against repo_dir.
@@ -138,14 +138,14 @@ def run_local_skill(
     and delegates to run_skill.
     Returns the path to the generated report file, or None if no report was written.
     """
-    return run_skill(SkillConfig(name=skill_name), repo_dir, use_rhoai_mcp, git_slug=git_slug)
+    return run_skill(SkillConfig(name=skill_name), repo_dir, git_slug, use_rhoai_mcp)
 
 
 def run_skill(
     skill: SkillConfig,
     repo_dir: str,
+    git_slug: str,
     use_rhoai_mcp: bool = False,
-    git_slug: str | None = None,
 ) -> str | None:
     """
     Run a single skill against repo_dir.
@@ -193,8 +193,8 @@ def run_skill(
 def run_composite_skill(
     repo_dir: str,
     composite_skill: str,
+    git_slug: str,
     use_rhoai_mcp: bool = False,
-    git_slug: str | None = None,
 ) -> None:
     """
     Run a composite skill against repo_dir using the autonomous agent pattern.
@@ -216,7 +216,7 @@ def run_composite_skill(
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
 
-    skill_tool = get_run_skill_tool(repo_dir, use_rhoai_mcp)
+    skill_tool = get_run_skill_tool(repo_dir, git_slug, use_rhoai_mcp)
     log_enrichments_tool = get_log_enrichments_tool(repo_dir, git_slug)
     coro = _run_as_agent(
         repo_dir,
