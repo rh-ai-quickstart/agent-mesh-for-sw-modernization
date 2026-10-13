@@ -86,7 +86,7 @@ Example output for Fortran and Ada:
 
 **Important:** The output file must contain pure JSON only — no markdown fencing, no prose, and no comments outside the JSON structure.
 
-Do NOT attempt to read the output path before writing — the file will not exist yet. Use write_file to create it directly at:
+Use write_file to write the merged result to:
   .enrichments/.assets/mappings/language_mappings.json
 
 ## Step 3 — Write .enrichments/.assets/graphrag/extract_graph.txt
