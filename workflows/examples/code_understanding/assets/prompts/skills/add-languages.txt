@@ -30,7 +30,11 @@ Once the scan is complete, produce an explicit list of unsupported languages bef
 
 ## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
 
-Use read_asset with path `mappings/language_mappings.json` to understand the structure. Then use read_file to check whether `.enrichments/.assets/mappings/language_mappings.json` already exists. If it does, parse that JSON as the base; if not, parse the read_asset JSON as the base. In either case, add the new language keys into each of the six sections of that base object — do not discard or replace existing keys. The JSON written to disk must contain every key that was in the base plus the new ones.
+Follow these steps in order:
+
+1. Call read_asset with path `mappings/language_mappings.json` to get the base JSON. Call read_file on `.enrichments/.assets/mappings/language_mappings.json`; if the file exists, use its parsed JSON as the base instead.
+2. For each unsupported language, add its entries into each of the six sections of the base JSON object.
+3. Call write_file with the complete updated JSON — every key that existed in the base must still be present alongside the new keys.
 
 **pygments_mappings**
 Map each Pygments lexer name (lowercase) that corresponds to this language to the canonical key you are introducing (e.g. `"c#": "csharp"`). Include all common Pygments lexer aliases for the language.
