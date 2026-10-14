@@ -30,7 +30,7 @@ Once the scan is complete, produce an explicit list of unsupported languages bef
 
 ## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
 
-Use read_asset with path `mappings/language_mappings.json` to read the existing mappings and understand the structure. Use read_file to check whether `.enrichments/.assets/mappings/language_mappings.json` already exists; if so use it as the base, otherwise use the read_asset content. Add entries for each unsupported language to all six sections below, keeping all existing entries intact.
+Use read_asset with path `mappings/language_mappings.json` to understand the structure. Then use read_file to check whether `.enrichments/.assets/mappings/language_mappings.json` already exists. If it does, parse that JSON as the base; if not, parse the read_asset JSON as the base. In either case, add the new language keys into each of the six sections of that base object — do not discard or replace existing keys. The JSON written to disk must contain every key that was in the base plus the new ones.
 
 **pygments_mappings**
 Map each Pygments lexer name (lowercase) that corresponds to this language to the canonical key you are introducing (e.g. `"c#": "csharp"`). Include all common Pygments lexer aliases for the language.
@@ -51,7 +51,7 @@ List directory names to exclude when scanning repositories of this language (bui
 **comment_delimiters_by_language**
 Provide `[open_delimiter, close_delimiter]` for block/multi-line comments in the language's source files (e.g. `["/*", "*/"]` for C-style, `["\"\"\"", "\"\"\""]` for Python-style docstrings).
 
-Example output for Fortran and Ada:
+Example of the new keys to add for Fortran and Ada (the actual output must also retain all pre-existing keys from the base file):
 
 ```json
 {
