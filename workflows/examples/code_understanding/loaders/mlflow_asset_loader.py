@@ -445,6 +445,7 @@ class MlFlowAssetLoader(AssetLoader):
     def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
         """Persists the enrichments directory to the MLflow pipeline asset store."""
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
+        assets_dir = os.path.join(enrichments_dir, ".assets")
         os.makedirs(enrichments_dir, exist_ok=True)
         tags = {"category": "enrichments"}
         if git_slug:
@@ -452,7 +453,6 @@ class MlFlowAssetLoader(AssetLoader):
         self.log_results(
             enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
         )
-        assets_dir = os.path.join(enrichments_dir, ".assets")
         if os.path.exists(assets_dir):
             assets_artifact_path = f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
             self.log_results(

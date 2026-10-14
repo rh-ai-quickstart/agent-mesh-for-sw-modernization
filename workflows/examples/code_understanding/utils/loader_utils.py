@@ -5,6 +5,13 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
+def merge_json_enrichment(base, override):
+    """Recursively merges override into base. Delegates to json_utils.merge_json."""
+    from utils.json_utils import merge_json
+
+    return merge_json(base, override)
+
+
 def is_global_scoped_enrichment(path: str) -> bool:
     """Returns True if the enrichment path is global-scoped (under .assets), False if repo-scoped."""
     return ".assets" in path
@@ -39,6 +46,28 @@ def load_local_enrichments(download_dir: str, asset_path: str, *, is_dir: bool =
         return content
 
     return None
+
+
+def process_enrichments(loader, assets_dir: str) -> None:
+    """For each file in assets_dir, merges its JSON content with the static counterpart if one exists."""
+    import json
+    from pathlib import Path
+
+    if not os.path.exists(assets_dir):
+        return
+
+    for path in Path(assets_dir).rglob("*"):
+        if not path.is_file():
+            continue
+        rel_path = path.relative_to(assets_dir)
+        try:
+            enrichment = json.loads(path.read_text())
+            original = loader.download(str(rel_path))
+            original = json.loads(original) if isinstance(original, str) else original
+            if original:
+                path.write_text(json.dumps(merge_json_enrichment(original, enrichment), indent=2))
+        except (json.JSONDecodeError, ValueError):
+            continue
 
 
 def download_result_directory(

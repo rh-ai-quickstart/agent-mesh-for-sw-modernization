@@ -685,7 +685,10 @@ def detect_languages(source_path: str, git_slug: str) -> list:
                 import json
 
                 with open(mappings_path) as f:
-                    languages = list(json.load(f).get("file_extensions", {}).keys())
+                    mappings = json.load(f)
+
+                code_utils.merge_language_mappings(mappings)
+                languages = code_utils.get_mapped_languages()
 
         if not languages:
 

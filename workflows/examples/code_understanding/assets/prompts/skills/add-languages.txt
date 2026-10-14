@@ -30,11 +30,9 @@ Once the scan is complete, produce an explicit list of unsupported languages bef
 
 ## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
 
-Follow these steps in order:
+Use read_asset with path `mappings/language_mappings.json` to read the existing language mappings. Use it as a reference for the expected structure and to confirm which languages are already present.
 
-1. Call read_asset with path `mappings/language_mappings.json` to get the base JSON. Call read_file on `.enrichments/.assets/mappings/language_mappings.json`; if the file exists, use its parsed JSON as the base instead.
-2. For each unsupported language, add its entries into each of the six sections of the base JSON object.
-3. Call write_file with the complete updated JSON — every key that existed in the base must still be present alongside the new keys.
+For each unsupported language identified in Step 1, generate entries for all six sections below. Use your knowledge of the language to produce accurate values. The output JSON must contain ONLY the new entries — do not repeat already-supported languages.
 
 **pygments_mappings**
 Map each Pygments lexer name (lowercase) that corresponds to this language to the canonical key you are introducing (e.g. `"c#": "csharp"`). Include all common Pygments lexer aliases for the language.
@@ -55,7 +53,7 @@ List directory names to exclude when scanning repositories of this language (bui
 **comment_delimiters_by_language**
 Provide `[open_delimiter, close_delimiter]` for block/multi-line comments in the language's source files (e.g. `["/*", "*/"]` for C-style, `["\"\"\"", "\"\"\""]` for Python-style docstrings).
 
-Example of the new keys to add for Fortran and Ada (the actual output must also retain all pre-existing keys from the base file):
+Example of the new keys to add for Fortran and Ada:
 
 ```json
 {
@@ -90,7 +88,7 @@ Example of the new keys to add for Fortran and Ada (the actual output must also 
 
 **Important:** The output file must contain pure JSON only — no markdown fencing, no prose, and no comments outside the JSON structure.
 
-Use write_file to write the merged result to:
+Do NOT attempt to read the output path before writing — the file will not exist yet. Use write_file to create it directly at:
   .enrichments/.assets/mappings/language_mappings.json
 
 ## Step 3 — Write .enrichments/.assets/graphrag/extract_graph.txt

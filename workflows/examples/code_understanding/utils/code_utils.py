@@ -45,7 +45,26 @@ def _extract_git_owner_and_repo(git_url: str):
     return tuple(parts[-2:])
 
 
-_MAPPINGS = _load_mappings()
+def cache_mappings():
+    """Loads and caches language mappings from the asset store."""
+    global _MAPPINGS
+    _MAPPINGS = _load_mappings()
+
+
+cache_mappings()
+
+
+def merge_language_mappings(new_mappings: dict):
+    """Merges new_mappings into the cached language mappings."""
+    from utils.json_utils import merge_json
+
+    global _MAPPINGS
+    _MAPPINGS = merge_json(_MAPPINGS or {}, new_mappings)
+
+
+def get_mapped_languages() -> list:
+    """Returns the list of languages present in the current language mappings."""
+    return list(_MAPPINGS.get("file_extensions", {}).keys())
 
 
 def get_file_extensions_for_language(language):

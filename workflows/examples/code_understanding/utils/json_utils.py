@@ -8,6 +8,39 @@ import yaml
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
+def merge_json(base, override):
+    """Recursively merges override into base.
+
+    - Both dicts: keys combined; override wins on conflict.
+    - Both lists: base elements kept; override elements appended if not already present,
+      with nested dicts/lists merged recursively into the first compatible element.
+    - Otherwise: override takes precedence over base.
+    """
+    if not override:
+        return base
+    if not base:
+        return override
+    if isinstance(base, dict) and isinstance(override, dict):
+        merged = {}
+        for key in set(base) | set(override):
+            merged[key] = merge_json(base.get(key), override.get(key))
+        return merged
+    if isinstance(base, list) and isinstance(override, list):
+        result = list(base)
+        for item in override:
+            if isinstance(item, (dict, list)):
+                for i, existing in enumerate(result):
+                    if type(existing) is type(item):
+                        result[i] = merge_json(existing, item)
+                        break
+                else:
+                    result.append(item)
+            elif item not in result:
+                result.append(item)
+        return result
+    return override if override is not None else base
+
+
 def _apply_defaults_to_json_keys(target: dict, schema: dict, handle_iterables: bool) -> None:
     """
     Applies missing schema defaults to target.
