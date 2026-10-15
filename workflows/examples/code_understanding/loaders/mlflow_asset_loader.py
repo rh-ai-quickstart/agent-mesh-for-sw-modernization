@@ -57,11 +57,13 @@ class MlFlowAssetLoader(AssetLoader):
 
         else:
 
-            filter_string = " AND ".join(
-                f"tags.\"{k}\" = '{str(v)}'"
-                for k, v in (tags or {}).items()
-                if v is not None and v != ""
-            )
+            filter_parts = []
+            for k, v in (tags or {}).items():
+                if v is None:
+                    filter_parts.append(f"tags.\"{k}\" IS NULL")
+                elif v != "":
+                    filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
+            filter_string = " AND ".join(filter_parts)
 
         logging.debug(f"Filter string: {filter_string}")
 
@@ -80,11 +82,19 @@ class MlFlowAssetLoader(AssetLoader):
 
         return os.path.join(asset_base_uri, asset_file_path)
 
-    def _mark_as_latest(self, client, experiment_id, new_run_id):
+    def _mark_as_latest(self, client, experiment_id, new_run_id, tags: dict = None):
+
+        filter_parts = ["tags.latest = 'true'"]
+        if tags:
+            for k, v in tags.items():
+                if v is None:
+                    filter_parts.append(f"tags.\"{k}\" IS NULL")
+                elif v != "":
+                    filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
 
         existing = client.search_runs(
             experiment_ids=[experiment_id],
-            filter_string="tags.latest = 'true'",
+            filter_string=" AND ".join(filter_parts),
         )
 
         for run in existing:
@@ -137,7 +147,9 @@ class MlFlowAssetLoader(AssetLoader):
             prefix = f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
             enrichment_path = f"{prefix}/{enrichment_path}"
         enrichment_tags = {"category": "enrichments"}
-        if not is_global_scoped_enrichment(enrichment_path):
+        if is_global_scoped_enrichment(enrichment_path):
+            enrichment_tags["git_slug"] = None
+        else:
             enrichment_tags["git_slug"] = git_slug
         return [
             (enrichment_path, self.RESULT_DIRECTORY_ASSET_EXPERIMENT, enrichment_tags),
@@ -303,6 +315,8 @@ class MlFlowAssetLoader(AssetLoader):
 
                 logging.info(f"Logged results to run {run.info.run_id}")
 
+                return run.info.run_id
+
         except Exception as e:
 
             logging.error(f"Error logging results {results_path}: {e}")
@@ -447,12 +461,12 @@ class MlFlowAssetLoader(AssetLoader):
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
         assets_dir = os.path.join(enrichments_dir, ".assets")
         os.makedirs(enrichments_dir, exist_ok=True)
+
         tags = {"category": "enrichments"}
         if git_slug:
             tags["git_slug"] = git_slug
-        self.log_results(
-            enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
-        )
+        self.log_results(enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags)
+
         if os.path.exists(assets_dir):
             assets_artifact_path = f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
             self.log_results(
@@ -460,6 +474,7 @@ class MlFlowAssetLoader(AssetLoader):
                 artifact_path=assets_artifact_path,
                 tags={"category": "enrichments"},
             )
+
         return f"Logged enrichments from {enrichments_dir}"
 
     def num_prompts(self, prompt_prefix: str) -> int:
@@ -528,7 +543,7 @@ class MlFlowAssetLoader(AssetLoader):
 
                 client.set_terminated(run_id, status="FINISHED")
 
-                logging.info(f"Upload complete. Run id: {run_id}")f
+                logging.info(f"Upload complete. Run id: {run_id}")
 
             except Exception:
 
