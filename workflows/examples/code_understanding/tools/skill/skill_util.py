@@ -26,8 +26,8 @@ async def _run_as_agent(
     extra_tools: list | None = None,
 ) -> None:
     from langchain.agents import AgentExecutor, create_tool_calling_agent
-    from langchain_community.chat_models import ChatLiteLLM
     from langchain_core.prompts import ChatPromptTemplate
+    from langchain_litellm import ChatLiteLLM
     from utils.tool_utils import SafeFileManagementToolkit
 
     llm = ChatLiteLLM(
