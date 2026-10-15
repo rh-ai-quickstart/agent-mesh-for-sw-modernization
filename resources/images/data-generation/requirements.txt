@@ -1,6 +1,6 @@
 langchain==0.3.26
 langchain-community==0.3.26
-langchain-litellm>=0.11.1
+langchain-litellm==0.3.5
 langchain-core==0.3.66
 langchain-experimental==0.3.4
 langchain-text-splitters==0.3.8
