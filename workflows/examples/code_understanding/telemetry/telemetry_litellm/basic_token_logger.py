@@ -30,7 +30,7 @@ class BasicTokenLogger(CustomLogger):
                 if val is not None:
                     self.totals[key] = self.totals.get(key, 0) + int(val)
             if self._track_cost:
-                cost = kwargs.get("response_cost") or 0.0
+                cost = kwargs.get("response_cost") or getattr(usage, "cost", None) or 0.0
                 self.totals["cost_usd"] = self.totals.get("cost_usd", 0.0) + cost
             self.step += 1
             try:

@@ -30,7 +30,7 @@ class MlFlowCustomTelemetry(CustomTelemetry):
     def track(self):
         import litellm
 
-        from .telemetry_litellm.mlflow_token_logger import MlflowTokenLogger
+        from .telemetry_litellm.mlflow_token_logger import MlflowTokenLogger, get_mlflow_callback
 
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 
@@ -42,7 +42,7 @@ class MlFlowCustomTelemetry(CustomTelemetry):
         mlflow.set_experiment(self._DEFAULT_EXPERIMENT_NAME)
 
         counter = MlflowTokenLogger(self._DEFAULT_EXPERIMENT_NAME)
-        litellm.callbacks = ["mlflow", counter]
+        litellm.callbacks = [counter, get_mlflow_callback()]
 
         atexit.register(counter.finalize)
 

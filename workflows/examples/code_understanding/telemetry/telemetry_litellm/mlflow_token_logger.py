@@ -4,6 +4,30 @@ import time
 from .basic_token_logger import BasicTokenLogger
 
 
+def get_mlflow_callback():
+    if os.environ.get("RHOAI_MLFLOW_COST_MONITORING_ENABLED", "false").lower() != "true":
+        return "mlflow"
+
+    from litellm.integrations.mlflow import MlflowLogger
+
+    class _CostAwareMlflowLogger(MlflowLogger):
+        def log_success_event(self, kwargs, response_obj, start_time, end_time):
+            if not kwargs.get("response_cost"):
+                cost = getattr(getattr(response_obj, "usage", None), "cost", None)
+                if cost:
+                    kwargs["response_cost"] = cost
+            super().log_success_event(kwargs, response_obj, start_time, end_time)
+
+        async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
+            if not kwargs.get("response_cost"):
+                cost = getattr(getattr(response_obj, "usage", None), "cost", None)
+                if cost:
+                    kwargs["response_cost"] = cost
+            await super().async_log_success_event(kwargs, response_obj, start_time, end_time)
+
+    return _CostAwareMlflowLogger()
+
+
 class MlflowTokenLogger(BasicTokenLogger):
     """Token logger that persists cumulative token metrics to an MLflow run."""
 
