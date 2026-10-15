@@ -384,7 +384,7 @@ class MlFlowAssetLoader(AssetLoader):
 
             name = self.get_prompt_name(prompt_path)
 
-            mlflow.register_prompt(name=name, template=content)
+            mlflow.genai.register_prompt(name=name, template=content)
 
             logging.info(f"Registered prompt '{name}'")
 
@@ -409,7 +409,7 @@ class MlFlowAssetLoader(AssetLoader):
 
             prompt_name = self.get_prompt_name(f"skills/{name}")
 
-            prompt = mlflow.load_prompt(prompt_name)
+            prompt = mlflow.genai.load_prompt(prompt_name)
 
             body, meta = self._get_prompt_body_and_metadata(prompt.template)
 
@@ -430,7 +430,7 @@ class MlFlowAssetLoader(AssetLoader):
 
             name = self.get_prompt_name(prompt_path)
 
-            prompt = mlflow.load_prompt(name)
+            prompt = mlflow.genai.load_prompt(name)
 
             body, meta = self._get_prompt_body_and_metadata(prompt.template)
 
@@ -468,7 +468,7 @@ class MlFlowAssetLoader(AssetLoader):
 
             prefix = prompt_prefix.replace("/", "-")
 
-            prompts = mlflow.search_prompts(filter_string=f"name LIKE '{prefix}--%'")
+            prompts = mlflow.genai.search_prompts(filter_string=f"name LIKE '{prefix}--%'")
 
             return len(prompts)
 
