@@ -41,12 +41,6 @@ class MlFlowCustomTelemetry(CustomTelemetry):
 
         mlflow.set_experiment(self._DEFAULT_EXPERIMENT_NAME)
 
-        try:
-            mlflow.openai.autolog()
-            logging.info("Mlflow tracking registered successfully")
-        except Exception as e:
-            logging.error(f"mlflow.openai.autolog() failed: {e}")
-
         counter = MlflowTokenLogger(self._DEFAULT_EXPERIMENT_NAME)
         litellm.callbacks = ["mlflow", counter]
 
@@ -72,6 +66,9 @@ class MlFlowCustomTelemetry(CustomTelemetry):
                     val = run.data.metrics.get(key)
                     if val is not None:
                         totals[key] = totals.get(key, 0) + int(val)
+                cost = run.data.metrics.get("cost_usd")
+                if cost is not None:
+                    totals["cost_usd"] = totals.get("cost_usd", 0.0) + cost
             return totals
         except Exception:
             return {}

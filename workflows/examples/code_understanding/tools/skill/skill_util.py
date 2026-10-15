@@ -26,13 +26,13 @@ async def _run_as_agent(
     extra_tools: list | None = None,
 ) -> None:
     from langchain.agents import AgentExecutor, create_tool_calling_agent
+    from langchain_community.chat_models import ChatLiteLLM
     from langchain_core.prompts import ChatPromptTemplate
-    from langchain_openai import ChatOpenAI
     from utils.tool_utils import SafeFileManagementToolkit
 
-    llm = ChatOpenAI(
-        model=os.environ["CODE_LLM_ID"],
-        base_url=os.environ["CODE_LLM_API_BASE"],
+    llm = ChatLiteLLM(
+        model=f"{os.environ['CODE_LLM_PROVIDER']}/{os.environ['CODE_LLM_ID']}",
+        api_base=os.environ["CODE_LLM_API_BASE"],
         api_key=os.environ["CODE_LLM_TOKEN"],
     )
     tools = SafeFileManagementToolkit(
