@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +29,17 @@ from services.trigger_run import trigger_run as _trigger_run  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
+def log_repos_as_enrichment(repos: list[dict[str, str]], namespace: str | None) -> None:
+    from loaders.default_asset_loader import DefaultAssetLoader
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        assets_dir = os.path.join(tmpdir, ".enrichments", ".assets", "repos")
+        os.makedirs(assets_dir)
+        with open(os.path.join(assets_dir, "repo_list.json"), "w") as f:
+            json.dump(repos, f)
+        DefaultAssetLoader(namespace=namespace).log_enrichments(tmpdir)
+
+
 def submit_pipeline_run(
     repos: list[dict[str, str]], namespace: str | None = None
 ) -> dict[str, Any]:
@@ -43,13 +57,18 @@ def submit_pipeline_run(
 
     params: dict[str, str] = {
         **({"git_repo": git_repo, "git_branch": git_branch} if single else {}),
+        **({"repos_json": json.dumps(repos)} if not single else {}),
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
     }
 
-    run = _trigger_run(
-        pipeline_name, run_name, params, repos=None if single else repos, namespace=namespace
-    )
+    if not single:
+        try:
+            log_repos_as_enrichment(repos, namespace)
+        except Exception:
+            logging.info("log_repos_as_enrichment failed; continuing with pipeline submission.", exc_info=True)
+
+    run = _trigger_run(pipeline_name, run_name, params, namespace=namespace)
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}
 
 

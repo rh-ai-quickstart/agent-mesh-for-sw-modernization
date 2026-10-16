@@ -126,14 +126,14 @@ def generate_code_and_meta_op(
 @dsl.component(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
 )
-def get_repo_list_op(kfp_run_id: str) -> list:
-    """Downloads and returns the repo list uploaded for this KFP run."""
+def get_repo_list_op(repos_json: str = "") -> list:
+    """Returns the repo list for this pipeline run."""
 
     from services.get_repo_list import get_multi_repo_list
     from utils.kubeflow_utils import setup_logging
 
     setup_logging()
-    return get_multi_repo_list(kfp_run_id)
+    return get_multi_repo_list(repos_json)
 
 
 ##############################################################################
@@ -165,10 +165,10 @@ def _run_pipeline(
 
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
-def _run_pipeline_multi_repo():
-    """Generates code metadata for all repositories in the asset-loader repo list."""
+def _run_pipeline_multi_repo(repos_json: str = ""):
+    """Generates code metadata for all repositories in the repo list."""
 
-    repo_list_task = get_repo_list_op(kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    repo_list_task = get_repo_list_op(repos_json=repos_json)
 
     with dsl.ParallelFor(
         items=repo_list_task.output, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))

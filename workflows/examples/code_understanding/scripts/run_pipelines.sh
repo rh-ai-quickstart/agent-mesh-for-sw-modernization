@@ -3,9 +3,10 @@
 # Pipelines must be uploaded first via: make upload-pipelines
 #
 # Usage:
-#   ./run_pipelines.sh --single-repo   # trigger single-repo pipeline run
-#   ./run_pipelines.sh                 # trigger multi-repo pipeline run (default)
-#   ./run_pipelines.sh --multi-repo    # trigger multi-repo pipeline run
+#   ./run_pipelines.sh --single-repo              # trigger single-repo pipeline run
+#   ./run_pipelines.sh                            # trigger multi-repo pipeline run (default)
+#   ./run_pipelines.sh --multi-repo               # trigger multi-repo pipeline run
+#   ./run_pipelines.sh --repo-list=repos.json     # trigger multi-repo with a repo list file
 #
 # Environment variables:
 #   KFP_NAMESPACE         Kubernetes namespace (KFP_HOST is derived from this)
@@ -25,9 +26,10 @@ usage() {
 Usage: $(basename "$0") [OPTION]...
 
 Options:
-  --single-repo   Trigger single-repo pipeline run (GIT_REPO required)
-  --multi-repo    Trigger multi-repo pipeline run (default)
-  -h, --help      Show this help message
+  --single-repo        Trigger single-repo pipeline run (GIT_REPO required)
+  --multi-repo         Trigger multi-repo pipeline run (default)
+  --repo-list=<file>   Path to a JSON file with the repo list (multi-repo only)
+  -h, --help           Show this help message
 
 Environment variables:
   KFP_NAMESPACE  Kubernetes namespace, used to derive KFP_HOST (required)
@@ -60,35 +62,44 @@ GRAPHRAG_SOURCE_PATH="${KFP_DATA_INDEXING_OUTPUT_PATH:-graph_rag_app/source}"
 #   $1  pipeline_name  name of the registered pipeline in KFP
 #   $2  run_name       name for the new run
 #   $3  params         optional JSON string of run parameters (default: {})
+#   $4  repos_json     optional JSON array string of repo dicts (multi-repo only)
 # ---------------------------------------------------------------------------
 trigger_pipeline() {
     local pipeline_name="$1"
     local run_name="$2"
     local params="$3"
+    local repos_json="${4:-}"
     [ -z "$params" ] && params='{}'
     echo "Triggering $pipeline_name as $run_name on $KFP_HOST..."
-    # Pass pipeline_name, run_name, and params via env vars to avoid shell
-    # quoting issues when the JSON params string is passed as a CLI argument.
+    # Pass pipeline_name, run_name, params, and optional repos_json via env vars
+    # to avoid shell quoting issues with JSON strings as CLI arguments.
     KFP_TRIGGER_PIPELINE="$pipeline_name" \
     KFP_TRIGGER_RUN="$run_name" \
     KFP_TRIGGER_PARAMS="$params" \
+    KFP_TRIGGER_REPOS_JSON="$repos_json" \
     PYTHONPATH="$CODE_UNDERSTANDING_DIR:${PYTHONPATH:-}" \
     python3 - <<'PYEOF'
 import os, json
 from services.trigger_run import trigger_run
-run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], json.loads(os.environ["KFP_TRIGGER_PARAMS"]))
+params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
+repos_json = os.environ.get("KFP_TRIGGER_REPOS_JSON", "")
+if repos_json:
+    params["repos_json"] = repos_json
+run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], params)
 print(f"  Submitted run id: {run.run_id}")
 PYEOF
     echo "  OK: $run_name submitted."
 }
 
 MODE="multi"
+REPO_LIST_FILE=""
 
 for arg in "$@"; do
     case "$arg" in
-        --single-repo) MODE="single" ;;
-        --multi-repo)  MODE="multi" ;;
-        -h|--help)     usage; exit 0 ;;
+        --single-repo)  MODE="single" ;;
+        --multi-repo)   MODE="multi" ;;
+        --repo-list=*)  REPO_LIST_FILE="${arg#*=}" ;;
+        -h|--help)      usage; exit 0 ;;
         *) echo "Error: Unknown argument: $arg" >&2; usage; exit 1 ;;
     esac
 done
@@ -98,11 +109,28 @@ if [[ "$MODE" == "single" ]]; then
         echo "Error: GIT_REPO must be set and non-empty for --single-repo." >&2
         exit 1
     fi
+    if [[ -n "$REPO_LIST_FILE" ]]; then
+        echo "Warning: --repo-list is ignored for --single-repo." >&2
+    fi
     trigger_pipeline "single_repo" "single_repo_${TIMESTAMP}" \
         "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\"}"
 else
+    REPOS_JSON=""
+    if [ -n "$REPO_LIST_FILE" ]; then
+        if [ ! -f "$REPO_LIST_FILE" ]; then
+            echo "Error: repo list file not found: $REPO_LIST_FILE" >&2
+            exit 1
+        fi
+        REPOS_JSON=$(python3 -c "
+import json, sys
+data = json.load(open(sys.argv[1]))
+repos = data['repos'] if isinstance(data, dict) and 'repos' in data else data
+print(json.dumps(repos))
+" "$REPO_LIST_FILE")
+    fi
     trigger_pipeline "multi_repo" "multi_repo_${TIMESTAMP}" \
-        "{\"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\"}"
+        "{\"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\"}" \
+        "$REPOS_JSON"
 fi
 
 echo "All done."

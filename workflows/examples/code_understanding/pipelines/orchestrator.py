@@ -9,6 +9,7 @@ Run directly to compile all pipelines to YAML:
 """
 
 import json
+import logging
 import os
 import sys
 
@@ -105,11 +106,12 @@ def single_repo_pipeline(
 def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
+    repos_json: str = "",
 ):
 
     if uses_kfp():
 
-        dg = DataGenerationPipeline.run_multi_repo()
+        dg = DataGenerationPipeline.run_multi_repo(repos_json=repos_json)
 
         idx = IndexingPipeline.run_multi_repo(
             parent_target_path=parent_target_path,
@@ -121,8 +123,16 @@ def multi_repo_pipeline(
 
     else:
 
-        # git_repos = DefaultAssetLoader().download("repos/repo_list.json")
-        git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS"))
+        git_repos = (
+            json.loads(repos_json)
+            if repos_json
+            else json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
+        )
+
+        if not git_repos:
+            logging.info(
+                "multi_repo_pipeline: no repos found in repos_json or GIT_REPO_LIST_CONTENTS; pipeline will do nothing."
+            )
 
         DataGenerationPipeline().run_multi_repo(git_repos)
 
