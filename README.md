@@ -30,7 +30,8 @@ Analyze legacy code with GraphRAG on Red Hat OpenShift AI to uncover dependencie
   - [10. Explore the optional console](#10-explore-the-optional-console)
   - [11. What you've accomplished](#11-what-youve-accomplished)
   - [12. Exporting and Importing your indexes (Optional)](#12-exporting-and-importing-your-indexes-optional)
-  - [13. Delete](#13-delete)
+  - [13. Explore traces with MLflow (Optional)](#13-explore-traces-with-mlflow-optional)
+  - [14. Delete](#14-delete)
 - [Reference](#reference)
   - [How the workflow works](#how-the-workflow-works)
   - [Configuration variables](#configuration-variables)
@@ -222,7 +223,7 @@ embedding model during installation, use this command instead:
 make install DEPLOY_EMBEDDING_MODEL=true
 ```
 
-OpenTelemetry and Tempo are optional and disabled by default. To deploy them as part of installation, run `make install DEPLOY_OTEL=true`.
+
 
 ### 5. Ask a question using the prebuilt index
 
@@ -499,7 +500,28 @@ make import-indexes KFP_NAMESPACE=destination-project \
 
 
 
-### 13. Delete
+### 13. Explore traces with MLflow (Optional)
+
+The application uses MLflow tracing to record LLM requests. These traces are
+logged to the `AIP-default` experiment and are available in MLflow without
+deploying OpenTelemetry or Tempo. In MLflow, select your project, choose
+**Experiments > AIP-default**, then select **Traces** in the left panel.
+![MLflow traces view](docs/images/traces.png)
+
+To also send traces to Tempo, install the Red Hat build of the OpenTelemetry
+Operator and Tempo Operator listed under
+[Minimum software requirements](#minimum-software-requirements), then enable
+the optional OpenTelemetry and Tempo deployment:
+
+```sh
+make install DEPLOY_OTEL=true
+```
+
+This flag deploys an OpenTelemetry Collector and Tempo and enables dual export,
+so traces are sent to both MLflow and Tempo. The Tempo copy can be queried
+using your cluster's tracing tools.
+
+### 14. Delete
 
 When you have finished, run:
 
@@ -556,7 +578,8 @@ values.
 | `ASSET_LOADER`, `INSTALL_PREBUILT_INDEX`, `CUSTOM_EVALUATOR`                                                                           | Asset backend, sample index upload, and evaluator                |
 | `LOGLEVEL`                                                                                                                             | Application logging level                                        |
 | `OTEL_SERVICE_NAME`, `OTEL_NAMESPACE`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER`                                                  | Optional tracing resources and exporter                          |
-| `MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT`, `OTEL_SEMCONV_STABILITY_OPT_IN`                                                                | Optional trace export and semantic-convention settings           |
+| `MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT`                                                                                                 | Dual-export MLflow traces to OTel (defaults to `DEPLOY_OTEL`)    |
+| `OTEL_SEMCONV_STABILITY_OPT_IN`                                                                                                        | OpenTelemetry semantic-convention setting                        |
 
 
 Useful Make overrides include `DEPLOY_EMBEDDING_MODEL`, `DEPLOY_OTEL`,

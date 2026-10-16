@@ -89,7 +89,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT         ?= http://$(OTEL_SERVICE_NAME)-collector.$(O
 OTEL_EXPORTER                       ?= otlp_http
 MLFLOW_TRACKING_INSECURE_TLS        ?= true
 MLFLOW_TRACKING_AUTH                ?= kubernetes-namespaced
-MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT ?= true
+MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT ?= $(if $(filter true,$(DEPLOY_OTEL)),true,false)
 OTEL_SEMCONV_STABILITY_OPT_IN       ?= genai
 
 # Local targets always use the external MLflow gateway.
