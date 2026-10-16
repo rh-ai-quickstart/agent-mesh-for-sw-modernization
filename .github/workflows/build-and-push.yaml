@@ -1,0 +1,64 @@
+name: Build and push images (main)
+
+# Publish upstream main only when BASE_VERSION differs before and after the push.
+# Ordinary merges skip publishing; manual builds remain available for retries.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check image version change
+    if: github.repository == 'rh-ai-quickstart/agent-mesh-for-sw-modernization'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changed: ${{ steps.version.outputs.changed }}
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Compare BASE_VERSION before and after push
+        id: version
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          VERSION=$(python3 .github/scripts/image_version.py)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No previous main commit to compare; use the manual workflow to publish." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git show "$BEFORE_SHA:Makefile" > "$RUNNER_TEMP/Makefile.before"
+          PREVIOUS_VERSION=$(python3 .github/scripts/image_version.py --makefile "$RUNNER_TEMP/Makefile.before")
+          if [[ "$VERSION" == "$PREVIOUS_VERSION" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "BASE_VERSION is still $VERSION; skipping image publication." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "BASE_VERSION changed from $PREVIOUS_VERSION to $VERSION; publishing images." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  publish:
+    name: Build and push main images
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    # Queue only publishers, so ordinary pushes cannot replace a pending version bump.
+    concurrency:
+      group: publish-main-images-${{ github.repository }}-${{ needs.version.outputs.version }}
+      cancel-in-progress: false
+    uses: ./.github/workflows/build-and-push-manual.yaml
+    with:
+      target_branch: ${{ github.sha }}
+      version: ${{ needs.version.outputs.version }}
+    secrets:
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}

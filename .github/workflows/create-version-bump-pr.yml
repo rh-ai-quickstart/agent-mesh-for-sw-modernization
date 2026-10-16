@@ -1,0 +1,63 @@
+name: Create Version Bump PR
+
+# Run on main with vMAJOR.MINOR.PATCH, or leave version empty for a patch bump.
+# Reuses one PR changing only BASE_VERSION; merge it to build/push the new version.
+# Enable Actions > General > Allow GitHub Actions to create and approve pull requests.
+# Uses GITHUB_TOKEN; generated PR checks may need "Approve workflows to run".
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New version (e.g. v0.1.7); leave empty to increment the patch
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: version-bump-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  create-pr:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Update BASE_VERSION
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          CURRENT_VERSION=$(python3 .github/scripts/image_version.py)
+          NEW_VERSION=$(python3 .github/scripts/image_version.py --bump "$REQUESTED_VERSION")
+          echo "previous=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update version bump PR
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          base: main
+          branch: automation/bump-base-version
+          add-paths: Makefile
+          commit-message: "chore: bump BASE_VERSION to ${{ steps.version.outputs.version }}"
+          title: "chore: bump BASE_VERSION to ${{ steps.version.outputs.version }}"
+          body: |
+            Update the default image version from `${{ steps.version.outputs.previous }}` to `${{ steps.version.outputs.version }}`.
+
+            Merging this PR triggers image builds and pushes to Quay.io using the new `BASE_VERSION`.
+
+            Requested by @${{ github.actor }} in [this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+      - name: Summarize version bump
+        env:
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: echo "Version bump PR - $PR_URL" >> "$GITHUB_STEP_SUMMARY"
