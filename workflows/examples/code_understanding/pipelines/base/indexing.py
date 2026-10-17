@@ -23,6 +23,7 @@ def generate_graphrag_index(
     import tracemalloc
 
     import nest_asyncio
+
     from loaders.default_asset_loader import DefaultAssetLoader
     from pipelines.base.data_generation import generate_git_slug
     from pipelines.graphrag import run_graphrag

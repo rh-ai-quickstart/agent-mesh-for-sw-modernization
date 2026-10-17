@@ -5,11 +5,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Metrics, Output  # noqa: E402
-from utils.kubeflow_utils import (  # noqa: E402
-    INDEXING_BASE_IMAGE,
-    get_pip_installable_git_url,
-    inject_secret_as_env,
-)
+
+from utils.kubeflow_utils import INDEXING_BASE_IMAGE  # noqa: E402
+from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -76,6 +74,7 @@ def graphrag_evaluation_op(
     import logging
 
     import pandas as pd
+
     from utils.kubeflow_utils import read_from_input_artifact, setup_logging
 
     setup_logging()
@@ -104,11 +103,14 @@ def graphrag_evaluation_op(
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(base_image=INDEXING_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
 def run_indexing_multi_repo_op(
-    parent_target_path: str, graphrag_dir: Output[Dataset], eval_results: Output[Dataset]
+    parent_target_path: str,
+    graphrag_dir: Output[Dataset],
+    eval_results: Output[Dataset],
 ):
     """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
 
     import pandas as pd
+
     from pipelines.base.indexing import IndexingPipeline
     from utils.kubeflow_utils import setup_logging, write_to_output_artifact
 
@@ -131,7 +133,6 @@ def _run_pipeline(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
-    pipeline_run_id: str = "",
 ) -> Dataset:
 
     task = graphrag_indexing_op(
@@ -141,7 +142,6 @@ def _run_pipeline(
         multi_repo=multi_repo,
     )
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
     eval_task = graphrag_evaluation_op(
         graphrag_dir=task.outputs["graphrag_dir"],
@@ -150,19 +150,15 @@ def _run_pipeline(
         multi_repo=multi_repo,
     )
     eval_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    eval_task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
     return task.outputs["graphrag_dir"]
 
 
 @dsl.pipeline(name="graphrag-indexing-multi-repo-pipeline")
-def _run_indexing_multi_repo_pipeline(
-    parent_target_path: str, pipeline_run_id: str = ""
-) -> Dataset:
+def _run_indexing_multi_repo_pipeline(parent_target_path: str) -> Dataset:
 
     task = run_indexing_multi_repo_op(parent_target_path=parent_target_path)
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
     return task.outputs["graphrag_dir"]
 
 

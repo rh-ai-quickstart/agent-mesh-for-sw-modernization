@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from kfp import dsl  # noqa: E402
+
 from utils.kubeflow_utils import compile_all_and_exit  # noqa: E402
 from utils.pipeline_utils import uses_kfp  # noqa: E402
 
@@ -43,7 +44,6 @@ def single_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     multi_repo: bool = False,
-    pipeline_run_id: str = dsl.PIPELINE_JOB_ID_PLACEHOLDER,
 ):
 
     if uses_kfp():
@@ -52,7 +52,6 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
-            pipeline_run_id=pipeline_run_id,
         )
 
         idx = IndexingPipeline.run(
@@ -60,7 +59,6 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
-            pipeline_run_id=pipeline_run_id,
         )
 
         AnalysisPipeline.run(
@@ -68,7 +66,6 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
-            pipeline_run_id=pipeline_run_id,
         )
 
     else:
@@ -77,7 +74,7 @@ def single_repo_pipeline(
 
         from pipelines.base.data_generation import generate_git_slug
 
-        os.environ.setdefault("PIPELINE_RUN_ID", str(uuid.uuid4()))
+        os.environ.setdefault("KFP_RUN_ID", f"local-{uuid.uuid4()}")
 
         git_slug = generate_git_slug(git_repo, git_branch)
         source_path = f"{parent_source_path}/{git_slug}"
@@ -115,31 +112,23 @@ def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     repos: list = [],
-    pipeline_run_id: str = dsl.PIPELINE_JOB_ID_PLACEHOLDER,
 ):
 
     if uses_kfp():
 
-        dg = DataGenerationPipeline.run_multi_repo(
-            repos=repos,
-            pipeline_run_id=pipeline_run_id,
-        )
+        dg = DataGenerationPipeline.run_multi_repo(repos=repos)
 
         idx = IndexingPipeline.run_multi_repo(
             parent_target_path=parent_target_path,
-            pipeline_run_id=pipeline_run_id,
         ).after(dg)
 
-        AnalysisPipeline.run_multi_repo(
-            graphrag_dir=idx.output,
-            pipeline_run_id=pipeline_run_id,
-        )
+        AnalysisPipeline.run_multi_repo(graphrag_dir=idx.output)
 
     else:
 
         import uuid
 
-        os.environ.setdefault("PIPELINE_RUN_ID", str(uuid.uuid4()))
+        os.environ.setdefault("KFP_RUN_ID", f"local-{uuid.uuid4()}")
 
         git_repos = repos or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
 

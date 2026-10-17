@@ -5,11 +5,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Markdown, Output  # noqa: E402
-from utils.kubeflow_utils import (  # noqa: E402
-    ANALYSIS_BASE_IMAGE,
-    get_pip_installable_git_url,
-    inject_secret_as_env,
-)
+
+from utils.kubeflow_utils import ANALYSIS_BASE_IMAGE  # noqa: E402
+from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -76,22 +74,22 @@ def _run_pipeline(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
-    pipeline_run_id: str = "",
 ):
 
     task = generate_migration_report_op(
-        graphrag_dir=graphrag_dir, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
+        graphrag_dir=graphrag_dir,
+        git_repo=git_repo,
+        git_branch=git_branch,
+        multi_repo=multi_repo,
     )
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
 
 @dsl.pipeline(name="graphrag-analysis-multi-repo-pipeline")
-def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset], pipeline_run_id: str = ""):
+def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
 
     task = run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
 
 ##############################################################################

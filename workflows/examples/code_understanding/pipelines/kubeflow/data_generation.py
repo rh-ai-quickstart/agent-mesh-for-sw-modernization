@@ -5,11 +5,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Output  # noqa: E402
-from utils.kubeflow_utils import (  # noqa: E402
-    DATA_GENERATION_BASE_IMAGE,
-    get_pip_installable_git_url,
-    inject_secret_as_env,
-)
+
+from utils.kubeflow_utils import DATA_GENERATION_BASE_IMAGE  # noqa: E402
+from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -62,10 +60,7 @@ def generate_code_and_meta_op(
 ):
     """Detects languages and generates code metadata for all detected languages."""
 
-    from pipelines.base.data_generation import (
-        detect_languages,
-        generate_code_and_meta,
-    )
+    from pipelines.base.data_generation import detect_languages, generate_code_and_meta
     from utils.kubeflow_utils import (
         read_from_input_artifact,
         setup_logging,
@@ -149,7 +144,6 @@ def _run_pipeline(
     git_repo: str = os.getenv("GIT_REPO", ""),
     git_branch: str = os.getenv("GIT_BRANCH", "main"),
     multi_repo: bool = False,
-    pipeline_run_id: str = "",
 ) -> Dataset:
 
     prep = prepare_environment_op(
@@ -164,18 +158,16 @@ def _run_pipeline(
         multi_repo=multi_repo,
     )
     gen.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    gen.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
     return gen.outputs["target_dir"]
 
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
-def _run_pipeline_multi_repo(repos: list = [], pipeline_run_id: str = ""):
+def _run_pipeline_multi_repo(repos: list = []):
     """Generates code metadata for all repositories in the repo list."""
 
     repo_list_task = get_repo_list_op(repos=repos)
     repo_list_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-    repo_list_task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
     with dsl.ParallelFor(
         items=repo_list_task.output, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
@@ -185,7 +177,6 @@ def _run_pipeline_multi_repo(repos: list = [], pipeline_run_id: str = ""):
             git_repo=repo.git_repo,
             git_branch=repo.git_branch,
             multi_repo=True,
-            pipeline_run_id=pipeline_run_id,
         )
 
 
