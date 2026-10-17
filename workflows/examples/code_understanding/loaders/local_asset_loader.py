@@ -148,6 +148,16 @@ class LocalAssetLoader(AssetLoader):
         os.makedirs(enrichments_dir, exist_ok=True)
         return f"Logged enrichments from {enrichments_dir}"
 
+    def log_repositories(self, git_repos: list) -> None:
+        """No-op. Local mode does not persist the repo list to a backing store."""
+        pass
+
+    def load_repositories(self) -> list:
+        """Returns the repo list from GIT_REPO_LIST_CONTENTS (local mode has no backing store)."""
+        import json
+
+        return json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]")
+
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of .txt files directly under the prefixed prompts directory."""
         prompt_dir = os.path.join(self._PROMPTS_DIR, prompt_prefix)

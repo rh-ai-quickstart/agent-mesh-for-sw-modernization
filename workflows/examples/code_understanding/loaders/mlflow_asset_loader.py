@@ -14,18 +14,6 @@ from .asset_loader import AssetLoader  # noqa: E402
 class MlFlowAssetLoader(AssetLoader):
     """Loads an asset from the MLflow artifacts registry."""
 
-    STATIC_ASSET_EXPERIMENT = (
-        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
-        "/code-refactoring/assets/static"
-    )
-    RESULT_DIRECTORY_ASSET_EXPERIMENT = (
-        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
-        "/code-refactoring/assets/result-directories"
-    )
-    RESULT_ASSET_EXPERIMENT = (
-        f"{os.environ.get('MLFLOW_NAMESPACE', os.environ.get('KFP_NAMESPACE', 'demo'))}"
-        "/code-refactoring/assets/results"
-    )
     _RUN_NAME = "code-understanding"
 
     def __init__(self, namespace: str = None):
@@ -60,7 +48,7 @@ class MlFlowAssetLoader(AssetLoader):
             filter_parts = []
             for k, v in (tags or {}).items():
                 if v is None:
-                    filter_parts.append(f"tags.\"{k}\" IS NULL")
+                    filter_parts.append(f'tags."{k}" IS NULL')
                 elif v != "":
                     filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
             filter_string = " AND ".join(filter_parts)
@@ -88,7 +76,7 @@ class MlFlowAssetLoader(AssetLoader):
         if tags:
             for k, v in tags.items():
                 if v is None:
-                    filter_parts.append(f"tags.\"{k}\" IS NULL")
+                    filter_parts.append(f'tags."{k}" IS NULL')
                 elif v != "":
                     filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
 
@@ -281,6 +269,14 @@ class MlFlowAssetLoader(AssetLoader):
         try:
             is_dir = os.path.isdir(results_path)
 
+            kfp_run_id = os.environ.get("KFP_RUN_ID", "").strip()
+            if kfp_run_id:
+                tags = {**(tags or {}), "kfp_run_id": kfp_run_id}
+
+            pipeline_run_id = os.environ.get("PIPELINE_RUN_ID", "").strip()
+            if pipeline_run_id:
+                tags = {**(tags or {}), "pipeline_run_id": pipeline_run_id}
+
             if os.path.dirname(results_path):
 
                 os.makedirs(os.path.dirname(results_path), exist_ok=True)
@@ -327,49 +323,44 @@ class MlFlowAssetLoader(AssetLoader):
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
-        import shutil
         import tempfile
 
         try:
             is_dir = os.path.isdir(results_path)
 
-            # When content is provided, write to a temp directory so we are not
-            # dependent on the current working directory being writable.
-            if content is not None and not is_dir:
-                tmp_dir = tempfile.mkdtemp()
-                log_path = os.path.join(tmp_dir, os.path.basename(results_path))
-                with open(log_path, "w") as f:
-                    f.write(content)
-            else:
-                tmp_dir = None
-                log_path = results_path
-                if os.path.dirname(results_path):
-                    os.makedirs(os.path.dirname(results_path), exist_ok=True)
-
-            client = MlflowClient()
-
-            experiment = self.get_or_create_experiment_by_name(
-                client, self.STATIC_ASSET_EXPERIMENT
-            )
-
-            with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
-
-                if tags:
-
-                    mlflow.set_tags(tags)
-
-                if is_dir:
-
-                    mlflow.log_artifacts(log_path, artifact_path=artifact_path)
-
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+                # When content is provided, write to a temp directory so we are not
+                # dependent on the current working directory being writable.
+                if content is not None and not is_dir:
+                    log_path = os.path.join(tmp_dir, os.path.basename(results_path))
+                    with open(log_path, "w") as f:
+                        f.write(content)
                 else:
+                    log_path = results_path
+                    if os.path.dirname(results_path):
+                        os.makedirs(os.path.dirname(results_path), exist_ok=True)
 
-                    mlflow.log_artifact(log_path, artifact_path=artifact_path)
+                client = MlflowClient()
 
-                logging.info(f"Logged asset to run {run.info.run_id}")
+                experiment = self.get_or_create_experiment_by_name(
+                    client, self.STATIC_ASSET_EXPERIMENT
+                )
 
-            if tmp_dir:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
+                with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
+
+                    if tags:
+
+                        mlflow.set_tags(tags)
+
+                    if is_dir:
+
+                        mlflow.log_artifacts(log_path, artifact_path=artifact_path)
+
+                    else:
+
+                        mlflow.log_artifact(log_path, artifact_path=artifact_path)
+
+                    logging.info(f"Logged asset to run {run.info.run_id}")
 
         except Exception as e:
 
@@ -465,7 +456,9 @@ class MlFlowAssetLoader(AssetLoader):
         tags = {"category": "enrichments"}
         if git_slug:
             tags["git_slug"] = git_slug
-        self.log_results(enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags)
+        self.log_results(
+            enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
+        )
 
         if os.path.exists(assets_dir):
             assets_artifact_path = f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
@@ -476,6 +469,39 @@ class MlFlowAssetLoader(AssetLoader):
             )
 
         return f"Logged enrichments from {enrichments_dir}"
+
+    def log_repositories(self, git_repos: list) -> None:
+        """Logs the repo list to the MLflow asset store under repos/repo_list.json."""
+        import json
+        import tempfile
+
+        try:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+                tmp_path = os.path.join(tmp_dir, "repo_list.json")
+                self.log_results(
+                    tmp_path,
+                    artifact_path="repos",
+                    tags={"category": "repositories"},
+                    content=json.dumps(git_repos),
+                )
+        except Exception:
+            logging.warning("Failed to log repo list to asset store", exc_info=True)
+
+    def load_repositories(self) -> list:
+        """Loads the repo list from MLflow, scoped by PIPELINE_RUN_ID if set, falling back to
+        GIT_REPO_LIST_CONTENTS."""
+        import json
+
+        asset_tags: dict = {"category": "repositories"}
+        pipeline_run_id = os.environ.get("PIPELINE_RUN_ID", "").strip()
+        if pipeline_run_id:
+            asset_tags["pipeline_run_id"] = pipeline_run_id
+
+        return self.download(
+            "repos/repo_list.json",
+            experiment_name=self.RESULT_ASSET_EXPERIMENT,
+            asset_tags=asset_tags,
+        ) or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]")
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of prompts in the MLflow registry matching the given prefix."""

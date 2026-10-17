@@ -777,9 +777,12 @@ class DataGenerationPipeline:
         import logging
         import os
 
+        from loaders.default_asset_loader import DefaultAssetLoader
         from utils import code_utils
 
         logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+        DefaultAssetLoader().log_repositories(git_repos)
 
         parent_source_path = os.getenv("PARENT_SOURCE_PATH", "source")
         parent_target_path = os.getenv("PARENT_TARGET_PATH", "target")

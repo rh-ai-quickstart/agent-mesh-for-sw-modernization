@@ -166,22 +166,15 @@ def compile_all_and_exit(pipelines: dict):
 @contextmanager
 def read_from_input_artifact(artifact):
     """Extract a KFP Input[Dataset] tar.gz archive to a temp dir."""
-    import shutil
     import tarfile
     import tempfile
 
-    tmp = tempfile.mkdtemp()
-
-    try:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
         with tarfile.open(artifact.path, "r:gz") as tar:
             tar.extractall(tmp)
 
         yield tmp
-
-    finally:
-
-        shutil.rmtree(tmp, ignore_errors=True)
 
 
 @contextmanager
@@ -195,13 +188,10 @@ def write_to_output_artifact(artifact, compresslevel=1):
                        data (e.g. parquet + embeddings) that compresses poorly.
     """
     import os
-    import shutil
     import tarfile
     import tempfile
 
-    tmp = tempfile.mkdtemp()
-
-    try:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
         yield tmp
 
@@ -210,23 +200,12 @@ def write_to_output_artifact(artifact, compresslevel=1):
         with tarfile.open(artifact.path, "w:gz", compresslevel=compresslevel) as tar:
             tar.add(tmp, arcname=".")
 
-    finally:
-
-        shutil.rmtree(tmp, ignore_errors=True)
-
 
 @contextmanager
 def use_ephemeral_space():
     """Yield a temporary directory and remove it on exit."""
-    import shutil
     import tempfile
 
-    tmp = tempfile.mkdtemp()
-
-    try:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
         yield tmp
-
-    finally:
-
-        shutil.rmtree(tmp, ignore_errors=True)

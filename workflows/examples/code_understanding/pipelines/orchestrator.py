@@ -43,6 +43,7 @@ def single_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     multi_repo: bool = False,
+    pipeline_run_id: str = dsl.PIPELINE_JOB_ID_PLACEHOLDER,
 ):
 
     if uses_kfp():
@@ -51,6 +52,7 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         idx = IndexingPipeline.run(
@@ -58,6 +60,7 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         AnalysisPipeline.run(
@@ -65,11 +68,16 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
     else:
 
+        import uuid
+
         from pipelines.base.data_generation import generate_git_slug
+
+        os.environ.setdefault("PIPELINE_RUN_ID", str(uuid.uuid4()))
 
         git_slug = generate_git_slug(git_repo, git_branch)
         source_path = f"{parent_source_path}/{git_slug}"
@@ -107,27 +115,38 @@ def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     repos: list = [],
+    pipeline_run_id: str = dsl.PIPELINE_JOB_ID_PLACEHOLDER,
 ):
 
     if uses_kfp():
 
-        dg = DataGenerationPipeline.run_multi_repo(repos=repos)
+        dg = DataGenerationPipeline.run_multi_repo(
+            repos=repos,
+            pipeline_run_id=pipeline_run_id,
+        )
 
         idx = IndexingPipeline.run_multi_repo(
             parent_target_path=parent_target_path,
+            pipeline_run_id=pipeline_run_id,
         ).after(dg)
 
         AnalysisPipeline.run_multi_repo(
             graphrag_dir=idx.output,
+            pipeline_run_id=pipeline_run_id,
         )
 
     else:
+
+        import uuid
+
+        os.environ.setdefault("PIPELINE_RUN_ID", str(uuid.uuid4()))
 
         git_repos = repos or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
 
         if not git_repos:
             logging.info(
-                "multi_repo_pipeline: no repos found in repos or GIT_REPO_LIST_CONTENTS; pipeline will do nothing."
+                "multi_repo_pipeline: no repos found in repos or GIT_REPO_LIST_CONTENTS;"
+                " pipeline will do nothing."
             )
 
         DataGenerationPipeline().run_multi_repo(git_repos)

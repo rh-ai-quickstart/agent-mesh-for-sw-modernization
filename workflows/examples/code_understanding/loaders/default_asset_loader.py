@@ -117,6 +117,14 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.log_enrichments(repo_dir, git_slug)
 
+    def log_repositories(self, git_repos: list) -> None:
+
+        return self._loader.log_repositories(git_repos)
+
+    def load_repositories(self) -> list:
+
+        return self._loader.load_repositories()
+
     def num_prompts(self, prompt_prefix: str) -> int:
 
         return self._loader.num_prompts(prompt_prefix)

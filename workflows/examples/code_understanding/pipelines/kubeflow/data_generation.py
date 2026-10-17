@@ -127,13 +127,16 @@ def generate_code_and_meta_op(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
 )
 def get_repo_list_op(repos: list = []) -> list:
-    """Returns the repo list for this pipeline run."""
-
+    """Returns the repo list for this pipeline run and logs it to the asset store."""
+    from loaders.default_asset_loader import DefaultAssetLoader
     from services.get_repo_list import get_multi_repo_list
     from utils.kubeflow_utils import setup_logging
 
     setup_logging()
-    return get_multi_repo_list(repos)
+
+    repo_list = get_multi_repo_list(repos)
+    DefaultAssetLoader().log_repositories(repo_list)
+    return repo_list
 
 
 ##############################################################################
@@ -146,6 +149,7 @@ def _run_pipeline(
     git_repo: str = os.getenv("GIT_REPO", ""),
     git_branch: str = os.getenv("GIT_BRANCH", "main"),
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ) -> Dataset:
 
     prep = prepare_environment_op(
@@ -160,15 +164,18 @@ def _run_pipeline(
         multi_repo=multi_repo,
     )
     gen.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    gen.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
     return gen.outputs["target_dir"]
 
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
-def _run_pipeline_multi_repo(repos: list = []):
+def _run_pipeline_multi_repo(repos: list = [], pipeline_run_id: str = ""):
     """Generates code metadata for all repositories in the repo list."""
 
     repo_list_task = get_repo_list_op(repos=repos)
+    repo_list_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    repo_list_task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
     with dsl.ParallelFor(
         items=repo_list_task.output, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
@@ -178,6 +185,7 @@ def _run_pipeline_multi_repo(repos: list = []):
             git_repo=repo.git_repo,
             git_branch=repo.git_branch,
             multi_repo=True,
+            pipeline_run_id=pipeline_run_id,
         )
 
 

@@ -19,6 +19,11 @@ class AssetLoader(ABC):
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
 
+    _MLFLOW_NS = os.environ.get("MLFLOW_NAMESPACE", os.environ.get("KFP_NAMESPACE", "demo"))
+    STATIC_ASSET_EXPERIMENT = f"{_MLFLOW_NS}/code-refactoring/assets/static"
+    RESULT_DIRECTORY_ASSET_EXPERIMENT = f"{_MLFLOW_NS}/code-refactoring/assets/result-directories"
+    RESULT_ASSET_EXPERIMENT = f"{_MLFLOW_NS}/code-refactoring/assets/results"
+
     @abstractmethod
     def load_skill(self, name: str) -> tuple[str, dict]:
         """Load a skill file by name.
@@ -170,6 +175,22 @@ class AssetLoader(ABC):
 
         Returns:
             A message describing what was logged.
+        """
+
+    @abstractmethod
+    def log_repositories(self, git_repos: list) -> None:
+        """Persists the repository list to the asset store with category=repositories.
+
+        Args:
+            git_repos: List of repository dicts (each with git_repo and git_branch keys).
+        """
+
+    @abstractmethod
+    def load_repositories(self) -> list:
+        """Loads the repository list from the asset store, falling back to GIT_REPO_LIST_CONTENTS.
+
+        Returns:
+            List of repository dicts.
         """
 
     @abstractmethod

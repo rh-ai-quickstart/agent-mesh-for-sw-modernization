@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 
@@ -224,6 +223,7 @@ class IndexingPipeline:
         import logging
         import os
 
+        from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_code_metadata_directories
 
         logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -233,8 +233,7 @@ class IndexingPipeline:
                 "KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"
             )
 
-        # git_repos = DefaultAssetLoader().download("repos/repo_list.json") or []
-        git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS")) or []
+        git_repos = DefaultAssetLoader().load_repositories()
 
         download_code_metadata_directories(git_repos, parent_target_path)
 

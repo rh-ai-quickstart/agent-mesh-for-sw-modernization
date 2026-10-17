@@ -76,19 +76,22 @@ def _run_pipeline(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
 
     task = generate_migration_report_op(
         graphrag_dir=graphrag_dir, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
     )
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
 
 @dsl.pipeline(name="graphrag-analysis-multi-repo-pipeline")
-def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
+def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset], pipeline_run_id: str = ""):
 
     task = run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
     task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    task.set_env_variable("PIPELINE_RUN_ID", pipeline_run_id)
 
 
 ##############################################################################

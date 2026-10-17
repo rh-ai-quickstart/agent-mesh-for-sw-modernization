@@ -13,7 +13,8 @@ def merge_json_enrichment(base, override):
 
 
 def is_global_scoped_enrichment(path: str) -> bool:
-    """Returns True if the enrichment path is global-scoped (under .assets), False if repo-scoped."""
+    """Returns True if the enrichment path is global-scoped (under .assets),
+    False if repo-scoped."""
     return ".assets" in path
 
 
@@ -49,7 +50,8 @@ def load_local_enrichments(download_dir: str, asset_path: str, *, is_dir: bool =
 
 
 def process_enrichments(loader, assets_dir: str) -> None:
-    """For each file in assets_dir, merges its JSON content with the static counterpart if one exists."""
+    """For each file in assets_dir, merges its JSON content with the static counterpart
+    if one exists."""
     import json
     from pathlib import Path
 
@@ -80,8 +82,8 @@ def download_result_directory(
 ):
     """Downloads a single repo's assets from the backing store to download_dir."""
 
+    from loaders.asset_loader import AssetLoader
     from loaders.default_asset_loader import DefaultAssetLoader
-    from loaders.mlflow_asset_loader import MlFlowAssetLoader
 
     DefaultAssetLoader(namespace=namespace).download_dir(
         asset_dir_path=DefaultAssetLoader.get_log_results_artifact_path(
@@ -90,7 +92,7 @@ def download_result_directory(
             multi_repo=multi_repo,
         ),
         download_dir=download_dir,
-        experiment_name=MlFlowAssetLoader.RESULT_DIRECTORY_ASSET_EXPERIMENT,
+        experiment_name=AssetLoader.RESULT_DIRECTORY_ASSET_EXPERIMENT,
         asset_tags=asset_tags,
     )
 
