@@ -166,11 +166,8 @@ def _run_pipeline(
 def _run_pipeline_multi_repo(repos: list = []):
     """Generates code metadata for all repositories in the repo list."""
 
-    repo_list_task = get_repo_list_op(repos=repos)
-    repo_list_task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
-
     with dsl.ParallelFor(
-        items=repo_list_task.output, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
+        items=repos, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
     ) as repo:
 
         _run_pipeline(
@@ -185,6 +182,16 @@ def _run_pipeline_multi_repo(repos: list = []):
 ##############################################################################
 
 
+def _get_repo_list(repos):
+    # Resolve the repo list at the top-level pipeline so the list param is passed
+    # directly to a component (not through an intermediate sub-pipeline - recommended
+    # for KFP v2).
+    task = get_repo_list_op(repos=repos)
+    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    return task
+
+
 class DataGenerationPipeline:
     run = staticmethod(_run_pipeline)
     run_multi_repo = staticmethod(_run_pipeline_multi_repo)
+    get_repo_list = staticmethod(_get_repo_list)

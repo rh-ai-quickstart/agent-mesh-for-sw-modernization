@@ -116,7 +116,9 @@ def multi_repo_pipeline(
 
     if uses_kfp():
 
-        dg = DataGenerationPipeline.run_multi_repo(repos=repos)
+        rp = DataGenerationPipeline.get_repo_list(repos=repos)
+
+        dg = DataGenerationPipeline.run_multi_repo(repos=rp.output)
 
         idx = IndexingPipeline.run_multi_repo(
             parent_target_path=parent_target_path,
