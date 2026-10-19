@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 
 def get_multi_repo_list(repos: list = None) -> list:
     """Return the repo list for a multi-repo pipeline run.
@@ -21,6 +25,8 @@ def get_multi_repo_list(repos: list = None) -> list:
     import json
     import logging
     import os
+
+    logging.info(f"get_multi_repo_list: starting...repos={repos}")
 
     if repos:
         return repos
