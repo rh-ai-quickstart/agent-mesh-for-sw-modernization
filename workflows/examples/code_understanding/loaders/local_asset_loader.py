@@ -148,7 +148,7 @@ class LocalAssetLoader(AssetLoader):
         os.makedirs(enrichments_dir, exist_ok=True)
         return f"Logged enrichments from {enrichments_dir}"
 
-    def log_repos(self, git_repos: list) -> None:
+    def log_repos(self, run_repos: list) -> None:
         """No-op. Local mode has no backing store; log_enrichments is in-memory only."""
         pass
 

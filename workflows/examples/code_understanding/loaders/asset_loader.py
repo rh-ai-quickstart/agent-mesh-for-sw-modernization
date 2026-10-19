@@ -178,7 +178,7 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_repos(self, git_repos: list) -> None:
+    def log_repos(self, run_repos: list) -> None:
         """Persists the repository list to the asset store.
 
         Implementations must first invoke ``log_enrichments`` to write
@@ -186,7 +186,8 @@ class AssetLoader(ABC):
         backend-specific logic (e.g. writing under category: repositories).
 
         Args:
-            git_repos: List of repository dicts (each with git_repo and git_branch keys).
+            run_repos: Repositories associated with the current pipeline run (each dict
+                has git_repo and git_branch keys).
         """
 
     @abstractmethod

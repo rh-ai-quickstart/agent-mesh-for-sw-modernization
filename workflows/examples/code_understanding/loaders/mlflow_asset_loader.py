@@ -466,18 +466,31 @@ class MlFlowAssetLoader(AssetLoader):
 
         return f"Logged enrichments from {enrichments_dir}"
 
-    def log_repos(self, git_repos: list) -> None:
+    def log_repos(self, run_repos: list) -> None:
         """Logs the repo list to the MLflow asset store: first as an enrichment under
-        repos/repo_list.json, then under category: repositories."""
+        repos/repo_list.json, then under category: repositories.
+
+        ``run_repos`` contains the repositories associated with the current pipeline run.
+        The existing ``repos/repo_list.json`` static asset (the full catalog of all known
+        repos) is used as the base and merged with ``run_repos`` via
+        ``merge_json_enrichment``, producing ``catalog_repos`` — the updated union of all
+        repos across the catalog. The enrichment is written with ``catalog_repos`` while
+        the asset store entry is written with the unmodified ``run_repos``.
+        """
         import json
         import tempfile
 
+        from utils.loader_utils import merge_json_enrichment
+
         try:
+            base = self.download("repos/repo_list.json") or []
+            catalog_repos = merge_json_enrichment(base, run_repos)
+
             with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
                 assets_dir = os.path.join(tmp_dir, ".enrichments", ".assets", "repos")
                 os.makedirs(assets_dir)
                 with open(os.path.join(assets_dir, "repo_list.json"), "w") as f:
-                    json.dump(git_repos, f)
+                    json.dump(catalog_repos, f)
                 self.log_enrichments(tmp_dir)
         except Exception:
             logging.warning("Failed to log repo list as enrichment", exc_info=True)
@@ -489,7 +502,7 @@ class MlFlowAssetLoader(AssetLoader):
                     tmp_path,
                     artifact_path="repos",
                     tags={"category": "repositories"},
-                    content=json.dumps(git_repos),
+                    content=json.dumps(run_repos),
                 )
         except Exception:
             logging.warning("Failed to log repo list to asset store", exc_info=True)

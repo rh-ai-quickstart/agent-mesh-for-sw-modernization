@@ -120,9 +120,9 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.log_enrichments(repo_dir, git_slug)
 
-    def log_repos(self, git_repos: list) -> None:
+    def log_repos(self, run_repos: list) -> None:
 
-        return self._loader.log_repos(git_repos)
+        return self._loader.log_repos(run_repos)
 
     def load_run_repos(self, run_id: str | None = None) -> list:
 
