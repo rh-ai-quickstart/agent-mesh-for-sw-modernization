@@ -22,7 +22,6 @@ from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 
-import catalog  # noqa: E402
 import cluster  # noqa: E402
 import downloads  # noqa: E402
 import index_storage  # noqa: E402
@@ -115,18 +114,15 @@ def set_namespace(body: NamespaceRequest, response: Response) -> dict[str, str]:
 
 @app.get("/api/catalog")
 def get_catalog() -> dict[str, Any]:
-    entries = catalog.load_catalog()
-    default = catalog.default_repo_entry()
-    return {
-        "repos": entries,
-        "default_key": catalog.repo_key(default) if default else None,
-    }
+    from api import repositories_service
+    return {"repos": repositories_service.get_catalog_repos()}
 
 
 @app.get("/api/indexes")
 def get_indexes() -> dict[str, Any]:
+    from api import repositories_service
     data = indexes.list_indexed_repos()
-    catalog_entries = catalog.load_catalog()
+    catalog_entries = repositories_service.get_catalog_repos()
     options = indexes.queryable_repos(data.get("indexes") or [], catalog_entries)
     return {**data, "queryable": options}
 

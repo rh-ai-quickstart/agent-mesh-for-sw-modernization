@@ -1334,7 +1334,7 @@
           api("/api/status"), api("/api/catalog"), api("/api/indexes"), api("/api/jobs")).catch(() => ({ jobs: [] })),
         ]); */
         const [status, catalog, indexes, v2runs, nsData] = await Promise.all([
-          api("/api/status"), api("/api/catalog"), api("/api/indexes"),
+          api("/api/status"), api("/api/v2/repositories/catalog-repos").catch(() => ({ repos: [] })), api("/api/indexes"),
           api("/api/v2/pipelines/runs").catch(() => ({ runs: [] })),
           api("/api/namespaces").catch(() => ({ namespaces: [], current: "" })),
         ]);

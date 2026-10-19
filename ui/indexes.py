@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from catalog import git_slug
 
 RESULT_DIRECTORY_EXPERIMENT_SUFFIX = "/code-refactoring/assets/result-directories"
 INDEX_ARTIFACT_ROOT = "results/datasets/repos"
@@ -233,7 +232,8 @@ def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def repo_is_indexed(git_repo: str, git_branch: str, indexes: list[dict[str, Any]]) -> bool:
-    slug = git_slug(git_repo, git_branch)
+    from utils.code_utils import generate_slug_from_repo
+    slug = generate_slug_from_repo(git_repo, git_branch)
     return any(item.get("git_slug") == slug and not item.get("multi_repo") for item in indexes)
 
 
@@ -246,8 +246,6 @@ def queryable_repos(
     catalog: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     """Catalog entries that have a GraphRAG index, plus optional multi-repo index."""
-    from catalog import repo_key
-
     options: list[dict[str, Any]] = []
     for item in catalog:
         if repo_is_indexed(item["git_repo"], item["git_branch"], indexes):
@@ -256,7 +254,7 @@ def queryable_repos(
                 {
                     **item,
                     "label": f"{short} @ {item['git_branch']}",
-                    "key": repo_key(item),
+                    "key": f"{item['git_repo']}|{item['git_branch']}",
                     "use_global": False,
                 }
             )
