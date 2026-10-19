@@ -121,15 +121,17 @@ def generate_code_and_meta_op(
 @dsl.component(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
 )
-def get_repo_list_op(repos: list = []) -> list:
+def get_repo_list_op(repos: str = "[]") -> list:
     """Returns the repo list for this pipeline run and logs it to the asset store."""
+    import json
+
     from loaders.default_asset_loader import DefaultAssetLoader
     from services.get_repo_list import get_multi_repo_list
     from utils.kubeflow_utils import setup_logging
 
     setup_logging()
 
-    repo_list = get_multi_repo_list(repos)
+    repo_list = get_multi_repo_list(json.loads(repos))
     DefaultAssetLoader().log_repositories(repo_list)
     return repo_list
 

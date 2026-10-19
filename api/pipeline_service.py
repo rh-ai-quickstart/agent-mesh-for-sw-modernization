@@ -57,7 +57,7 @@ def submit_pipeline_run(
 
     params: dict[str, Any] = {
         **({"git_repo": git_repo, "git_branch": git_branch} if single else {}),
-        **({"repos": repos} if not single else {}),
+        **({"repos": json.dumps(repos)} if not single else {}),
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
     }

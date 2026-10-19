@@ -84,7 +84,7 @@ from services.trigger_run import trigger_run
 params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
 repos_json = os.environ.get("KFP_TRIGGER_REPOS_JSON", "")
 if repos_json:
-    params["repos"] = json.loads(repos_json)
+    params["repos"] = repos_json
 run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], params)
 print(f"  Submitted run id: {run.run_id}")
 PYEOF

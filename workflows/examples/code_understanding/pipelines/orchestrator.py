@@ -111,7 +111,7 @@ def single_repo_pipeline(
 def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
-    repos: list = [],
+    repos: str = "[]",  # JSON-encoded list; avoids KFP v2 parameterType: LIST runtime drop
 ):
 
     if uses_kfp():
@@ -132,7 +132,7 @@ def multi_repo_pipeline(
 
         os.environ.setdefault("KFP_RUN_ID", f"local-{uuid.uuid4()}")
 
-        git_repos = repos or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
+        git_repos = json.loads(repos) or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
 
         if not git_repos:
             logging.info(
