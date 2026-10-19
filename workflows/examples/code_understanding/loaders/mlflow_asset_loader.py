@@ -466,10 +466,21 @@ class MlFlowAssetLoader(AssetLoader):
 
         return f"Logged enrichments from {enrichments_dir}"
 
-    def log_repositories(self, git_repos: list) -> None:
-        """Logs the repo list to the MLflow asset store under repos/repo_list.json."""
+    def log_repos(self, git_repos: list) -> None:
+        """Logs the repo list to the MLflow asset store: first as an enrichment under
+        repos/repo_list.json, then under category: repositories."""
         import json
         import tempfile
+
+        try:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+                assets_dir = os.path.join(tmp_dir, ".enrichments", ".assets", "repos")
+                os.makedirs(assets_dir)
+                with open(os.path.join(assets_dir, "repo_list.json"), "w") as f:
+                    json.dump(git_repos, f)
+                self.log_enrichments(tmp_dir)
+        except Exception:
+            logging.warning("Failed to log repo list as enrichment", exc_info=True)
 
         try:
             with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
@@ -483,13 +494,13 @@ class MlFlowAssetLoader(AssetLoader):
         except Exception:
             logging.warning("Failed to log repo list to asset store", exc_info=True)
 
-    def load_repositories(self) -> list:
-        """Loads the repo list from MLflow, scoped by KFP_RUN_ID if set, falling back to
-        GIT_REPO_LIST_CONTENTS."""
+    def load_run_repos(self, run_id: str | None = None) -> list:
+        """Loads the repo list from MLflow, scoped by run_id (or KFP_RUN_ID env var) if set,
+        falling back to GIT_REPO_LIST_CONTENTS."""
         import json
 
         asset_tags: dict = {"category": "repositories"}
-        kfp_run_id = os.environ.get("KFP_RUN_ID", "").strip()
+        kfp_run_id = (run_id or os.environ.get("KFP_RUN_ID", "")).strip()
         if kfp_run_id:
             asset_tags["kfp_run_id"] = kfp_run_id
 
@@ -498,6 +509,17 @@ class MlFlowAssetLoader(AssetLoader):
             experiment_name=self.RESULT_ASSET_EXPERIMENT,
             asset_tags=asset_tags,
         ) or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]")
+
+    def load_catalog_repos(self) -> list:
+        """Downloads the full repo catalog from MLflow, trying enrichments first and falling
+        back to static assets.
+
+        Delegates to ``download`` which resolves candidates via
+        ``_get_download_candidate_metadata``: enrichments in
+        ``RESULT_DIRECTORY_ASSET_EXPERIMENT`` are tried first, then
+        ``repos/repo_list.json`` in ``STATIC_ASSET_EXPERIMENT``.
+        """
+        return self.download("repos/repo_list.json") or []
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of prompts in the MLflow registry matching the given prefix."""

@@ -178,19 +178,40 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_repositories(self, git_repos: list) -> None:
-        """Persists the repository list to the asset store with category=repositories.
+    def log_repos(self, git_repos: list) -> None:
+        """Persists the repository list to the asset store.
+
+        Implementations must first invoke ``log_enrichments`` to write
+        ``repos/repo_list.json`` into the enrichments store, then apply any
+        backend-specific logic (e.g. writing under category: repositories).
 
         Args:
             git_repos: List of repository dicts (each with git_repo and git_branch keys).
         """
 
     @abstractmethod
-    def load_repositories(self) -> list:
+    def load_run_repos(self, run_id: str | None = None) -> list:
         """Loads the repository list from the asset store, falling back to GIT_REPO_LIST_CONTENTS.
+
+        Args:
+            run_id: Optional KFP run ID to scope the lookup. When omitted the
+                ``KFP_RUN_ID`` environment variable is used if set.
 
         Returns:
             List of repository dicts.
+        """
+
+    @abstractmethod
+    def load_catalog_repos(self) -> list:
+        """Downloads the full repo catalog, trying enrichments first and falling back to
+        static assets.
+
+        Resolution order:
+        1. Enrichments (``RESULT_DIRECTORY_ASSET_EXPERIMENT``) — written by ``log_repos``.
+        2. Static asset (``STATIC_ASSET_EXPERIMENT``) — fallback.
+
+        Returns:
+            List of repository dicts, or an empty list if neither source is available.
         """
 
     @abstractmethod

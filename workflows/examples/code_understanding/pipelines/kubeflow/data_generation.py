@@ -126,13 +126,13 @@ def get_repo_list_op(repos: str = "[]") -> list:
     import json
 
     from loaders.default_asset_loader import DefaultAssetLoader
-    from services.get_repo_list import get_multi_repo_list
+    from services.get_run_repos import get_run_repos
     from utils.kubeflow_utils import setup_logging
 
     setup_logging()
 
-    repo_list = get_multi_repo_list(json.loads(repos))
-    DefaultAssetLoader().log_repositories(repo_list)
+    repo_list = get_run_repos(json.loads(repos))
+    DefaultAssetLoader().log_repos(repo_list)
     return repo_list
 
 

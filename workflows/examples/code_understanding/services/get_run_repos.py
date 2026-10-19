@@ -7,7 +7,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
-def get_multi_repo_list(repos: list = None) -> list:
+def get_run_repos(repos: list = None) -> list:
     """Return the repo list for a multi-repo pipeline run.
 
     Resolution order:
@@ -26,7 +26,7 @@ def get_multi_repo_list(repos: list = None) -> list:
     import logging
     import os
 
-    logging.info(f"get_multi_repo_list: starting...repos={repos}")
+    logging.info(f"get_run_repos: starting...repos={repos}")
 
     if repos:
         return repos
@@ -35,5 +35,5 @@ def get_multi_repo_list(repos: list = None) -> list:
     if env_contents:
         return json.loads(env_contents)
 
-    logging.info("get_multi_repo_list: no repo list found in repos or GIT_REPO_LIST_CONTENTS; returning empty list.")
+    logging.info("get_run_repos: no repo list found in repos or GIT_REPO_LIST_CONTENTS; returning empty list.")
     return []

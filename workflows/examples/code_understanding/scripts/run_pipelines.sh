@@ -79,11 +79,16 @@ trigger_pipeline() {
     KFP_TRIGGER_REPOS_JSON="$repos_json" \
     PYTHONPATH="$CODE_UNDERSTANDING_DIR:${PYTHONPATH:-}" \
     python3 - <<'PYEOF'
-import os, json
+import os, json, logging
 from services.trigger_run import trigger_run
+from services.update_repos import log_repos
 params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
 repos_json = os.environ.get("KFP_TRIGGER_REPOS_JSON", "")
 if repos_json:
+    try:
+        log_repos(json.loads(repos_json))
+    except Exception:
+        logging.warning("log_repos failed; continuing with pipeline submission.", exc_info=True)
     params["repos"] = repos_json
 run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], params)
 print(f"  Submitted run id: {run.run_id}")

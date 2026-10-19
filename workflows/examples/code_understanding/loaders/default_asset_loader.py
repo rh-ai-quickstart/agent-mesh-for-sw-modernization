@@ -117,13 +117,17 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.log_enrichments(repo_dir, git_slug)
 
-    def log_repositories(self, git_repos: list) -> None:
+    def log_repos(self, git_repos: list) -> None:
 
-        return self._loader.log_repositories(git_repos)
+        return self._loader.log_repos(git_repos)
 
-    def load_repositories(self) -> list:
+    def load_run_repos(self, run_id: str | None = None) -> list:
 
-        return self._loader.load_repositories()
+        return self._loader.load_run_repos(run_id=run_id)
+
+    def load_catalog_repos(self) -> list:
+
+        return self._loader.load_catalog_repos()
 
     def num_prompts(self, prompt_prefix: str) -> int:
 

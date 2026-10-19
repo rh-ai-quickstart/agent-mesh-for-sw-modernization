@@ -58,9 +58,11 @@ app.add_middleware(
 
 from api.pipelines import router as _v2_router  # noqa: E402
 from api.queries import router as _v2_queries_router  # noqa: E402
+from api.repositories import router as _v2_repositories_router  # noqa: E402
 
 app.include_router(_v2_router, prefix="/api/v2")
 app.include_router(_v2_queries_router, prefix="/api/v2")
+app.include_router(_v2_repositories_router, prefix="/api/v2")
 
 
 class NamespaceRequest(BaseModel):

@@ -234,7 +234,7 @@ class IndexingPipeline:
                 "KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"
             )
 
-        git_repos = DefaultAssetLoader().load_repositories()
+        git_repos = DefaultAssetLoader().load_run_repos()
 
         download_code_metadata_directories(git_repos, parent_target_path)
 
