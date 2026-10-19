@@ -3,9 +3,6 @@ import logging
 import os
 import traceback
 
-import mlflow
-from mlflow.tracking import MlflowClient
-
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 from .asset_loader import AssetLoader  # noqa: E402
@@ -28,14 +25,16 @@ class MlFlowAssetLoader(AssetLoader):
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 
         if tracking_uri:
+            import mlflow
 
             mlflow.set_tracking_uri(tracking_uri)
 
     def _get_absolute_artifact_uri(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
     ):
+        import mlflow
 
-        client = MlflowClient()
+        client = mlflow.tracking.MlflowClient()
 
         experiment = self.get_or_create_experiment_by_name(client, experiment_name)
 
@@ -165,6 +164,8 @@ class MlFlowAssetLoader(AssetLoader):
         Returns:
             The asset content (parsed dict for .json files, str otherwise), or None if not found.
         """
+        import mlflow
+
         candidates = self._get_download_candidate_metadata(
             asset_file_path, git_slug, experiment_name, asset_tags
         )
@@ -205,6 +206,8 @@ class MlFlowAssetLoader(AssetLoader):
         git_slug: str = None,
     ):
         """Downloads a directory from the MLflow artifacts registry to a local directory."""
+        import mlflow
+
         candidates = self._get_download_candidate_metadata(
             asset_dir_path, git_slug, experiment_name, asset_tags
         )
@@ -266,6 +269,8 @@ class MlFlowAssetLoader(AssetLoader):
         content: str = None,
     ):
         """Logs pipeline output artifacts to a new MLflow run."""
+        import mlflow
+
         try:
             is_dir = os.path.isdir(results_path)
 
@@ -283,7 +288,7 @@ class MlFlowAssetLoader(AssetLoader):
 
                     f.write(content)
 
-            client = MlflowClient()
+            client = mlflow.tracking.MlflowClient()
 
             experiment_name = (
                 self.RESULT_DIRECTORY_ASSET_EXPERIMENT if is_dir else self.RESULT_ASSET_EXPERIMENT
@@ -319,6 +324,7 @@ class MlFlowAssetLoader(AssetLoader):
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
+        import mlflow
         import tempfile
 
         try:
@@ -336,7 +342,7 @@ class MlFlowAssetLoader(AssetLoader):
                     if os.path.dirname(results_path):
                         os.makedirs(os.path.dirname(results_path), exist_ok=True)
 
-                client = MlflowClient()
+                client = mlflow.tracking.MlflowClient()
 
                 experiment = self.get_or_create_experiment_by_name(
                     client, self.STATIC_ASSET_EXPERIMENT
@@ -376,6 +382,8 @@ class MlFlowAssetLoader(AssetLoader):
     def upload_prompt(self, prompt_path: str):
         """Registers a prompt template from the local assets directory to the MLflow prompt
         registry."""
+        import mlflow
+
         try:
 
             asset_uri = os.path.join(self._PROMPTS_DIR, prompt_path + ".txt")
@@ -406,6 +414,8 @@ class MlFlowAssetLoader(AssetLoader):
         Returns:
             Tuple of (body string, frontmatter metadata dict).
         """
+        import mlflow
+
         try:
 
             prompt_name = self.get_prompt_name(f"skills/{name}")
@@ -425,6 +435,8 @@ class MlFlowAssetLoader(AssetLoader):
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
         """Loads a prompt from the MLflow prompt registry and renders it with the provided
         variables."""
+        import mlflow
+
         try:
 
             from jinja2 import Template
@@ -536,6 +548,8 @@ class MlFlowAssetLoader(AssetLoader):
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of prompts in the MLflow registry matching the given prefix."""
+        import mlflow
+
         try:
 
             prefix = prompt_prefix.replace("/", "-")
@@ -556,9 +570,11 @@ class MlFlowAssetLoader(AssetLoader):
         Args:
             assets_dir: Local path to the directory containing assets to upload.
         """
+        import mlflow
+
         try:
 
-            client = MlflowClient()
+            client = mlflow.tracking.MlflowClient()
 
             experiment = self.get_or_create_experiment_by_name(
                 client, self.STATIC_ASSET_EXPERIMENT
