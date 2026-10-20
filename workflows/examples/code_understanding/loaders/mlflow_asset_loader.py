@@ -622,6 +622,8 @@ class MlFlowAssetLoader(AssetLoader):
 
                 logging.info(f"Upload complete. Run id: {run_id}")
 
+                self._mark_as_latest(client, experiment.experiment_id, run_id)
+
             except Exception:
 
                 client.set_terminated(run_id, status="FAILED")
