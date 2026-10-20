@@ -16,9 +16,6 @@ class DefaultAssetLoader(AssetLoader):
 
     def __init__(self, namespace: str = None):
         if os.getenv("ASSET_LOADER") == "mlflow":
-            # Deferred import: mlflow has a circular-import bug in some versions that
-            # triggers when it is imported at module level.  Importing here ensures mlflow
-            # is only loaded when it is actually needed.
             from .mlflow_asset_loader import MlFlowAssetLoader
 
             self._loader = MlFlowAssetLoader(namespace=namespace)

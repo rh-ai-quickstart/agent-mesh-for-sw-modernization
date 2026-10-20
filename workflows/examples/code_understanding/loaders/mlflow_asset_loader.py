@@ -3,6 +3,9 @@ import logging
 import os
 import traceback
 
+import mlflow  # noqa: F401 - module-level import intentional to prevent
+               # circular-import
+
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 from .asset_loader import AssetLoader  # noqa: E402
