@@ -70,11 +70,7 @@ def single_repo_pipeline(
 
     else:
 
-        import uuid
-
         from pipelines.base.data_generation import generate_git_slug
-
-        os.environ.setdefault("KFP_RUN_ID", f"local-{uuid.uuid4()}")
 
         git_slug = generate_git_slug(git_repo, git_branch)
         source_path = f"{parent_source_path}/{git_slug}"
@@ -127,10 +123,6 @@ def multi_repo_pipeline(
         AnalysisPipeline.run_multi_repo(graphrag_dir=idx.output)
 
     else:
-
-        import uuid
-
-        os.environ.setdefault("KFP_RUN_ID", f"local-{uuid.uuid4()}")
 
         git_repos = json.loads(repos) or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
 

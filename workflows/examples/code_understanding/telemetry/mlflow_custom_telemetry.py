@@ -47,7 +47,7 @@ class MlFlowCustomTelemetry(CustomTelemetry):
         atexit.register(counter.finalize)
 
     @staticmethod
-    def get_token_usage(kfp_run_id: str) -> dict:
+    def get_token_usage(pipeline_run_id: str) -> dict:
         from mlflow.tracking import MlflowClient
 
         try:
@@ -58,7 +58,7 @@ class MlFlowCustomTelemetry(CustomTelemetry):
                 return {}
             runs = client.search_runs(
                 experiment_ids=[experiment.experiment_id],
-                filter_string=f"tags.kfp_run_id = '{kfp_run_id}'",
+                filter_string=f"tags.pipeline_run_id = '{pipeline_run_id}'",
             )
             totals: dict[str, int] = {}
             for run in runs:

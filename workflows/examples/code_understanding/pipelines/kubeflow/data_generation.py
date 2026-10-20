@@ -159,7 +159,6 @@ def _run_pipeline(
         source_dir=prep.outputs["source_dir"],
         multi_repo=multi_repo,
     )
-    gen.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
     return gen.outputs["target_dir"]
 
@@ -189,7 +188,6 @@ def _get_repo_list(repos):
     # directly to a component (not through an intermediate sub-pipeline - recommended
     # for KFP v2).
     task = get_repo_list_op(repos=repos)
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
     return task
 
 

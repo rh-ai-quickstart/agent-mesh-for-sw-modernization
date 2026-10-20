@@ -274,9 +274,11 @@ class MlFlowAssetLoader(AssetLoader):
         try:
             is_dir = os.path.isdir(results_path)
 
-            kfp_run_id = os.environ.get("KFP_RUN_ID", "").strip()
-            if kfp_run_id:
-                tags = {**(tags or {}), "kfp_run_id": kfp_run_id}
+            from utils.pipeline_utils import get_pipeline_run_id
+
+            pipeline_run_id = get_pipeline_run_id()
+            if pipeline_run_id:
+                tags = {**(tags or {}), "pipeline_run_id": pipeline_run_id}
 
             if os.path.dirname(results_path):
 
@@ -520,14 +522,16 @@ class MlFlowAssetLoader(AssetLoader):
             logging.warning("Failed to log repo list to asset store", exc_info=True)
 
     def load_run_repos(self, run_id: str | None = None) -> list:
-        """Loads the repo list from MLflow, scoped by run_id (or KFP_RUN_ID env var) if set,
+        """Loads the repo list from MLflow, scoped by run_id (or get_pipeline_run_id()) if set,
         falling back to GIT_REPO_LIST_CONTENTS."""
         import json
 
+        from utils.pipeline_utils import get_pipeline_run_id
+
         asset_tags: dict = {"category": "repositories"}
-        kfp_run_id = (run_id or os.environ.get("KFP_RUN_ID", "")).strip()
-        if kfp_run_id:
-            asset_tags["kfp_run_id"] = kfp_run_id
+        pipeline_run_id = run_id or get_pipeline_run_id()
+        if pipeline_run_id:
+            asset_tags["pipeline_run_id"] = pipeline_run_id
 
         return self.download(
             "repos/repo_list.json",

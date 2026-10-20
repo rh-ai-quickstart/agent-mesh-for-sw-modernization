@@ -195,8 +195,9 @@ class AssetLoader(ABC):
         """Loads the repository list from the asset store, falling back to GIT_REPO_LIST_CONTENTS.
 
         Args:
-            run_id: Optional KFP run ID to scope the lookup. When omitted the
-                ``KFP_RUN_ID`` environment variable is used if set.
+            run_id: Optional pipeline run identifier to scope the lookup. In KFP
+                this is the ``ARGO_WORKFLOW_UID`` of the run. When omitted,
+                ``get_pipeline_run_id()`` is used.
 
         Returns:
             List of repository dicts.

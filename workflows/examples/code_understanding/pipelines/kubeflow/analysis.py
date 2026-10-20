@@ -82,14 +82,12 @@ def _run_pipeline(
         git_branch=git_branch,
         multi_repo=multi_repo,
     )
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
 
 @dsl.pipeline(name="graphrag-analysis-multi-repo-pipeline")
 def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
 
     task = run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
 
 ##############################################################################

@@ -20,7 +20,8 @@ def get_run_repos(run_id: str, namespace: str | None = None) -> list[dict[str, A
     lookup by ``run_id``.
 
     Args:
-        run_id: KFP run ID to scope the repo list lookup.
+        run_id: Pipeline run identifier to scope the repo list lookup. In KFP
+            this is the ``ARGO_WORKFLOW_UID`` of the run.
         namespace: Optional MLflow/KFP namespace for the asset loader.
 
     Returns:

@@ -45,10 +45,12 @@ class MlflowTokenLogger(BasicTokenLogger):
         client = MlflowClient()
 
         if not self.run_id:
-            kfp_run_id = os.environ.get("KFP_RUN_ID", "").strip()
+            from utils.pipeline_utils import get_pipeline_run_id
+
+            pipeline_run_id = get_pipeline_run_id()
             tags = {"mlflow.runName": "token_usage"}
-            if kfp_run_id:
-                tags["kfp_run_id"] = kfp_run_id
+            if pipeline_run_id:
+                tags["pipeline_run_id"] = pipeline_run_id
             experiment = client.get_experiment_by_name(self._experiment_name)
             experiment_id = (
                 experiment.experiment_id

@@ -12,5 +12,5 @@ class BasicCustomTelemetry(CustomTelemetry):
         litellm.callbacks = [BasicTokenLogger()]
 
     @staticmethod
-    def get_token_usage(kfp_run_id: str) -> dict:
+    def get_token_usage(pipeline_run_id: str) -> dict:
         return {}

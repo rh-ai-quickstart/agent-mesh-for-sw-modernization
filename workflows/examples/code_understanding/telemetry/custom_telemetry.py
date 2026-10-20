@@ -10,5 +10,5 @@ class CustomTelemetry(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_token_usage(kfp_run_id: str) -> dict:
-        """Return aggregated token usage for a KFP run."""
+    def get_token_usage(pipeline_run_id: str) -> dict:
+        """Return aggregated token usage for a pipeline run."""
