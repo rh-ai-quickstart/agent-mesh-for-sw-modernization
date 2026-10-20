@@ -22,6 +22,8 @@ from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 
+import mlflow  # noqa: E402, F401  - pre-warm: fully initializes mlflow before concurrent request threads can race on first import
+
 import cluster  # noqa: E402
 import downloads  # noqa: E402
 import index_storage  # noqa: E402
