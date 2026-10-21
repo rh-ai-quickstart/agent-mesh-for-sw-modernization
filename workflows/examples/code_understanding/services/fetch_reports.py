@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -41,18 +42,19 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
                 prefix, git_slug=git_slug, multi_repo=multi_repo
             )
             with tempfile.TemporaryDirectory() as tmpdir:
+                download_dir = os.path.join(tmpdir, os.path.basename(artifact_path))
                 try:
                     loader.download_dir(
                         artifact_path,
-                        download_dir=tmpdir,
+                        download_dir=download_dir,
                         experiment_name=loader.RESULT_ASSET_EXPERIMENT,
                         asset_tags={**base_tags, "category": category},
                     )
-                    content = _read_dir_contents(tmpdir)
+                    content = _read_dir_contents(download_dir)
                     logging.info(
                         f"Downloaded {category} report from artifact '{artifact_path}', "
                         f"git_slug='{git_slug}', multi_repo='{multi_repo}',"
-                        f"download_dir='{tmpdir}'"
+                        f"download_dir='{download_dir}'"
                     )
                     logging.debug(f"Contents: {content}")
                     return content
