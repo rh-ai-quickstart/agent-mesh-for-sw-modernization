@@ -66,10 +66,16 @@ class AnalysisPipeline:
 
         graphrag_source_path = os.getenv("KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source")
 
+        artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
+            DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+            git_slug=None,
+            multi_repo=True,
+        )
+
         logging.info("Downloading multi-repo GraphRAG index...")
         download_result_directory(
             git_slug=None,
-            download_dir=os.path.join(graphrag_source_path, "output"),
+            download_dir=os.path.join(graphrag_source_path, os.path.basename(artifact_path)),
             results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
             multi_repo=True,
             asset_tags={"multi_repo": True, "category": "indexing"},

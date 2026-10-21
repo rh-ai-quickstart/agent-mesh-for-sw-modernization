@@ -428,7 +428,8 @@ class DependencyAnalyzer:
 
         Args:
             download_dir: Root directory of the GraphRAG source. Artifacts are
-                downloaded into its output/ subdirectory and settings.yaml is written here.
+                downloaded into a subdirectory named after the artifact leaf and
+                settings.yaml is written here.
             git_slug: Repository slug used to scope the artifact lookup.
             multi_repo: Whether the index spans multiple repositories.
             git_repo: Repository URL, used in error messages.
@@ -442,7 +443,12 @@ class DependencyAnalyzer:
         from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_result_directory
 
-        output_dir = os.path.join(download_dir, "output")
+        artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
+            DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+            git_slug=git_slug,
+            multi_repo=multi_repo,
+        )
+        output_dir = os.path.join(download_dir, os.path.basename(artifact_path))
 
         try:
             download_result_directory(
