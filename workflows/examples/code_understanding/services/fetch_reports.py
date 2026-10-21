@@ -51,7 +51,8 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
                     content = _read_dir_contents(tmpdir)
                     logging.info(
                         f"Downloaded {category} report from artifact '{artifact_path}', "
-                        f"git_slug='{git_slug}', multi_repo='{multi_repo}'"
+                        f"git_slug='{git_slug}', multi_repo='{multi_repo}',"
+                        f"download_dir='{tmpdir}'"
                     )
                     logging.debug(f"Contents: {content}")
                     return content
