@@ -5,11 +5,11 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
-def merge_json_enrichment(base, override):
+def merge_json_enrichment(base, override, treat_lists_as_singletons: bool = False):
     """Recursively merges override into base. Delegates to json_utils.merge_json."""
     from utils.json_utils import merge_json
 
-    return merge_json(base, override)
+    return merge_json(base, override, treat_lists_as_singletons)
 
 
 def is_global_scoped_enrichment(path: str) -> bool:

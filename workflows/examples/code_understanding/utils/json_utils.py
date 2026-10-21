@@ -8,12 +8,17 @@ import yaml
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
-def merge_json(base, override):
+def merge_json(base, override, treat_lists_as_singletons: bool = False):
     """Recursively merges override into base.
 
     - Both dicts: keys combined; override wins on conflict.
-    - Both lists: base elements kept; override elements appended if not already present,
-      with nested dicts/lists merged recursively into the first compatible element.
+    - Both lists: base elements kept; override elements appended if not already present.
+      When ``treat_lists_as_singletons=False`` (default) each override element is treated
+      as an independent value: appended only if an equal element is not already present
+      (identity semantics — multiple elements of the same type may coexist).
+      When ``treat_lists_as_singletons=True`` at most one element of each type is kept —
+      nested dicts/lists are merged recursively into the first element of the same type
+      (type-based singleton semantics).
     - Otherwise: override takes precedence over base.
     """
     if not override:
@@ -23,18 +28,22 @@ def merge_json(base, override):
     if isinstance(base, dict) and isinstance(override, dict):
         merged = {}
         for key in set(base) | set(override):
-            merged[key] = merge_json(base.get(key), override.get(key))
+            merged[key] = merge_json(base.get(key), override.get(key), treat_lists_as_singletons)
         return merged
     if isinstance(base, list) and isinstance(override, list):
         result = list(base)
         for item in override:
             if isinstance(item, (dict, list)):
-                for i, existing in enumerate(result):
-                    if type(existing) is type(item):
-                        result[i] = merge_json(existing, item)
-                        break
+                if treat_lists_as_singletons:
+                    for i, existing in enumerate(result):
+                        if type(existing) is type(item):
+                            result[i] = merge_json(existing, item, treat_lists_as_singletons)
+                            break
+                    else:
+                        result.append(item)
                 else:
-                    result.append(item)
+                    if item not in result:
+                        result.append(item)
             elif item not in result:
                 result.append(item)
         return result
