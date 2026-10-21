@@ -133,6 +133,8 @@ export UI_URL
 
 E2E_UI_PYTHON ?= 3.12
 E2E_UI_REQUIREMENTS ?= tests/e2e/ui/requirements.txt
+RUN_PIPELINES ?= false
+E2E_PIPELINE_ARGS = $(if $(filter true,$(RUN_PIPELINES)),--run-pipelines,)
 
 E2E_UI_INSTALL_CMD := uv python install $(E2E_UI_PYTHON) && uv run --no-project --python $(E2E_UI_PYTHON) --with-requirements $(E2E_UI_REQUIREMENTS) -- playwright install chromium
 E2E_UI_TEST_CMD    := uv run --no-project --python $(E2E_UI_PYTHON) --with-requirements $(E2E_UI_REQUIREMENTS) -- python -m pytest tests/e2e/ui/ -v --tb=short --browser chromium --output=tests/e2e/ui/test-results --screenshot=on --tracing=retain-on-failure
@@ -197,8 +199,11 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 	helm-template \
 	verify-secrets \
 	verify-deploy \
-	test-ui \
+	test-ui-e2e \
 	test-api \
+	test-playwright \
+	test-cli-e2e \
+	test-e2e \
 	test-workflows \
 	test-all \
 	format \
@@ -245,7 +250,7 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 	deploy-console-plugin \
 	enable-console-plugin \
 	test-ui-install \
-	test-ui
+	test-ui-e2e
 
 help:
 	@echo "Agent Mesh for Software Modernization"
@@ -288,13 +293,16 @@ help-all:
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when enabled"
 	@echo ""
 	@echo "Testing:"
-	@echo "  test-all                    Run API, UI unit, workflow, and index transfer tests"
+	@echo "  test-all                    Run API, UI unit, Playwright, workflow, and index transfer tests"
 	@echo "  test-api                    Run API route and service tests"
 	@echo "  test-ui-unit                Run console API and unit tests"
+	@echo "  test-playwright             Test UI submissions with mocked APIs (no cluster)"
 	@echo "  test-workflows              Run workflow pipeline tests"
 	@echo "  test-index-transfer         Run index transfer tests"
 	@echo "  test-ui-install             Install Playwright and Chromium for UI smoke tests"
-	@echo "  test-ui                     Check the deployed console UI with Playwright"
+	@echo "  test-ui-e2e                 Check the deployed console UI with Playwright"
+	@echo "  test-cli-e2e                Run deployed CLI tests (RUN_PIPELINES=true enables pipeline tests)"
+	@echo "  test-e2e                    Run CLI then UI E2E suites (RUN_PIPELINES=true enables pipeline tests)"
 	@echo "  helm-dependencies           Download Helm chart dependencies"
 	@echo "  helm-lint                   Lint the deployment chart"
 	@echo "  helm-template               Render the deployment chart"
@@ -352,8 +360,9 @@ help-all:
 	@echo "Common runtime overrides (not exhaustive):"
 	@echo "  ENV_FILE                    Environment file to load (default: ./.env)"
 	@echo "  BASE_VERSION                Fallback for omitted image tags (default: $(BASE_VERSION))"
-	@echo "  UI_URL                      Override the console URL for test-ui (for example http://localhost:8080)"
+	@echo "  UI_URL                      Override the console URL for test-ui-e2e (for example http://localhost:8080)"
 	@echo "  E2E_UI_PYTHON               Python version for Playwright tests (default: 3.12)"
+	@echo "  RUN_PIPELINES               Include real pipeline runs in E2E tests (default: false)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
 	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  MANAGE_NAMESPACE           Create namespace and apply metadata (default: true; false for pre-provisioned namespaces)"
@@ -694,13 +703,28 @@ test-workflows:
 	uv run --project . --group test --frozen \
 		pytest tests/unit/workflows
 
-test-all: test-api test-ui-unit test-workflows test-index-transfer
+test-all: test-api test-ui-unit test-playwright test-workflows test-index-transfer
 
 test-ui-install:
 	@echo "==> Installing Playwright and Chromium for UI smoke tests..."
 	$(E2E_UI_INSTALL_CMD)
 
-test-ui:
+test-playwright:
+	@echo "==> Running browser tests with mocked APIs..."
+	uv run --project . --group test --frozen playwright install chromium
+	uv run --project . --group test --frozen \
+		python -m pytest tests/playwright/ -v --tb=short --browser chromium
+
+test-e2e:
+	$(MAKE) test-cli-e2e
+	$(MAKE) test-ui-e2e
+
+test-cli-e2e:
+	@echo "==> Running CLI E2E tests against the deployed project..."
+	uv run --project . --group test --frozen \
+		python -m pytest tests/e2e/cli/ $(E2E_PIPELINE_ARGS) -v --tb=short
+
+test-ui-e2e:
 	@set -eu; \
 	KFP_NAMESPACE="$(KFP_NAMESPACE)"; export KFP_NAMESPACE; \
 	: "$${KFP_NAMESPACE:?ERROR: set KFP_NAMESPACE in the environment or pass KFP_NAMESPACE=<namespace> to make}"; \

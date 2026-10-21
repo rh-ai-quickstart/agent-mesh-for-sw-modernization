@@ -18,7 +18,7 @@ KFP_NAMESPACE = os.getenv("KFP_NAMESPACE", "").strip()
 def require_deployed_console() -> None:
     """Fail early unless the deployed app's readiness endpoint is healthy."""
     if not UI_URL:
-        pytest.fail("UI_URL is not set; run this suite with `make test-ui`.")
+        pytest.fail("UI_URL is not set; run this suite with `make test-ui-e2e`.")
 
     try:
         with urlopen(f"{UI_URL}/api/health", timeout=15) as response:

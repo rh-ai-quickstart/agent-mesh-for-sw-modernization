@@ -6,12 +6,20 @@ on:
       branch:
         required: true
         type: string
+      run_pipelines:
+        description: Run real indexing and analysis-only pipelines
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       branch:
         description: Branch to deploy and test
         default: main
         type: string
+      run_pipelines:
+        description: Run real indexing and analysis-only pipelines
+        type: boolean
+        default: false
 
 concurrency:
   group: agent-mesh-for-sw-modernization-ci-testing
@@ -41,7 +49,7 @@ jobs:
           repo_url: https://github.com/${{ github.repository }}
           ref: ${{ inputs.branch }}
           namespace: agent-mesh-for-sw-modernization-ci-project-1
-          deploy_command: "make install MANAGE_NAMESPACE=false DEPLOY_EMBEDDING_MODEL=true WAIT_TIMEOUT=10m"
+          deploy_command: "make install MANAGE_NAMESPACE=false DEPLOY_EMBEDDING_MODEL=true WAIT_TIMEOUT=10m CUSTOM_EVALUATOR=basic"
         env:
           PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
           PROD_SERVER: ${{ secrets.PROD_SERVER }}
@@ -75,13 +83,22 @@ jobs:
         env:
           KFP_NAMESPACE: agent-mesh-for-sw-modernization-ci-project-1
 
-      - name: Run tests
+      - name: Run CLI and UI E2E tests
         uses: ./.github/actions/run-quickstart-tests
-        timeout-minutes: 30
+        timeout-minutes: 240
         with:
-          test_command: "make test-ui"
+          test_command: "make test-e2e RUN_PIPELINES=${{ inputs.run_pipelines }}"
           upload_results: "tests/e2e/ui/test-results"
         env:
+          # apply-secrets must receive the same configuration as installation.
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GRAPHRAG_LLM_TOKEN: ${{ secrets.GRAPHRAG_LLM_TOKEN }}
+          GRAPHRAG_LLM_ID: ${{ vars.GRAPHRAG_LLM_ID }}
+          GRAPHRAG_LLM_API_BASE: ${{ vars.GRAPHRAG_LLM_API_BASE }}
+          GRAPHRAG_LLM_PROVIDER: ${{ vars.GRAPHRAG_LLM_PROVIDER }}
+          GRAPHRAG_LLM_PROVIDER_SETTINGS_XML: ${{ vars.GRAPHRAG_LLM_PROVIDER_SETTINGS_XML }}
+          DEPLOY_EMBEDDING_MODEL: "true"
+          CUSTOM_EVALUATOR: basic
           KFP_NAMESPACE: agent-mesh-for-sw-modernization-ci-project-1
 
       - name: Cleanup

@@ -20,9 +20,11 @@ test = [
     "kfp==2.17.0",
     "kfp-kubernetes==2.14.3",
     "opentelemetry-exporter-otlp-proto-grpc>=1.40.0",
+    "playwright==1.48.0",
     "PyGithub>=2.0.0",
     "pydantic>=2.0.0",
     "pytest>=8,<9",
+    "pytest-playwright==0.5.2",
     "pyyaml==6.0.2",
     "uvicorn[standard]>=0.34.0",
 ]
@@ -46,3 +48,6 @@ package = false
 
 [tool.pytest.ini_options]
 pythonpath = [".", "workflows/examples"]
+markers = [
+    "pipeline: deployed E2E tests that submit real pipeline or analysis runs (requires --run-pipelines)",
+]

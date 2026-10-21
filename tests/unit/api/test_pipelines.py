@@ -101,3 +101,27 @@ def test_analysis_submission_failure_returns_error(client, monkeypatch):
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Pipeline service unavailable"
+
+
+def test_pipeline_status_passes_selected_run_id_to_report_lookup(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        pipeline_service,
+        "get_kfp_run_state",
+        lambda run_id, namespace=None: "SUCCEEDED",
+    )
+    monkeypatch.setattr(
+        pipeline_service,
+        "get_run_git_metadata",
+        lambda run_id, namespace=None: ("repo-main", False),
+    )
+    monkeypatch.setattr(
+        pipeline_service,
+        "_fetch_reports",
+        lambda git_slug, multi_repo, kfp_run_id: seen.append(kfp_run_id) or (None, "report"),
+    )
+
+    status = pipeline_service.get_run_status("selected-kfp")
+
+    assert seen == ["selected-kfp"]
+    assert status["analysis_report"] == "report"
