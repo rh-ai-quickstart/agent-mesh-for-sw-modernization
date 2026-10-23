@@ -15,7 +15,6 @@ class MlFlowAssetLoader(AssetLoader):
     """Loads an asset from the MLflow artifacts registry."""
 
     _RUN_NAME = "code-understanding"
-
     def __init__(self, namespace: str = None):
 
         ns = namespace or os.environ.get(
@@ -32,14 +31,56 @@ class MlFlowAssetLoader(AssetLoader):
 
             mlflow.set_tracking_uri(tracking_uri)
 
-    def _get_absolute_artifact_uri(
+    def _get_global_enrichment_runs(self, client, experiment_id: str, base_filter: str) -> list:
+        """Returns the ordered list of global enrichment runs to merge: [checkpoint] + [deltas].
+
+        The checkpoint run (tagged latest=true) is first; delta runs (no latest tag, created
+        after the checkpoint) follow in chronological order.
+        """
+        checkpoint_runs = client.search_runs(
+            experiment_ids=[experiment_id],
+            filter_string=f"{base_filter} AND tags.latest = 'true'",
+            order_by=["attributes.start_time DESC"],
+            max_results=1,
+        )
+        checkpoint = checkpoint_runs[0] if checkpoint_runs else None
+
+        delta_filter = f"{base_filter} AND tags.latest IS NULL"
+        if checkpoint:
+            delta_filter += f" AND attributes.start_time >= {checkpoint.info.start_time}"
+
+        delta_runs = client.search_runs(
+            experiment_ids=[experiment_id],
+            filter_string=delta_filter,
+            order_by=["attributes.start_time ASC"],
+        )
+
+        return ([checkpoint] if checkpoint else []) + list(delta_runs)
+
+    def _get_absolute_artifact_uris(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
-    ):
+    ) -> list[str]:
         import mlflow
+
+        from utils.loader_utils import is_global_scoped_enrichment_tagset
 
         client = mlflow.tracking.MlflowClient()
 
         experiment = self.get_or_create_experiment_by_name(client, experiment_name)
+
+        tag_filter_parts = []
+        for k, v in (tags or {}).items():
+            if v is None:
+                tag_filter_parts.append(f'tags."{k}" IS NULL')
+            elif v != "":
+                tag_filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
+
+        if is_global_scoped_enrichment_tagset(tags):
+            base_filter = " AND ".join(tag_filter_parts)
+            runs = self._get_global_enrichment_runs(client, experiment.experiment_id, base_filter)
+            if not runs:
+                return [os.path.join(experiment.artifact_location, asset_file_path)]
+            return [os.path.join(run.info.artifact_uri, asset_file_path) for run in runs]
 
         if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags:
 
@@ -47,13 +88,7 @@ class MlFlowAssetLoader(AssetLoader):
 
         else:
 
-            filter_parts = []
-            for k, v in (tags or {}).items():
-                if v is None:
-                    filter_parts.append(f'tags."{k}" IS NULL')
-                elif v != "":
-                    filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
-            filter_string = " AND ".join(filter_parts)
+            filter_string = " AND ".join(tag_filter_parts)
 
         logging.debug(f"Filter string: {filter_string}")
 
@@ -70,7 +105,7 @@ class MlFlowAssetLoader(AssetLoader):
 
         logging.info(f"Base absolute storage URI: {asset_base_uri}")
 
-        return os.path.join(asset_base_uri, asset_file_path)
+        return [os.path.join(asset_base_uri, asset_file_path)]
 
     def _mark_as_latest(self, client, experiment_id, new_run_id, tags: dict = None):
 
@@ -146,6 +181,38 @@ class MlFlowAssetLoader(AssetLoader):
             (asset_path, experiment_name or self.STATIC_ASSET_EXPERIMENT, asset_tags),
         ]
 
+    def _download_and_merge_enrichments(
+        self, uris: list[str], dst_path: str = None
+    ):
+        """Downloads and merges content across multiple artifact URIs.
+
+        Returns the merged content (dict/list for JSON, str otherwise), or None if
+        no URI yields a readable artifact.
+        """
+        import mlflow
+
+        from utils.loader_utils import merge_json_enrichment
+
+        merged = None
+        latest_path = None
+        for uri in uris:
+            try:
+                path = mlflow.artifacts.download_artifacts(
+                    artifact_uri=uri, dst_path=dst_path
+                )
+                with open(path) as f:
+                    content = json.load(f) if uri.endswith(".json") else f.read()
+                merged = content if merged is None else merge_json_enrichment(merged, content)
+                latest_path = path
+            except Exception:
+                logging.info("_download_and_merge_enrichments: skipping URI %s: %s", uri, traceback.format_exc())
+
+        if latest_path and merged is not None:
+            with open(latest_path, "w") as f:
+                json.dump(merged, f) if isinstance(merged, (dict, list)) else f.write(merged)
+
+        return merged
+
     def download(
         self,
         asset_file_path: str,
@@ -167,8 +234,6 @@ class MlFlowAssetLoader(AssetLoader):
         Returns:
             The asset content (parsed dict for .json files, str otherwise), or None if not found.
         """
-        import mlflow
-
         candidates = self._get_download_candidate_metadata(
             asset_file_path, git_slug, experiment_name, asset_tags
         )
@@ -177,18 +242,13 @@ class MlFlowAssetLoader(AssetLoader):
 
             try:
 
-                asset_uri = self._get_absolute_artifact_uri(
+                asset_uris = self._get_absolute_artifact_uris(
                     path, experiment_name=exp_name, tags=tags
                 )
 
-                local_path = mlflow.artifacts.download_artifacts(
-                    artifact_uri=asset_uri,
-                    dst_path=download_dir,
-                )
-
-                with open(local_path, "r") as f:
-
-                    return json.load(f) if asset_uri.endswith(".json") else f.read()
+                merged = self._download_and_merge_enrichments(asset_uris, dst_path=download_dir)
+                if merged is not None:
+                    return merged
 
             except Exception:
 
@@ -219,19 +279,33 @@ class MlFlowAssetLoader(AssetLoader):
 
         for path, exp_name, tags in candidates:
             try:
-
-                asset_uri = self._get_absolute_artifact_uri(
+                asset_uris = self._get_absolute_artifact_uris(
                     path, experiment_name=exp_name, tags=tags
                 )
 
                 os.makedirs(parent_dir, exist_ok=True)
+                mlflow.artifacts.download_artifacts(
+                    artifact_uri=asset_uris[0], dst_path=parent_dir
+                )
 
-                mlflow.artifacts.download_artifacts(artifact_uri=asset_uri, dst_path=parent_dir)
+                enrichment_prefix = os.path.join(".enrichments", ".assets")
+                for root, _, files in os.walk(download_dir):
+                    for f in files:
+                        full_path = os.path.join(root, f)
+                        if enrichment_prefix not in full_path:
+                            continue
+                        rel_path = os.path.relpath(full_path, download_dir)
+                        file_uris = self._get_absolute_artifact_uris(
+                            f"{path}/{rel_path}", experiment_name=exp_name, tags=tags
+                        )
+                        merged = self._download_and_merge_enrichments(file_uris)
+                        if merged is not None:
+                            with open(full_path, "w") as fp:
+                                json.dump(merged, fp) if isinstance(merged, (dict, list)) else fp.write(merged)
 
                 return True
 
             except Exception:
-
                 logging.info(
                     "Asset %s not found, trying next candidate: %s",
                     path,
@@ -469,15 +543,15 @@ class MlFlowAssetLoader(AssetLoader):
         tags = {"category": "enrichments"}
         if git_slug:
             tags["git_slug"] = git_slug
+
         self.log_results(
             enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
         )
 
         if os.path.exists(assets_dir):
-            assets_artifact_path = f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets"
             self.log_results(
                 assets_dir,
-                artifact_path=assets_artifact_path,
+                artifact_path=f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
                 tags={"category": "enrichments"},
             )
 

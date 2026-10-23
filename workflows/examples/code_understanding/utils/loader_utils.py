@@ -18,6 +18,17 @@ def is_global_scoped_enrichment(path: str) -> bool:
     return ".assets" in path
 
 
+def is_global_scoped_enrichment_tagset(tags: dict) -> bool:
+    """Returns True if tags represent a global-scoped enrichment run
+    (category=enrichments with git_slug explicitly None)."""
+    return (
+        bool(tags)
+        and tags.get("category") == "enrichments"
+        and "git_slug" in tags
+        and tags["git_slug"] is None
+    )
+
+
 def normalize_asset_path(asset_path: str) -> str:
     """Strip a leading /assets/ prefix from asset_path if present."""
 
