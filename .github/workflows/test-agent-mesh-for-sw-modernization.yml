@@ -110,3 +110,14 @@ jobs:
           cleanup_command: "make uninstall"
         env:
           KFP_NAMESPACE: agent-mesh-for-sw-modernization-ci-project-1
+
+      - name: Clean up MLflow experiments
+        if: always()
+        working-directory: ./quickstart
+        timeout-minutes: 5
+        env:
+          MLFLOW_GATEWAY_URL: ${{ secrets.MLFLOW_GATEWAY_URL }}
+          KFP_NAMESPACE: agent-mesh-for-sw-modernization-ci-project-1
+        run: |
+          : "${MLFLOW_GATEWAY_URL:?MLFLOW_GATEWAY_URL secret must be set}"
+          make clean-mlflow LOCAL_MLFLOW_TRACKING_URI="$MLFLOW_GATEWAY_URL"

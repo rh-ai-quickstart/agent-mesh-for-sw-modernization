@@ -212,6 +212,7 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 	install \
 	_install-preflight \
 	uninstall \
+	clean-mlflow \
 	deploy-embedding-model \
 	prepare-workbench-images \
 	deploy-notebooks \
@@ -266,6 +267,7 @@ help:
 	@echo "Administrator tasks:"
 	@echo "  install                     Install the complete application stack"
 	@echo "  uninstall                   Remove the application stack and PVC-backed data"
+	@echo "  clean-mlflow                Mark quickstart MLflow experiments and runs for deletion"
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
 	@echo "  list-indexes                List completed index runs, including combined indexes"
 	@echo "  export-indexes              Download by INDEX_GIT_SLUG (latest) or INDEX_RUN_ID"
@@ -286,6 +288,7 @@ help-all:
 	@echo "Deployment:"
 	@echo "  install                     Install the complete application stack"
 	@echo "  uninstall                   Remove the application stack and PVC-backed data"
+	@echo "  clean-mlflow                Mark quickstart MLflow data for deletion (ARGS=--dry-run previews)"
 	@echo "  deploy-embedding-model      Deploy the e5-mistral embedding model"
 	@echo "  prepare-workbench-images    Register project workbench images with OpenShift AI"
 	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
@@ -1074,6 +1077,9 @@ run-pipelines:
 	oc wait job/run-pipelines -n "$(KFP_NAMESPACE)" \
 		--for=condition=complete --timeout="$(WAIT_TIMEOUT)" || JOB_EXIT=$$?; \
 	[ "$$JOB_EXIT" -eq 0 ] || { echo "Error: pipeline submission failed or timed out." >&2; exit "$$JOB_EXIT"; }
+
+clean-mlflow:
+	@LOCAL_MLFLOW_TRACKING_URI="$(LOCAL_MLFLOW_TRACKING_URI)" uv run --project . --frozen python workflows/examples/code_understanding/scripts/cleanup_mlflow.py $(ARGS)
 
 list-indexes:
 	@LOCAL_MLFLOW_TRACKING_URI="$(LOCAL_MLFLOW_TRACKING_URI)" uv run --project . --frozen python workflows/examples/code_understanding/scripts/transfer_index.py list

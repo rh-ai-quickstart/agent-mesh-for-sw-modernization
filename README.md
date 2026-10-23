@@ -564,6 +564,29 @@ secrets, and PVC-backed application data. The application and telemetry
 namespaces remain. Externally stored MLflow data, externally pushed container
 images, and the optional cluster-wide OpenShift console plugin also remain.
 
+To clean up MLflow data separately:
+
+```sh
+make clean-mlflow ARGS=--dry-run
+make clean-mlflow
+```
+
+Stop active pipelines and queries first (or run `make uninstall`) to prevent
+them from writing more data during cleanup. In the selected MLflow workspace,
+the target renames each quickstart experiment to `<original-name>-deleted-<experiment-id>`,
+then marks it and its runs for deletion. This includes the telemetry experiment
+(`MLFLOW_EXPERIMENT_NAME`, default `AIP-default`). Renaming frees the original
+names so a later installation or workflow run creates fresh experiments without
+restoring the old data. Other experiments and the MLflow service remain.
+
+MLflow experiment deletion is a **soft delete**. Stored artifact files are
+not permanently removed by this target. To reclaim storage, an MLflow
+administrator must run [server-side garbage collection](https://mlflow.org/docs/latest/api_reference/cli.html#mlflow-gc)
+against the server's backend and artifact store, scoped to the experiment IDs
+printed by the command. Previously deleted experiments that still have their
+original names require server-side garbage collection before those names can
+be reused; cleanup reports this condition without restoring them.
+
 ## Reference
 
 
