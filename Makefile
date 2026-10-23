@@ -194,6 +194,7 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 .PHONY: \
 	help \
 	help-all \
+	version \
 	helm-dependencies \
 	helm-lint \
 	helm-template \
@@ -272,6 +273,9 @@ help:
 	@echo "  import-indexes              Import a local INDEX_BUNDLE archive"
 	@echo ""
 	@echo "Run 'make help-all' to list all administrative and development tasks."
+
+version:
+	@echo "$(BASE_VERSION)"
 
 help-all:
 	@echo "Agent Mesh for Software Modernization"

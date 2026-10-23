@@ -1,64 +1,97 @@
-name: Build and push images (main)
+name: Build and push images
 
-# Publish main in non-fork repositories only when BASE_VERSION changes in the push.
-# Ordinary merges skip publishing; manual builds remain available for retries.
 on:
   push:
     branches:
       - main
+      - dev
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch whose images should be built
+        required: true
+        default: main
+        type: choice
+        options:
+          - main
+          - dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ inputs.target_branch || github.ref_name }}
+  cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
 
+env:
+  REGISTRY: quay.io/rh-ai-quickstart
+
 jobs:
-  version:
-    name: Check image version change
-    if: github.event.repository.fork == false
+  build-and-push:
+    if: github.repository_owner == 'rh-ai-quickstart' && github.event.repository.fork == false
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      changed: ${{ steps.version.outputs.changed }}
     steps:
-      - name: Checkout merged commit
+      - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
+          ref: ${{ inputs.target_branch || github.sha }}
 
-      - name: Compare BASE_VERSION before and after push
+      - name: Extract image tags
         id: version
         env:
-          BEFORE_SHA: ${{ github.event.before }}
+          TARGET_BRANCH: ${{ inputs.target_branch || github.ref_name }}
         run: |
-          VERSION=$(python3 .github/scripts/image_version.py)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No previous main commit to compare; use the manual workflow to publish." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+          BASE_VERSION=$(make version)
+          if [[ ! "${BASE_VERSION}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "make version must return a valid OCI tag (1-128 characters, starting with a letter, number, or underscore)." >&2
+            exit 1
           fi
-          git show "$BEFORE_SHA:Makefile" > "$RUNNER_TEMP/Makefile.before"
-          PREVIOUS_VERSION=$(python3 .github/scripts/image_version.py --makefile "$RUNNER_TEMP/Makefile.before")
-          if [[ "$VERSION" == "$PREVIOUS_VERSION" ]]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "BASE_VERSION is still $VERSION; skipping image publication." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${TARGET_BRANCH}" = "main" ]; then
+            TAG_BASE="${BASE_VERSION}"
+          elif [ "${TARGET_BRANCH}" = "dev" ]; then
+            TAG_BASE="${BASE_VERSION}-dev"
           else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "BASE_VERSION changed from $PREVIOUS_VERSION to $VERSION; publishing images." >> "$GITHUB_STEP_SUMMARY"
+            echo "Unsupported target branch: ${TARGET_BRANCH}" >&2
+            exit 1
           fi
+          COMMIT_SHA=$(git rev-parse HEAD)
+          VERSIONS="${TAG_BASE} ${TAG_BASE}-${COMMIT_SHA}"
+          if [ "${TARGET_BRANCH}" = "main" ]; then
+            VERSIONS="${VERSIONS} latest"
+          else
+            VERSIONS="${VERSIONS} dev"
+          fi
+          for TAG in ${VERSIONS}; do
+            if [[ ! "${TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+              echo "Derived image tag is not a valid OCI tag: ${TAG}" >&2
+              exit 1
+            fi
+          done
+          echo "versions=${VERSIONS}" >> "$GITHUB_OUTPUT"
 
-  publish:
-    name: Build and push main images
-    needs: version
-    if: needs.version.outputs.changed == 'true'
-    # Queue only publishers, so ordinary pushes cannot replace a pending version bump.
-    concurrency:
-      group: publish-main-images-${{ github.repository }}-${{ needs.version.outputs.version }}
-      cancel-in-progress: false
-    uses: ./.github/workflows/build-and-push-manual.yaml
-    with:
-      target_branch: ${{ github.sha }}
-      version: ${{ needs.version.outputs.version }}
-    secrets:
-      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Build all images
+        run: |
+          IFS=' ' read -ra VERSIONS <<< "${{ steps.version.outputs.versions }}"
+          for version in "${VERSIONS[@]}"; do
+            echo "Building images with version: ${version}"
+            VERSION="${version}" make build-all-images
+          done
+
+      - name: Push all images
+        run: |
+          IFS=' ' read -ra VERSIONS <<< "${{ steps.version.outputs.versions }}"
+          for version in "${VERSIONS[@]}"; do
+            echo "Pushing images with version: ${version}"
+            VERSION="${version}" make push-all-images
+          done
