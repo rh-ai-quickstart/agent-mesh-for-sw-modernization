@@ -21,8 +21,8 @@ if _CU_ROOT not in sys.path:
 from services.fetch_reports import fetch_reports as _fetch_reports  # noqa: E402
 from services.get_run_status import get_kfp_run_state  # noqa: E402
 from services.list_runs import get_run_git_metadata, list_kfp_runs  # noqa: E402
-from services.update_repos import log_repos  # noqa: E402
 from services.trigger_run import trigger_run as _trigger_run  # noqa: E402
+from services.update_repos import log_repos  # noqa: E402
 
 
 def submit_pipeline_run(
@@ -47,11 +47,10 @@ def submit_pipeline_run(
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
     }
 
-    if not single:
-        try:
-            log_repos(repos, namespace)
-        except Exception:
-            logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
+    try:
+        log_repos(repos, namespace)
+    except Exception:
+        logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
 
     run = _trigger_run(pipeline_name, run_name, params, namespace=namespace)
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}

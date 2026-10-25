@@ -3,8 +3,7 @@ import logging
 import os
 import traceback
 
-import mlflow  # noqa: F401 - module-level import intentional to prevent
-               # circular-import
+import mlflow  # module-level import intentional to prevent circular-import
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -15,6 +14,7 @@ class MlFlowAssetLoader(AssetLoader):
     """Loads an asset from the MLflow artifacts registry."""
 
     _RUN_NAME = "code-understanding"
+
     def __init__(self, namespace: str = None):
 
         ns = namespace or os.environ.get(
@@ -27,8 +27,6 @@ class MlFlowAssetLoader(AssetLoader):
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 
         if tracking_uri:
-            import mlflow
-
             mlflow.set_tracking_uri(tracking_uri)
 
     def _get_global_enrichment_runs(self, client, experiment_id: str, base_filter: str) -> list:
@@ -60,8 +58,6 @@ class MlFlowAssetLoader(AssetLoader):
     def _get_absolute_artifact_uris(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
     ) -> list[str]:
-        import mlflow
-
         from utils.loader_utils import is_global_scoped_enrichment_tagset
 
         client = mlflow.tracking.MlflowClient()
@@ -76,10 +72,15 @@ class MlFlowAssetLoader(AssetLoader):
                 tag_filter_parts.append(f"tags.\"{k}\" = '{str(v)}'")
 
         if is_global_scoped_enrichment_tagset(tags):
+            enrichment_experiment = self.get_or_create_experiment_by_name(
+                client, self.RESULT_DIRECTORY_ASSET_EXPERIMENT
+            )
             base_filter = " AND ".join(tag_filter_parts)
-            runs = self._get_global_enrichment_runs(client, experiment.experiment_id, base_filter)
+            runs = self._get_global_enrichment_runs(
+                client, enrichment_experiment.experiment_id, base_filter
+            )
             if not runs:
-                return [os.path.join(experiment.artifact_location, asset_file_path)]
+                return [os.path.join(enrichment_experiment.artifact_location, asset_file_path)]
             return [os.path.join(run.info.artifact_uri, asset_file_path) for run in runs]
 
         if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags:
@@ -181,31 +182,29 @@ class MlFlowAssetLoader(AssetLoader):
             (asset_path, experiment_name or self.STATIC_ASSET_EXPERIMENT, asset_tags),
         ]
 
-    def _download_and_merge_enrichments(
-        self, uris: list[str], dst_path: str = None
-    ):
+    def _download_and_merge_enrichments(self, uris: list[str], dst_path: str = None):
         """Downloads and merges content across multiple artifact URIs.
 
         Returns the merged content (dict/list for JSON, str otherwise), or None if
         no URI yields a readable artifact.
         """
-        import mlflow
-
         from utils.loader_utils import merge_json_enrichment
 
         merged = None
         latest_path = None
         for uri in uris:
             try:
-                path = mlflow.artifacts.download_artifacts(
-                    artifact_uri=uri, dst_path=dst_path
-                )
+                path = mlflow.artifacts.download_artifacts(artifact_uri=uri, dst_path=dst_path)
                 with open(path) as f:
                     content = json.load(f) if uri.endswith(".json") else f.read()
                 merged = content if merged is None else merge_json_enrichment(merged, content)
                 latest_path = path
             except Exception:
-                logging.info("_download_and_merge_enrichments: skipping URI %s: %s", uri, traceback.format_exc())
+                logging.info(
+                    "_download_and_merge_enrichments: skipping URI %s: %s",
+                    uri,
+                    traceback.format_exc(),
+                )
 
         if latest_path and merged is not None:
             with open(latest_path, "w") as f:
@@ -251,12 +250,12 @@ class MlFlowAssetLoader(AssetLoader):
                     return merged
 
             except Exception:
-
                 logging.info(
-                    "Asset %s not found, trying next candidate: %s",
+                    "Asset %s not found, trying next candidate",
                     path,
-                    traceback.format_exc(),
                 )
+
+                logging.debug(traceback.format_exc())
 
         return None
 
@@ -269,8 +268,6 @@ class MlFlowAssetLoader(AssetLoader):
         git_slug: str = None,
     ):
         """Downloads a directory from the MLflow artifacts registry to a local directory."""
-        import mlflow
-
         candidates = self._get_download_candidate_metadata(
             asset_dir_path, git_slug, experiment_name, asset_tags
         )
@@ -301,16 +298,20 @@ class MlFlowAssetLoader(AssetLoader):
                         merged = self._download_and_merge_enrichments(file_uris)
                         if merged is not None:
                             with open(full_path, "w") as fp:
-                                json.dump(merged, fp) if isinstance(merged, (dict, list)) else fp.write(merged)
+                                if isinstance(merged, (dict, list)):
+                                    json.dump(merged, fp)
+                                else:
+                                    fp.write(merged)
 
                 return True
 
             except Exception:
                 logging.info(
-                    "Asset %s not found, trying next candidate: %s",
+                    "Asset %s not found, trying next candidate",
                     path,
-                    traceback.format_exc(),
                 )
+
+                logging.debug(traceback.format_exc())
 
         raise Exception(f"Asset {asset_dir_path} not found.")
 
@@ -346,8 +347,6 @@ class MlFlowAssetLoader(AssetLoader):
         content: str = None,
     ):
         """Logs pipeline output artifacts to a new MLflow run."""
-        import mlflow
-
         try:
             is_dir = os.path.isdir(results_path)
 
@@ -403,7 +402,6 @@ class MlFlowAssetLoader(AssetLoader):
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
-        import mlflow
         import tempfile
 
         try:
@@ -461,8 +459,6 @@ class MlFlowAssetLoader(AssetLoader):
     def upload_prompt(self, prompt_path: str):
         """Registers a prompt template from the local assets directory to the MLflow prompt
         registry."""
-        import mlflow
-
         try:
 
             asset_uri = os.path.join(self._PROMPTS_DIR, prompt_path + ".txt")
@@ -493,8 +489,6 @@ class MlFlowAssetLoader(AssetLoader):
         Returns:
             Tuple of (body string, frontmatter metadata dict).
         """
-        import mlflow
-
         try:
 
             prompt_name = self.get_prompt_name(f"skills/{name}")
@@ -514,8 +508,6 @@ class MlFlowAssetLoader(AssetLoader):
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
         """Loads a prompt from the MLflow prompt registry and renders it with the provided
         variables."""
-        import mlflow
-
         try:
 
             from jinja2 import Template
@@ -629,8 +621,6 @@ class MlFlowAssetLoader(AssetLoader):
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of prompts in the MLflow registry matching the given prefix."""
-        import mlflow
-
         try:
 
             prefix = prompt_prefix.replace("/", "-")
@@ -651,8 +641,6 @@ class MlFlowAssetLoader(AssetLoader):
         Args:
             assets_dir: Local path to the directory containing assets to upload.
         """
-        import mlflow
-
         try:
 
             client = mlflow.tracking.MlflowClient()
