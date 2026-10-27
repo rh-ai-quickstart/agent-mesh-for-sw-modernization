@@ -142,22 +142,25 @@ to be part of the Quickstart cluster.
 
 ### Required user permissions
 
-Full `cluster-admin` access is not required if the following permissions are delegated:
+The installer needs permission to manage project resources, including workloads,
+ImageStreams, service accounts, Roles, and RoleBindings, and to grant the chart's
+`admin`, MLflow view/edit, and DSPA API access.
 
-- **Project resources:** manage workloads, ImageStreams, service accounts, Roles,
-and RoleBindings, including permission to grant the chart's `admin`, MLflow
-view/edit, and DSPA API access.
+Cluster-scoped permissions are needed for these operations:
+
 - **Namespace setup:** create the target namespace and apply its OpenShift AI
-metadata. To skip this step, have an administrator prepare the namespace with
-the `opendatahub.io/dashboard: "true"` label, then use
-`make install MANAGE_NAMESPACE=false`.
-- **Read access:** installation reads the cluster ingress configuration and the
-gateway in `openshift-ingress`. Local MLflow commands also read the gateway
-Route. The console reads the target Namespace object.
-- **Optional telemetry:** read the OpenTelemetry and Tempo CRDs and manage telemetry resources.
-- **Optional console plugin:** manage cluster-wide `ConsolePlugin` and
-`ConsoleLink` resources, update the cluster console configuration, and read
-console resources in `openshift-console`.
+  metadata. To skip this step, have an administrator prepare the namespace with
+  the `opendatahub.io/dashboard: "true"` label, then use
+  `make install MANAGE_NAMESPACE=false`.
+- **Read access:** installation reads the cluster ingress configuration, and the
+  console reads the target Namespace object.
+- **Optional telemetry:** read the OpenTelemetry and Tempo CRDs. Creating a
+  separate telemetry namespace also requires namespace management permissions.
+- **Optional console plugin:** manage `ConsolePlugin` and `ConsoleLink` resources
+  and update the cluster console configuration.
+
+Additional namespaced permissions are needed to read the gateway and its Route
+in `openshift-ingress` and read console resources in `openshift-console` for the optional plugin.
 
 An administrator or another authorized user must provision OpenShift AI,
 MLflow, pipelines, and any optional operators before installation.
