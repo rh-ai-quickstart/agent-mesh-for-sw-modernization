@@ -142,19 +142,25 @@ to be part of the Quickstart cluster.
 
 ### Required user permissions
 
-The installer requires permission to manage workloads and resources in the
-target project. By default, `make install` also creates the target namespace
-and applies the OpenShift AI dashboard label and requester annotation. If an
-administrator pre-creates and configures the namespace, run
-`make install MANAGE_NAMESPACE=false` to skip those cluster-scoped namespace
-operations. The target namespace must already exist and have the
-`opendatahub.io/dashboard: "true"` label. If OpenTelemetry is enabled in a
-separate namespace, that namespace must also be pre-created.
+Full `cluster-admin` access is not required if the following permissions are delegated:
 
-Workbench ImageStreams are created in the target project and need permission
-to manage resources there. Optional OpenTelemetry deployment and the OpenShift
-console plugin have additional cluster-scoped requirements; use cluster-admin
-or equivalent delegated permissions for those features.
+- **Project resources:** manage workloads, ImageStreams, service accounts, Roles,
+and RoleBindings, including permission to grant the chart's `admin`, MLflow
+view/edit, and DSPA API access.
+- **Namespace setup:** create the target namespace and apply its OpenShift AI
+metadata. To skip this step, have an administrator prepare the namespace with
+the `opendatahub.io/dashboard: "true"` label, then use
+`make install MANAGE_NAMESPACE=false`.
+- **Read access:** installation reads the cluster ingress configuration and the
+gateway in `openshift-ingress`. Local MLflow commands also read the gateway
+Route. The console reads the target Namespace object.
+- **Optional telemetry:** read the OpenTelemetry and Tempo CRDs and manage telemetry resources.
+- **Optional console plugin:** manage cluster-wide `ConsolePlugin` and
+`ConsoleLink` resources, update the cluster console configuration, and read
+console resources in `openshift-console`.
+
+An administrator or another authorized user must provision OpenShift AI,
+MLflow, pipelines, and any optional operators before installation.
 
 ## Deploy
 
@@ -343,6 +349,7 @@ replace. Supplying `--git-repo` matters here: without it, the wrapper queries
 a multi-repository index, which may not exist yet.
 
 Expected output:
+
 ```
 ##################ADHOC RESULTS##################
 
@@ -352,6 +359,8 @@ The Tic‑Tac‑Toe codebase is organized as a single GAME package that cont
 
 1. **PLAY (the orchestrator)** – PLAY is the entry point and drives the entire game loop.  It initializes the board, alternates turns, calls the move‑generation routines, updates the display, and checks for win or draw conditions.  It also...
 ```
+
+
 
 ### 8. Analyze multiple repositories
 
@@ -380,6 +389,7 @@ wrappers/adhoc.sh "Which repositories share dependencies that affect migration o
 ```
 
 Example output:
+
 ```
 ##################ADHOC RESULTS##################
 
@@ -393,6 +403,8 @@ Example output:
 - The timetable code (`TIMETABLEAPP`) invokes `TRAINCATALOG.getTrains()`. This method constructs `Train` objects from the `Train` class defined in the **northpolesouthern‑train** repository. Consequently, the timetable repository has a hard‑coded compile‑time and runtime dependency on the train repository.  
 - **Migration sequence:** the **northpolesouthern‑train** repository must be built or migrated before the **northpolesouthern‑timetable** repository can be compiled or executed...
 ```
+
+
 
 ### 9. Analyze your own repositories
 
