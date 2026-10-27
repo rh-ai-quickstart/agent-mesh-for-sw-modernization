@@ -1,5 +1,4 @@
 import os
-import time
 
 from .asset_loader import AssetLoader
 from .local_asset_loader import LocalAssetLoader
@@ -112,14 +111,13 @@ class DefaultAssetLoader(AssetLoader):
         return self._loader.download_prompt(prompt_path, **kwargs)
 
     def log_enrichments(
-        self, repo_dir: str, git_slug: str | None = None, logged_time: int | None = None
+        self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         from utils.loader_utils import process_enrichments
 
-        logged_time = int(time.time() * 1000)
         process_enrichments(self, os.path.join(repo_dir, ".enrichments", ".assets"))
 
-        return self._loader.log_enrichments(repo_dir, git_slug, logged_time=logged_time)
+        return self._loader.log_enrichments(repo_dir, git_slug)
 
     def log_repos(self, run_repos: list) -> None:
 

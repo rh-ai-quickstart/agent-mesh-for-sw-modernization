@@ -143,7 +143,7 @@ class LocalAssetLoader(AssetLoader):
         return Template(body).render(**kwargs), meta
 
     def log_enrichments(
-        self, repo_dir: str, git_slug: str | None = None, logged_time: int | None = None
+        self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         """Ensures the enrichments directory exists. No remote upload for local storage."""
         enrichments_dir = os.path.join(repo_dir, ".enrichments")

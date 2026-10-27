@@ -56,19 +56,19 @@ class MlFlowAssetLoader(AssetLoader):
 
         return ([checkpoint] if checkpoint else []) + list(delta_runs)
 
-    def _mark_as_archived(self, client, experiment_id: str, logged_time: int) -> None:
-        """Archives all unarchived global enrichment runs created before logged_time."""
+    def _mark_as_archived(self, client, anchor_run) -> None:
+        """Archives all unarchived global enrichment runs created before anchor_run.info.start_time."""
         stale = client.search_runs(
-            experiment_ids=[experiment_id],
+            experiment_ids=[anchor_run.info.experiment_id],
             filter_string=(
                 "tags.category = 'enrichments'"
                 ' AND tags."git_slug" IS NULL'
                 " AND tags.archived IS NULL"
-                f" AND attributes.start_time < {logged_time}"
+                f" AND attributes.start_time < {anchor_run.info.start_time}"
             ),
         )
-        for run in stale:
-            client.set_tag(run.info.run_id, "archived", "true")
+        for stale_run in stale:
+            client.set_tag(stale_run.info.run_id, "archived", "true")
 
     def _get_absolute_artifact_uris(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
@@ -542,7 +542,7 @@ class MlFlowAssetLoader(AssetLoader):
             raise e
 
     def log_enrichments(
-        self, repo_dir: str, git_slug: str | None = None, logged_time: int | None = None
+        self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         """Persists the enrichments directory to the MLflow pipeline asset store."""
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
@@ -553,9 +553,11 @@ class MlFlowAssetLoader(AssetLoader):
         if git_slug:
             tags["git_slug"] = git_slug
 
-        self.log_results(
+        client = mlflow.tracking.MlflowClient()
+        run_id = self.log_results(
             enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
         )
+        anchor_run = client.get_run(run_id)
 
         if os.path.exists(assets_dir):
             self.log_results(
@@ -564,12 +566,7 @@ class MlFlowAssetLoader(AssetLoader):
                 tags={"category": "enrichments"},
             )
 
-        if logged_time is not None:
-            client = mlflow.tracking.MlflowClient()
-            experiment = self.get_or_create_experiment_by_name(
-                client, self.RESULT_DIRECTORY_ASSET_EXPERIMENT
-            )
-            self._mark_as_archived(client, experiment.experiment_id, logged_time)
+        self._mark_as_archived(client, anchor_run)
 
         return f"Logged enrichments from {enrichments_dir}"
 
