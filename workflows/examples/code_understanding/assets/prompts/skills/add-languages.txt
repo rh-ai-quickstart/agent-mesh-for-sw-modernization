@@ -101,6 +101,9 @@ Once read, update the configuration file so that it also supports the languages 
 Assume that the chat model used is gpt-oss-120b.
 The changes should be additive where possible, and try to keep them concise.
 
+REQUIRED: Insert all additions before the final `Output:` line; that line and its trailing blank lines
+are the generation cue and must remain untouched at the end of the file.
+
 Do NOT attempt to read the output path before writing. Use write_file to create it directly at:
   .enrichments/.assets/graphrag/extract_graph.txt
 

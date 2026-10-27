@@ -33,17 +33,18 @@ class MlFlowAssetLoader(AssetLoader):
         """Returns the ordered list of global enrichment runs to merge: [checkpoint] + [deltas].
 
         The checkpoint run (tagged latest=true) is first; delta runs (no latest tag, created
-        after the checkpoint) follow in chronological order.
+        after the checkpoint) follow in chronological order. Only unarchived runs are returned.
         """
+        archived_filter = f"{base_filter} AND tags.archived IS NULL"
         checkpoint_runs = client.search_runs(
             experiment_ids=[experiment_id],
-            filter_string=f"{base_filter} AND tags.latest = 'true'",
+            filter_string=f"{archived_filter} AND tags.latest = 'true'",
             order_by=["attributes.start_time DESC"],
             max_results=1,
         )
         checkpoint = checkpoint_runs[0] if checkpoint_runs else None
 
-        delta_filter = f"{base_filter} AND tags.latest IS NULL"
+        delta_filter = f"{archived_filter} AND tags.latest IS NULL"
         if checkpoint:
             delta_filter += f" AND attributes.start_time >= {checkpoint.info.start_time}"
 
@@ -54,6 +55,20 @@ class MlFlowAssetLoader(AssetLoader):
         )
 
         return ([checkpoint] if checkpoint else []) + list(delta_runs)
+
+    def _mark_as_archived(self, client, experiment_id: str, logged_time: int) -> None:
+        """Archives all unarchived global enrichment runs created before logged_time."""
+        stale = client.search_runs(
+            experiment_ids=[experiment_id],
+            filter_string=(
+                "tags.category = 'enrichments'"
+                ' AND tags."git_slug" IS NULL'
+                " AND tags.archived IS NULL"
+                f" AND attributes.start_time < {logged_time}"
+            ),
+        )
+        for run in stale:
+            client.set_tag(run.info.run_id, "archived", "true")
 
     def _get_absolute_artifact_uris(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
@@ -526,7 +541,9 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
-    def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
+    def log_enrichments(
+        self, repo_dir: str, git_slug: str | None = None, logged_time: int | None = None
+    ) -> str:
         """Persists the enrichments directory to the MLflow pipeline asset store."""
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
         assets_dir = os.path.join(enrichments_dir, ".assets")
@@ -546,6 +563,13 @@ class MlFlowAssetLoader(AssetLoader):
                 artifact_path=f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
                 tags={"category": "enrichments"},
             )
+
+        if logged_time is not None:
+            client = mlflow.tracking.MlflowClient()
+            experiment = self.get_or_create_experiment_by_name(
+                client, self.RESULT_DIRECTORY_ASSET_EXPERIMENT
+            )
+            self._mark_as_archived(client, experiment.experiment_id, logged_time)
 
         return f"Logged enrichments from {enrichments_dir}"
 

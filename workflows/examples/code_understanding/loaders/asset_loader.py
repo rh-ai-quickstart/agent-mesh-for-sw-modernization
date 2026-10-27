@@ -166,7 +166,9 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_enrichments(self, repo_dir: str, git_slug: str | None = None) -> str:
+    def log_enrichments(
+        self, repo_dir: str, git_slug: str | None = None, logged_time: int | None = None
+    ) -> str:
         """Persists the enrichments directory to the pipeline asset store.
 
         Args:
