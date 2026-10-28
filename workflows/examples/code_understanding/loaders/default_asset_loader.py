@@ -113,9 +113,9 @@ class DefaultAssetLoader(AssetLoader):
     def log_enrichments(
         self, repo_dir: str, git_slug: str | None = None
     ) -> str:
-        from utils.loader_utils import process_enrichments
+        from utils.loader_utils import get_global_scoped_enrichment_dir, process_enrichments
 
-        process_enrichments(self, os.path.join(repo_dir, ".enrichments", ".assets"))
+        process_enrichments(self, get_global_scoped_enrichment_dir(repo_dir))
 
         return self._loader.log_enrichments(repo_dir, git_slug)
 

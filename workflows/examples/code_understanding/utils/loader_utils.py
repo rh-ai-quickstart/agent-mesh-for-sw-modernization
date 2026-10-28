@@ -13,9 +13,26 @@ def merge_json_enrichment(base, override, treat_lists_as_singletons: bool = Fals
 
 
 def is_global_scoped_enrichment(path: str) -> bool:
-    """Returns True if the enrichment path is global-scoped (under .assets),
-    False if repo-scoped."""
-    return ".assets" in path
+    """Returns True if the path is global-scoped — i.e., at or under .enrichments/.assets."""
+    parts = os.path.normpath(path).split(os.sep)
+    return any(
+        parts[i] == ".enrichments" and parts[i + 1] == ".assets"
+        for i in range(len(parts) - 1)
+    )
+
+
+def get_global_scoped_enrichment_dir(base_dir: str | None) -> str | None:
+    """Returns the global-scoped enrichments assets directory for base_dir.
+
+    Returns None if base_dir is None.  If base_dir is already the enrichments
+    assets directory (.enrichments/.assets), it is returned unchanged.
+    Otherwise {base_dir}/.enrichments/.assets is returned.
+    """
+    if not base_dir:
+        return None
+    if is_global_scoped_enrichment(base_dir):
+        return base_dir
+    return os.path.join(base_dir, ".enrichments", ".assets")
 
 
 def is_global_scoped_enrichment_tagset(tags: dict) -> bool:
@@ -38,14 +55,17 @@ def normalize_asset_path(asset_path: str) -> str:
 
 
 def load_local_enrichments(download_dir: str, asset_path: str, *, is_dir: bool = False):
-    """Tier 1: check <download_dir>/.enrichments/.assets/ on the local filesystem.
+    """Tier 1: check the global-scoped enrichments assets directory on the local filesystem.
+
+    ``download_dir`` is passed to ``get_global_scoped_enrichment_dir`` so callers
+    may pass either the repository root or the assets directory itself.
 
     Returns resolved content (file) or True (directory) on hit, None on miss.
     """
     if not download_dir:
         return None
 
-    local_path = os.path.join(download_dir, ".enrichments", ".assets", asset_path)
+    local_path = os.path.join(get_global_scoped_enrichment_dir(download_dir), asset_path)
 
     if is_dir and os.path.isdir(local_path):
         logging.debug("Resolved asset dir from local enrichments: %s", local_path)

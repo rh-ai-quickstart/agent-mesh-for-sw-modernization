@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Annotated
 
 
@@ -31,8 +32,6 @@ class SafeFileManagementToolkit:
                     ]
 
                 t.args_schema = _PatchedSchema
-
-                import os
 
                 root_dir = getattr(t, "root_dir", None) or ""
                 original_run = t._run
@@ -97,8 +96,13 @@ def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None
     def read_asset(path: str) -> str:
         """Read a file from the pipeline asset directory by its path relative to assets/."""
         from loaders.default_asset_loader import DefaultAssetLoader
+        from utils.loader_utils import get_global_scoped_enrichment_dir
 
-        content = DefaultAssetLoader().download(path, download_dir=repo_dir, git_slug=git_slug)
+        content = DefaultAssetLoader().download(
+            path,
+            download_dir=get_global_scoped_enrichment_dir(repo_dir),
+            git_slug=git_slug,
+        )
         if content is None:
             raise RuntimeError(f"Required asset not found: {path}")
         if isinstance(content, (dict, list)):

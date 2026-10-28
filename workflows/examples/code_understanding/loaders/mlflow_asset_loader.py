@@ -57,7 +57,7 @@ class MlFlowAssetLoader(AssetLoader):
         return ([checkpoint] if checkpoint else []) + list(delta_runs)
 
     def _mark_as_archived(self, client, anchor_run) -> None:
-        """Archives all unarchived global enrichment runs created before anchor_run.info.start_time."""
+        """Archives all unarchived global enrichment runs created before anchor_run."""
         stale = client.search_runs(
             experiment_ids=[anchor_run.info.experiment_id],
             filter_string=(
@@ -545,8 +545,10 @@ class MlFlowAssetLoader(AssetLoader):
         self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         """Persists the enrichments directory to the MLflow pipeline asset store."""
+        from utils.loader_utils import get_global_scoped_enrichment_dir
+
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
-        assets_dir = os.path.join(enrichments_dir, ".assets")
+        assets_dir = get_global_scoped_enrichment_dir(repo_dir)
         os.makedirs(enrichments_dir, exist_ok=True)
 
         tags = {"category": "enrichments"}
@@ -554,17 +556,22 @@ class MlFlowAssetLoader(AssetLoader):
             tags["git_slug"] = git_slug
 
         client = mlflow.tracking.MlflowClient()
+        if os.path.exists(assets_dir):
+            try:
+                self.log_results(
+                    assets_dir,
+                    artifact_path=f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
+                    tags={"category": "enrichments"},
+                )
+            except Exception as e:
+                logging.warning("Failed to log assets_dir enrichment run; continuing: %s", e)
+
+        # anchor_run is logged last so its start_time is the latest, ensuring
+        # _mark_as_archived leaves exactly 1 unarchived global enrichment run.
         run_id = self.log_results(
             enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
         )
         anchor_run = client.get_run(run_id)
-
-        if os.path.exists(assets_dir):
-            self.log_results(
-                assets_dir,
-                artifact_path=f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
-                tags={"category": "enrichments"},
-            )
 
         self._mark_as_archived(client, anchor_run)
 
@@ -584,14 +591,14 @@ class MlFlowAssetLoader(AssetLoader):
         import json
         import tempfile
 
-        from utils.loader_utils import merge_json_enrichment
+        from utils.loader_utils import get_global_scoped_enrichment_dir, merge_json_enrichment
 
         try:
             base = self.download("repos/repo_list.json") or []
             catalog_repos = merge_json_enrichment(base, run_repos)
 
             with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
-                assets_dir = os.path.join(tmp_dir, ".enrichments", ".assets", "repos")
+                assets_dir = os.path.join(get_global_scoped_enrichment_dir(tmp_dir), "repos")
                 os.makedirs(assets_dir)
                 with open(os.path.join(assets_dir, "repo_list.json"), "w") as f:
                     json.dump(catalog_repos, f)
