@@ -7,7 +7,7 @@ description: >
   configuration. Outputs are written under .enrichments/.assets/ so they can be
   uploaded and applied by downstream pipeline stages.
 license: Apache-2.0
-compatibility: Requires list_directory, read_file, write_file, read_asset, log_enrichments tools.
+compatibility: Requires list_directory, read_file, write_file, read_asset, register_enrichments tools.
 metadata:
   version: "1.0"
   skills: []
@@ -109,7 +109,7 @@ Do NOT attempt to read the output path before writing. Use write_file to create 
 
 ## Step 4 — Persist outputs
 
-Call log_enrichments to store all files written under .enrichments/ to the pipeline asset store
+Call register_enrichments to store all files written under .enrichments/ to the pipeline asset store
 so they are available on future pipeline runs. No arguments are required.
 
 Do NOT write any files other than the two output paths specified in Steps 2 and 3. Do not create

@@ -102,7 +102,7 @@ class LocalAssetLoader(AssetLoader):
             with open(results_path, "w") as f:
                 f.write(content)
 
-    def log_static_asset(
+    def register_static_asset(
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Delegates to log_results; no experiment distinction for local storage."""
@@ -142,7 +142,7 @@ class LocalAssetLoader(AssetLoader):
         body, meta = self._get_prompt_body_and_metadata(raw)
         return Template(body).render(**kwargs), meta
 
-    def log_enrichments(
+    def register_enrichments(
         self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         """Ensures the enrichments directory exists. No remote upload for local storage."""
@@ -151,7 +151,7 @@ class LocalAssetLoader(AssetLoader):
         return f"Logged enrichments from {enrichments_dir}"
 
     def log_repos(self, run_repos: list) -> None:
-        """No-op. Local mode has no backing store; log_enrichments is in-memory only."""
+        """No-op. Local mode has no backing store; register_enrichments is in-memory only."""
         pass
 
     def load_run_repos(self, run_id: str | None = None) -> list:

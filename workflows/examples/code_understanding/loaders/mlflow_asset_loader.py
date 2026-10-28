@@ -413,7 +413,7 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
-    def log_static_asset(
+    def register_static_asset(
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
@@ -541,7 +541,7 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
-    def log_enrichments(
+    def register_enrichments(
         self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         """Persists the enrichments directory to the MLflow pipeline asset store."""
@@ -602,7 +602,7 @@ class MlFlowAssetLoader(AssetLoader):
                 os.makedirs(assets_dir)
                 with open(os.path.join(assets_dir, "repo_list.json"), "w") as f:
                     json.dump(catalog_repos, f)
-                self.log_enrichments(tmp_dir)
+                self.register_enrichments(tmp_dir)
         except Exception:
             logging.warning("Failed to log repo list as enrichment", exc_info=True)
 

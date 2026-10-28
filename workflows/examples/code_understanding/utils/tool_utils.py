@@ -52,7 +52,7 @@ class SafeFileManagementToolkit:
         return self._patch_tools(tools)
 
 
-def get_log_enrichments_tool(repo_dir: str, git_slug: str):
+def get_register_enrichments_tool(repo_dir: str, git_slug: str):
     """Return a LangChain tool that logs the enrichments directory to the pipeline asset store.
 
     The returned tool is a no-argument callable suitable for injection into a skill agent or
@@ -66,7 +66,7 @@ def get_log_enrichments_tool(repo_dir: str, git_slug: str):
     from langchain_core.tools import tool
 
     @tool
-    def log_enrichments(note: str = "") -> str:
+    def register_enrichments(note: str = "") -> str:
         """Persist the enrichments directory to the pipeline asset store.
 
         Call this after all output files have been written so they survive across pipeline runs.
@@ -74,9 +74,9 @@ def get_log_enrichments_tool(repo_dir: str, git_slug: str):
         """
         from loaders.default_asset_loader import DefaultAssetLoader
 
-        return DefaultAssetLoader().log_enrichments(repo_dir, git_slug)
+        return DefaultAssetLoader().register_enrichments(repo_dir, git_slug)
 
-    return log_enrichments
+    return register_enrichments
 
 
 def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None):

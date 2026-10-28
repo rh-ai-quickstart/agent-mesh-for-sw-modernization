@@ -6,7 +6,7 @@ description: >
   listed under metadata.skills in series against the target repository.
   Add skills to metadata.skills to extend the enrichment.
 license: Apache-2.0
-compatibility: Requires git, Python 3.11+, read_file, write_file, list_files, log_enrichments tools.
+compatibility: Requires git, Python 3.11+, read_file, write_file, list_files, register_enrichments tools.
 metadata:
   version: "1.0"
   skills:
@@ -18,9 +18,9 @@ metadata:
 ---
 Use the run_skill tool to execute each skill in the enabled skills list against the target repository.
 
-Once all skills have been executed, call log_enrichments to persist all files written under
+Once all skills have been executed, call register_enrichments to persist all files written under
 .enrichments/ to the pipeline asset store so they are available on future pipeline runs.
 No arguments are required.
 
-Do NOT write any files directly. Only use run_skill to execute skills and log_enrichments to
+Do NOT write any files directly. Only use run_skill to execute skills and register_enrichments to
 persist their outputs. Do not create test files, scratch files, or any other intermediate output.

@@ -88,11 +88,11 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.log_results(results_path, artifact_path, tags, content)
 
-    def log_static_asset(
+    def register_static_asset(
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
 
-        return self._loader.log_static_asset(results_path, artifact_path, tags, content)
+        return self._loader.register_static_asset(results_path, artifact_path, tags, content)
 
     def upload_all_assets(self, assets_dir: str):
 
@@ -110,14 +110,14 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.download_prompt(prompt_path, **kwargs)
 
-    def log_enrichments(
+    def register_enrichments(
         self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         from utils.loader_utils import get_global_scoped_enrichment_dir, process_enrichments
 
         process_enrichments(self, get_global_scoped_enrichment_dir(repo_dir))
 
-        return self._loader.log_enrichments(repo_dir, git_slug)
+        return self._loader.register_enrichments(repo_dir, git_slug)
 
     def log_repos(self, run_repos: list) -> None:
 

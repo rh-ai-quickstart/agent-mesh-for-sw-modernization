@@ -10,7 +10,7 @@ def get_run_skill_tool(repo_dir: str, git_slug: str, use_rhoai_mcp: bool = False
     Args:
         repo_dir:       Absolute path to the cloned repository.
         git_slug:       Repository slug forwarded to local sub-skill agents so their
-                        log_enrichments tool can tag artifacts correctly.
+                        register_enrichments tool can tag artifacts correctly.
         use_rhoai_mcp:  Whether to include rhoai-mcp tools in the skill agent.
 
     Returns:

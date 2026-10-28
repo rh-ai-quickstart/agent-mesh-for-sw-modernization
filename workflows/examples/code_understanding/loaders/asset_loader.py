@@ -120,7 +120,7 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_static_asset(
+    def register_static_asset(
         self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
     ):
         """Logs an artifact to the static asset store (same experiment as ``download``).
@@ -166,7 +166,7 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_enrichments(
+    def register_enrichments(
         self, repo_dir: str, git_slug: str | None = None
     ) -> str:
         """Persists the enrichments directory to the pipeline asset store.
@@ -183,7 +183,7 @@ class AssetLoader(ABC):
     def log_repos(self, run_repos: list) -> None:
         """Persists the repository list to the asset store.
 
-        Implementations must first invoke ``log_enrichments`` to write
+        Implementations must first invoke ``register_enrichments`` to write
         ``repos/repo_list.json`` into the enrichments store, then apply any
         backend-specific logic (e.g. writing under category: repositories).
 

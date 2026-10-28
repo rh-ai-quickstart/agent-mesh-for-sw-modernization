@@ -152,7 +152,7 @@ def run_skill(
 
     Returns the path to the generated report file, or None if no report was written.
     """
-    from utils.tool_utils import get_log_enrichments_tool, get_read_asset_tool
+    from utils.tool_utils import get_register_enrichments_tool, get_read_asset_tool
 
     logging.info("Running skill: %s", skill.name)
 
@@ -160,7 +160,7 @@ def run_skill(
     if skill.repo is None:
         extra_tools = [
             get_read_asset_tool(repo_dir, git_slug),
-            get_log_enrichments_tool(repo_dir, git_slug),
+            get_register_enrichments_tool(repo_dir, git_slug),
         ]
     else:
         extra_tools = None
@@ -204,7 +204,7 @@ def run_composite_skill(
     """
     from loaders.default_asset_loader import DefaultAssetLoader
     from tools.skill.skill_tool import get_run_skill_tool
-    from utils.tool_utils import get_log_enrichments_tool
+    from utils.tool_utils import get_register_enrichments_tool
 
     logging.info("Running composite skill: %s", composite_skill)
 
@@ -217,12 +217,12 @@ def run_composite_skill(
     logging.info("Composite skill instructions:\n%s", instructions)
 
     skill_tool = get_run_skill_tool(repo_dir, git_slug, use_rhoai_mcp)
-    log_enrichments_tool = get_log_enrichments_tool(repo_dir, git_slug)
+    register_enrichments_tool = get_register_enrichments_tool(repo_dir, git_slug)
     coro = _run_as_agent(
         repo_dir,
         instructions,
         use_rhoai_mcp=use_rhoai_mcp,
-        extra_tools=[skill_tool, log_enrichments_tool],
+        extra_tools=[skill_tool, register_enrichments_tool],
     )
     try:
         loop = asyncio.get_running_loop()
