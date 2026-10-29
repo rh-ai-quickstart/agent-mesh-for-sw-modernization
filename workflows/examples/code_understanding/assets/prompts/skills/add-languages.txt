@@ -24,13 +24,15 @@ java, python, c++, c, javascript, sql, ruby, shell, ansible, terraform, cloudfor
 jsp, freemarker, velocity, xslt, django, jinja2, handlebars, pug, ejs, nunjucks, mustache, erb,
 liquid, twig, blade
 
-Check each language found strictly against the list above. Do not assume a language is supported unless it appears explicitly in the list.
+Languages in the list above are already supported. Languages not found here may still be supported — the read_asset check below determines the final set.
 
-Once the scan is complete, produce an explicit list of unsupported languages before proceeding. If the list is empty, stop here and write no output files. Otherwise continue to Step 2.
+Then use read_asset with path `mappings/language_mappings.json` and collect the keys from the `file_extensions` section. Add any keys found there to the supported-languages list before determining what is unsupported.
+
+Once the directory scan and the read_asset check are both complete, produce an explicit list of unsupported languages before proceeding. If the list is empty, stop here and write no output files. Otherwise continue to Step 2.
 
 ## Step 2 — Write .enrichments/.assets/mappings/language_mappings.json
 
-Use read_asset with path `mappings/language_mappings.json` to read the existing language mappings. Use it as a reference for the expected structure and to confirm which languages are already present.
+The language mappings were already loaded in Step 1. Use the file as a reference for the expected structure.
 
 For each unsupported language identified in Step 1, generate entries for all six sections below. Use your knowledge of the language to produce accurate values. The output JSON must contain ONLY the new entries — do not repeat already-supported languages.
 
