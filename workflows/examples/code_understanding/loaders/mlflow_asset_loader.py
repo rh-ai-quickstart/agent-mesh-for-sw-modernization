@@ -564,15 +564,19 @@ class MlFlowAssetLoader(AssetLoader):
             assets_dir = get_global_scoped_enrichment_dir(_repo_dir)
             os.makedirs(enrichments_dir, exist_ok=True)
 
+            if not git_slug:
+                sync_enrichments(self, assets_dir)
+
             if enrichment_files:
                 for rel_path, content in enrichment_files.items():
                     dst = os.path.join(assets_dir, rel_path)
                     os.makedirs(os.path.dirname(dst), exist_ok=True)
                     with open(dst, "w") as f:
-                        json.dump(content, f) if isinstance(content, (dict, list)) else f.write(str(content))
-
-            if not git_slug:
-                sync_enrichments(self, assets_dir)
+                        (
+                            json.dump(content, f)
+                            if isinstance(content, (dict, list))
+                            else f.write(str(content))
+                        )
 
             tags = {"category": "enrichments"}
             if git_slug:
