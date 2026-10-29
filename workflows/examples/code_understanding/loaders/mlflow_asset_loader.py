@@ -573,7 +573,8 @@ class MlFlowAssetLoader(AssetLoader):
         )
         anchor_run = client.get_run(run_id)
 
-        self._mark_as_archived(client, anchor_run)
+        if not git_slug:
+            self._mark_as_archived(client, anchor_run)
 
         return f"Logged enrichments from {enrichments_dir}"
 

@@ -96,13 +96,30 @@ def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None
     def read_asset(path: str) -> str:
         """Read a file from the pipeline asset directory by its path relative to assets/."""
         from loaders.default_asset_loader import DefaultAssetLoader
-        from utils.loader_utils import get_global_scoped_enrichment_dir
-
-        content = DefaultAssetLoader().download(
-            path,
-            download_dir=get_global_scoped_enrichment_dir(repo_dir),
-            git_slug=git_slug,
+        from utils.loader_utils import (
+            get_global_scoped_enrichment_dir,
+            load_local_enrichments,
+            normalize_asset_path,
         )
+
+        path = normalize_asset_path(path)
+        enrichments_dir = get_global_scoped_enrichment_dir(repo_dir)
+
+        content = None
+        parent_dir = os.path.dirname(path)
+        if parent_dir and enrichments_dir:
+            try:
+                DefaultAssetLoader().download_dir(parent_dir,
+                                                  os.path.join(enrichments_dir,
+                                                               parent_dir),
+                                                  git_slug=git_slug)
+                content = load_local_enrichments(enrichments_dir, path)
+            except Exception:
+                pass
+
+        if content is None:
+            content = DefaultAssetLoader().download(path, git_slug=git_slug)
+
         if content is None:
             raise RuntimeError(f"Required asset not found: {path}")
         if isinstance(content, (dict, list)):

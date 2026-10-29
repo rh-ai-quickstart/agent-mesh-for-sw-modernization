@@ -47,9 +47,9 @@ def is_global_scoped_enrichment_tagset(tags: dict) -> bool:
 
 
 def normalize_asset_path(asset_path: str) -> str:
-    """Strip a leading /assets/ prefix from asset_path if present."""
+    """Strip any prefix up to and including assets/ from asset_path if present."""
 
-    _, sep, remainder = ("/" + asset_path).partition("/assets/")
+    _, sep, remainder = asset_path.partition("assets/")
 
     return remainder if sep else asset_path
 

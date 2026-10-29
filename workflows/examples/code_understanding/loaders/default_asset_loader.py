@@ -57,7 +57,7 @@ class DefaultAssetLoader(AssetLoader):
         asset_dir_path = normalize_asset_path(asset_dir_path)
 
         return load_local_enrichments(
-            download_dir, asset_dir_path, is_dir=True
+            os.path.dirname(download_dir), asset_dir_path, is_dir=True
         ) or self._loader.download_dir(
             asset_dir_path,
             download_dir,
