@@ -542,41 +542,64 @@ class MlFlowAssetLoader(AssetLoader):
             raise e
 
     def register_enrichments(
-        self, repo_dir: str, git_slug: str | None = None
+        self,
+        repo_dir: str | None = None,
+        git_slug: str | None = None,
+        enrichment_files: dict | None = None,
     ) -> str:
         """Persists the enrichments directory to the MLflow pipeline asset store."""
-        from utils.loader_utils import get_global_scoped_enrichment_dir
+        import contextlib
+        import tempfile as _tmp
 
-        enrichments_dir = os.path.join(repo_dir, ".enrichments")
-        assets_dir = get_global_scoped_enrichment_dir(repo_dir)
-        os.makedirs(enrichments_dir, exist_ok=True)
+        from utils.loader_utils import get_global_scoped_enrichment_dir, sync_enrichments
 
-        tags = {"category": "enrichments"}
-        if git_slug:
-            tags["git_slug"] = git_slug
-
-        client = mlflow.tracking.MlflowClient()
-        if os.path.exists(assets_dir):
-            try:
-                self.log_results(
-                    assets_dir,
-                    artifact_path=f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
-                    tags={"category": "enrichments"},
-                )
-            except Exception as e:
-                logging.warning("Failed to log assets_dir enrichment run; continuing: %s", e)
-
-        # anchor_run is logged last so its start_time is the latest, ensuring
-        # _mark_as_archived leaves exactly 1 unarchived global enrichment run.
-        run_id = self.log_results(
-            enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
+        _ctx = (
+            _tmp.TemporaryDirectory(ignore_cleanup_errors=True)
+            if repo_dir is None
+            else contextlib.nullcontext(repo_dir)
         )
-        anchor_run = client.get_run(run_id)
 
-        if not git_slug:
-            self._mark_as_archived(client, anchor_run)
+        with _ctx as _repo_dir:
+            enrichments_dir = os.path.join(_repo_dir, ".enrichments")
+            assets_dir = get_global_scoped_enrichment_dir(_repo_dir)
+            os.makedirs(enrichments_dir, exist_ok=True)
 
-        return f"Logged enrichments from {enrichments_dir}"
+            if enrichment_files:
+                for rel_path, content in enrichment_files.items():
+                    dst = os.path.join(assets_dir, rel_path)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    with open(dst, "w") as f:
+                        json.dump(content, f) if isinstance(content, (dict, list)) else f.write(str(content))
+
+            if not git_slug:
+                sync_enrichments(self, assets_dir)
+
+            tags = {"category": "enrichments"}
+            if git_slug:
+                tags["git_slug"] = git_slug
+
+            client = mlflow.tracking.MlflowClient()
+            if os.path.exists(assets_dir):
+                try:
+                    self.log_results(
+                        assets_dir,
+                        artifact_path=f"{self.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
+                        tags={"category": "enrichments"},
+                    )
+                except Exception as e:
+                    logging.warning("Failed to log assets_dir enrichment run; continuing: %s", e)
+
+            # anchor_run is logged last so its start_time is the latest, ensuring
+            # _mark_as_archived leaves exactly 1 unarchived global enrichment run.
+            run_id = self.log_results(
+                enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
+            )
+            anchor_run = client.get_run(run_id)
+
+            if not git_slug:
+                self._mark_as_archived(client, anchor_run)
+
+        return f"Logged enrichments from {repo_dir or 'temp directory'}"
 
     def log_repos(self, run_repos: list) -> None:
         """Logs the repo list to the MLflow asset store: first as an enrichment under
@@ -592,18 +615,12 @@ class MlFlowAssetLoader(AssetLoader):
         import json
         import tempfile
 
-        from utils.loader_utils import get_global_scoped_enrichment_dir, merge_json_enrichment
+        from utils.loader_utils import merge_json_enrichment
 
         try:
             base = self.download("repos/repo_list.json") or []
             catalog_repos = merge_json_enrichment(base, run_repos)
-
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
-                assets_dir = os.path.join(get_global_scoped_enrichment_dir(tmp_dir), "repos")
-                os.makedirs(assets_dir)
-                with open(os.path.join(assets_dir, "repo_list.json"), "w") as f:
-                    json.dump(catalog_repos, f)
-                self.register_enrichments(tmp_dir)
+            self.register_enrichments(enrichment_files={"repos/repo_list.json": catalog_repos})
         except Exception:
             logging.warning("Failed to log repo list as enrichment", exc_info=True)
 

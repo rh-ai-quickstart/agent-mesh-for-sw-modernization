@@ -111,13 +111,12 @@ class DefaultAssetLoader(AssetLoader):
         return self._loader.download_prompt(prompt_path, **kwargs)
 
     def register_enrichments(
-        self, repo_dir: str, git_slug: str | None = None
+        self,
+        repo_dir: str | None = None,
+        git_slug: str | None = None,
+        enrichment_files: dict | None = None,
     ) -> str:
-        from utils.loader_utils import get_global_scoped_enrichment_dir, process_enrichments
-
-        process_enrichments(self, get_global_scoped_enrichment_dir(repo_dir))
-
-        return self._loader.register_enrichments(repo_dir, git_slug)
+        return self._loader.register_enrichments(repo_dir, git_slug, enrichment_files=enrichment_files)
 
     def log_repos(self, run_repos: list) -> None:
 

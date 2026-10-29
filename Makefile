@@ -527,6 +527,12 @@ run-pipelines:
 		--type=merge -p '{"stringData":{"GIT_REPO":"$(PIPELINE_GIT_REPO)"}}' || true && \
 	[ -n "$(PIPELINE_GIT_BRANCH)" ] && oc patch secret code-understanding-env -n $$KFP_NAMESPACE \
 		--type=merge -p '{"stringData":{"GIT_BRANCH":"$(PIPELINE_GIT_BRANCH)"}}' || true && \
+	if [ -n "$(PIPELINE_GIT_REPO_LIST)" ]; then \
+		[ -f "$(PIPELINE_GIT_REPO_LIST)" ] || { echo "Error: PIPELINE_GIT_REPO_LIST file not found: $(PIPELINE_GIT_REPO_LIST)" >&2; exit 1; } && \
+		echo "==> Injecting repo list from $(PIPELINE_GIT_REPO_LIST) into secret..." && \
+		oc set data secret/code-understanding-env -n $$KFP_NAMESPACE \
+			--from-file=GIT_REPO_LIST_CONTENTS="$(PIPELINE_GIT_REPO_LIST)"; \
+	fi && \
 	echo "==> Submitting run-pipelines job..." && \
 	oc delete job run-pipelines -n $$KFP_NAMESPACE --ignore-not-found=true && \
 	helm template agent-mesh-for-sw resources/helm \

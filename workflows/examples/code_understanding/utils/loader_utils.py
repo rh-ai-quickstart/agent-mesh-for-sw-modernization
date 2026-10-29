@@ -80,27 +80,51 @@ def load_local_enrichments(download_dir: str, asset_path: str, *, is_dir: bool =
     return None
 
 
-def process_enrichments(loader, assets_dir: str) -> None:
-    """For each file in assets_dir, merges its JSON content with the static counterpart
-    if one exists."""
+def sync_enrichments(loader, assets_dir: str) -> None:
+    """Downloads global enrichment assets from the store and merges them into assets_dir.
+
+    For each file present in the remote global enrichment store:
+    - Not present locally: copied in, preserving content (e.g. graphrag/, mappings/)
+      across archival cycles.
+    - Present locally and JSON: merged with local as override, remote as base.
+    - Present locally and not JSON: left unchanged.
+
+    Call this before registering global (git_slug=None) enrichments so that
+    previously stored content is not discarded when a new anchor run archives
+    the previous global enrichment run.
+    """
     import json
+    import shutil
+    import tempfile
     from pathlib import Path
 
-    if not os.path.exists(assets_dir):
-        return
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as seed_dir:
+        seed_assets = get_global_scoped_enrichment_dir(seed_dir)
+        loader.load_results(
+            download_dir=seed_assets,
+            artifact_path=f"{loader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
+        )
+        if not os.path.exists(seed_assets):
+            return
 
-    for path in Path(assets_dir).rglob("*"):
-        if not path.is_file():
-            continue
-        rel_path = path.relative_to(assets_dir)
-        try:
-            enrichment = json.loads(path.read_text())
-            original = loader.download(str(rel_path))
-            original = json.loads(original) if isinstance(original, str) else original
-            if original:
-                path.write_text(json.dumps(merge_json_enrichment(original, enrichment), indent=2))
-        except (json.JSONDecodeError, ValueError):
-            continue
+        os.makedirs(assets_dir, exist_ok=True)
+
+        for seed_path in Path(seed_assets).rglob("*"):
+            if not seed_path.is_file():
+                continue
+            rel = seed_path.relative_to(seed_assets)
+            dst = Path(assets_dir) / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+
+            if not dst.exists():
+                shutil.copy2(seed_path, dst)
+            elif seed_path.suffix == ".json":
+                try:
+                    remote = json.loads(seed_path.read_text())
+                    local = json.loads(dst.read_text())
+                    dst.write_text(json.dumps(merge_json_enrichment(remote, local), indent=2))
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
 
 def download_result_directory(

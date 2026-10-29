@@ -11,7 +11,7 @@ def get_run_repos(repos: list = None) -> list:
     """Return the repo list for a multi-repo pipeline run.
 
     Resolution order:
-    1. ``repos`` parameter (passed directly from the UI or ``--repo-list`` flag)
+    1. ``repos`` parameter (passed directly from the UI)
     2. ``GIT_REPO_LIST_CONTENTS`` environment variable (injected via the
        ``code-understanding-env`` secret by ``make run-pipelines``)
     3. Empty list as a last resort.

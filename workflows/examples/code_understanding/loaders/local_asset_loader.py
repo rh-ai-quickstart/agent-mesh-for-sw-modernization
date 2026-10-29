@@ -143,9 +143,14 @@ class LocalAssetLoader(AssetLoader):
         return Template(body).render(**kwargs), meta
 
     def register_enrichments(
-        self, repo_dir: str, git_slug: str | None = None
+        self,
+        repo_dir: str | None = None,
+        git_slug: str | None = None,
+        enrichment_files: dict | None = None,
     ) -> str:
         """Ensures the enrichments directory exists. No remote upload for local storage."""
+        if repo_dir is None:
+            return "Logged enrichments (local no-op)"
         enrichments_dir = os.path.join(repo_dir, ".enrichments")
         os.makedirs(enrichments_dir, exist_ok=True)
         return f"Logged enrichments from {enrichments_dir}"

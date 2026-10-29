@@ -167,13 +167,19 @@ class AssetLoader(ABC):
 
     @abstractmethod
     def register_enrichments(
-        self, repo_dir: str, git_slug: str | None = None
+        self,
+        repo_dir: str | None = None,
+        git_slug: str | None = None,
+        enrichment_files: dict | None = None,
     ) -> str:
         """Persists the enrichments directory to the pipeline asset store.
 
         Args:
             repo_dir: Root of the cloned repository; .enrichments/ is derived from this path.
+                When None, a temporary directory is created internally.
             git_slug: Optional repository slug used to namespace the artifact path and tags.
+            enrichment_files: Optional mapping of relative paths to content to write into
+                .enrichments/.assets/ before registering (e.g. {"repos/repo_list.json": [...]}).
 
         Returns:
             A message describing what was logged.

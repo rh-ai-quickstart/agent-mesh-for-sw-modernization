@@ -6,7 +6,9 @@
 #   ./run_pipelines.sh --single-repo              # trigger single-repo pipeline run
 #   ./run_pipelines.sh                            # trigger multi-repo pipeline run (default)
 #   ./run_pipelines.sh --multi-repo               # trigger multi-repo pipeline run
-#   ./run_pipelines.sh --repo-list=repos.json     # trigger multi-repo with a repo list file
+#
+# For multi-repo, inject the repo list via the code-understanding-env secret
+# (GIT_REPO_LIST_CONTENTS) using: make run-pipelines PIPELINE_GIT_REPO_LIST=<file>
 #
 # Environment variables:
 #   KFP_NAMESPACE         Kubernetes namespace (KFP_HOST is derived from this)
@@ -28,7 +30,6 @@ Usage: $(basename "$0") [OPTION]...
 Options:
   --single-repo        Trigger single-repo pipeline run (GIT_REPO required)
   --multi-repo         Trigger multi-repo pipeline run (default)
-  --repo-list=<file>   Path to a JSON file with the repo list (multi-repo only)
   -h, --help           Show this help message
 
 Environment variables:
@@ -38,6 +39,7 @@ Environment variables:
   PARENT_SOURCE_PATH                Parent source path (default: source)
   PARENT_TARGET_PATH                Parent target path (default: target)
   KFP_DATA_INDEXING_OUTPUT_PATH     GraphRAG base path (default: graph_rag_app/source)
+  GIT_REPO_LIST_CONTENTS            JSON repo list (injected via code-understanding-env secret)
 EOF
 }
 
@@ -97,13 +99,11 @@ PYEOF
 }
 
 MODE="multi"
-REPO_LIST_FILE=""
 
 for arg in "$@"; do
     case "$arg" in
         --single-repo)  MODE="single" ;;
         --multi-repo)   MODE="multi" ;;
-        --repo-list=*)  REPO_LIST_FILE="${arg#*=}" ;;
         -h|--help)      usage; exit 0 ;;
         *) echo "Error: Unknown argument: $arg" >&2; usage; exit 1 ;;
     esac
@@ -114,28 +114,11 @@ if [[ "$MODE" == "single" ]]; then
         echo "Error: GIT_REPO must be set and non-empty for --single-repo." >&2
         exit 1
     fi
-    if [[ -n "$REPO_LIST_FILE" ]]; then
-        echo "Warning: --repo-list is ignored for --single-repo." >&2
-    fi
     trigger_pipeline "single_repo" "single_repo_${TIMESTAMP}" \
         "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\"}"
 else
-    REPOS_JSON=""
-    if [ -n "$REPO_LIST_FILE" ]; then
-        if [ ! -f "$REPO_LIST_FILE" ]; then
-            echo "Error: repo list file not found: $REPO_LIST_FILE" >&2
-            exit 1
-        fi
-        REPOS_JSON=$(python3 -c "
-import json, sys
-data = json.load(open(sys.argv[1]))
-repos = data['repos'] if isinstance(data, dict) and 'repos' in data else data
-print(json.dumps(repos))
-" "$REPO_LIST_FILE")
-    fi
     trigger_pipeline "multi_repo" "multi_repo_${TIMESTAMP}" \
-        "{\"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\"}" \
-        "$REPOS_JSON"
+        "{\"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\"}"
 fi
 
 echo "All done."

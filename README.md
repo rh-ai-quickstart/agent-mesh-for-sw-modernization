@@ -90,9 +90,26 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
    ```make run-pipelines ARGS="--single-repo" PIPELINE_GIT_REPO=https://github.com/org/repo PIPELINE_GIT_BRANCH=main```
 
 2. To run the **Code Understanding** pipeline for multiple repositories:
-    - Update `workflows/examples/code_understanding/assets/repos/repo_list.json` with the list of repositories to be processed.
-    - Run the following command:
-   ```make run-pipelines ARGS="--multi-repo"```
+    - Run the following command, passing a local JSON file with the list of 
+      repositories:
+   ```make run-pipelines ARGS="--multi-repo" PIPELINE_GIT_REPO_LIST=/path/to/repos.json```
+   
+   where `/path/to/repos.json` is a local file that follows the JSON structure shown below:
+   ```json
+   [
+     {
+       "git_repo": "https://github.com/org/repo",
+       "git_branch": "main"
+     },
+     {
+       "git_repo": "https://github.com/org/repo2",
+       "git_branch": "main"
+      }
+    ]
+   ```
+
+  OR to use the default list of repositories:
+  ```make run-pipelines ARGS="--multi-repo"```
 
 ## Running Adhoc Queries
 1. To run adhoc queries about the indexed code, run the following:
