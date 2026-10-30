@@ -1,0 +1,8 @@
+{
+  "replacements": [
+    {
+      "rule": "makefile_base_version",
+      "paths": ["Makefile"]
+    }
+  ]
+}
