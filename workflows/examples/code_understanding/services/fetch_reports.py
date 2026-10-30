@@ -24,7 +24,12 @@ def _read_dir_contents(path: str) -> str | None:
     return "\n".join(parts) or None
 
 
-def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, str | None]:
+def fetch_reports(
+    kfp_trigger_id: str,
+    git_slug: str | None,
+    multi_repo: bool,
+    namespace: str | None = None,
+) -> tuple[str | None, str | None]:
     """Return (evaluation_report, analysis_report) downloaded from MLflow."""
     if not multi_repo and not git_slug:
         return None, None
@@ -36,6 +41,11 @@ def fetch_reports(git_slug: str | None, multi_repo: bool) -> tuple[str | None, s
         base_tags: dict[str, Any] = (
             {"multi_repo": True} if multi_repo else ({"git_slug": git_slug} if git_slug else {})
         )
+        from utils.kubeflow_utils import get_argo_workflow_uid
+
+        argo_uid = get_argo_workflow_uid(kfp_trigger_id, namespace=namespace)
+        if argo_uid:
+            base_tags["pipeline_run_id"] = argo_uid
 
         def _get(prefix: str, category: str) -> str | None:
             artifact_path = AssetLoader.get_log_results_artifact_path(

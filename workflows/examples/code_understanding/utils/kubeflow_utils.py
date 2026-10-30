@@ -133,6 +133,47 @@ def inject_secret_as_env(secret_name: str):
 
 
 ##############################################################################
+# Argo Workflow helpers
+##############################################################################
+
+
+def get_argo_workflow_uid(kfp_trigger_id: str, namespace: str | None = None) -> str | None:
+    """Return the ARGO_WORKFLOW_UID for a KFP run.
+
+    Looks up the Argo Workflow labelled ``pipeline/runid=<kfp_trigger_id>`` and returns
+    its ``metadata.uid`` — the value written as ``pipeline_run_id`` on MLflow result
+    runs by ``get_pipeline_run_id()`` inside pipeline pods.
+
+    Returns None if the workflow cannot be found or the API call fails.
+    """
+    try:
+        from kubernetes import client as k8s_client
+        from kubernetes import config as k8s_config
+
+        try:
+            k8s_config.load_incluster_config()
+        except Exception:
+            k8s_config.load_kube_config()
+
+        ns = namespace or os.getenv("KFP_NAMESPACE", "default")
+        items = (
+            k8s_client.CustomObjectsApi()
+            .list_namespaced_custom_object(
+                "argoproj.io",
+                "v1alpha1",
+                ns,
+                "workflows",
+                label_selector=f"pipeline/runid={kfp_trigger_id}",
+            )
+            .get("items", [])
+        )
+        return items[0]["metadata"]["uid"] if items else None
+
+    except Exception:
+        return None
+
+
+##############################################################################
 # Pipeline compilation helper
 ##############################################################################
 

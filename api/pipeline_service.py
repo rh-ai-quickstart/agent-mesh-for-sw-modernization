@@ -73,7 +73,9 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
     analysis_report: str | None = None
     if state in {"SUCCEEDED", "SKIPPED"}:
         git_slug, multi_repo = get_run_git_metadata(job_id, namespace=namespace)
-        evaluation_report, analysis_report = _fetch_reports(git_slug, multi_repo)
+        evaluation_report, analysis_report = _fetch_reports(
+            job_id, git_slug, multi_repo, namespace=namespace
+        )
 
     return {
         "status": state.lower(),
