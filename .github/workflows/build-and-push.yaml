@@ -140,6 +140,8 @@ jobs:
         if: steps.image-check.outputs.needed == 'true'
         env:
           VERSIONS: ${{ steps.version.outputs.versions }}
+          # Each image repository gets its own cache, isolated by branch.
+          IMAGE_CACHE_TAG: buildcache-${{ inputs.target_branch || github.ref_name }}
         run: |
           IFS=' ' read -ra VERSIONS <<< "${VERSIONS}"
           VERSION="${VERSIONS[0]}" REGISTRY="${REGISTRY}" make build-all-images

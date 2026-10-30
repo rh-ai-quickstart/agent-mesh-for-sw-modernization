@@ -157,6 +157,12 @@ else
 $(error Unsupported CONTAINER_ENGINE '$(CONTAINER_ENGINE)'; use docker or podman)
 endif
 
+# CI imports and exports a separate cache tag in each existing image repository.
+# Leave unset for local builds; registry cache flags apply only to Docker Buildx.
+IMAGE_CACHE_TAG ?=
+image-cache-options = --cache-from "type=registry,ref=$(1):$(IMAGE_CACHE_TAG)" --cache-to "type=registry,ref=$(1):$(IMAGE_CACHE_TAG),mode=max"
+image-cache-flags = $(if $(and $(filter docker,$(CONTAINER_ENGINE)),$(IMAGE_CACHE_TAG)),$(call image-cache-options,$(1)))
+
 BUILD_REGISTRY       = $(or $(REGISTRY),$(KFP_IMAGE_REGISTRY))
 DATAGEN_IMAGE        = $(BUILD_REGISTRY)/$(KFP_DATA_GENERATION_BASE_IMAGE_NAME):$(or $(VERSION),$(KFP_DATA_GENERATION_BASE_IMAGE_TAG))
 INDEX_IMAGE          = $(BUILD_REGISTRY)/$(KFP_INDEXING_BASE_IMAGE_NAME):$(or $(VERSION),$(KFP_INDEXING_BASE_IMAGE_TAG))
@@ -832,7 +838,7 @@ _build-one-image:
 		fi; \
 	fi && \
 	echo "==> Building image: $$IMAGE" && \
-	$(IMAGE_BUILD) -t "$$IMAGE" -f "$(IMAGE_FILE)" "$(IMAGE_CONTEXT)"
+	$(IMAGE_BUILD) $(call image-cache-flags,$$REGISTRY/$$IMAGE_NAME) -t "$$IMAGE" -f "$(IMAGE_FILE)" "$(IMAGE_CONTEXT)"
 
 _push-one-image:
 	@if [ -f "$(ENV_FILE)" ]; then set -a && . "$(ENV_FILE)" && set +a; fi && \
@@ -945,7 +951,7 @@ build-push-images-needed:
 		echo "Cannot resolve image comparison base $$BASE_REF; proceeding with the build."; exit 0; \
 	fi; \
 	if git diff --quiet "$$BASE_REF" HEAD -- \
-		Makefile \
+		Makefile .github/workflows/build-and-push.yaml \
 		resources/images/data-generation \
 		resources/images/data-indexing \
 		resources/images/pipeline-tools \
@@ -962,21 +968,21 @@ build-push-images-needed:
 build-all-images:
 	@[ -n "$(or $(VERSION),$(CONSOLE_IMAGE_TAG))" ] || { echo "Set VERSION or CONSOLE_IMAGE_TAG to build console images" >&2; exit 1; }
 	@echo "==> Building data generation image: $(DATAGEN_IMAGE)" && \
-	$(IMAGE_BUILD) -t "$(DATAGEN_IMAGE)" -f resources/images/data-generation/Containerfile resources/images/data-generation && \
+	$(IMAGE_BUILD) $(call image-cache-flags,$(BUILD_REGISTRY)/$(KFP_DATA_GENERATION_BASE_IMAGE_NAME)) -t "$(DATAGEN_IMAGE)" -f resources/images/data-generation/Containerfile resources/images/data-generation && \
 	echo "==> Building indexing image: $(INDEX_IMAGE)" && \
-	$(IMAGE_BUILD) -t "$(INDEX_IMAGE)" -f resources/images/data-indexing/Containerfile resources/images/data-indexing && \
+	$(IMAGE_BUILD) $(call image-cache-flags,$(BUILD_REGISTRY)/$(KFP_INDEXING_BASE_IMAGE_NAME)) -t "$(INDEX_IMAGE)" -f resources/images/data-indexing/Containerfile resources/images/data-indexing && \
 	if [ "$(ANALYSIS_IMAGE)" = "$(INDEX_IMAGE)" ]; then \
 		echo "==> Skipping analysis image build; it uses the indexing image."; \
 	else \
 		echo "==> Building analysis image: $(ANALYSIS_IMAGE)" && \
-		$(IMAGE_BUILD) -t "$(ANALYSIS_IMAGE)" -f resources/images/data-indexing/Containerfile resources/images/data-indexing; \
+		$(IMAGE_BUILD) $(call image-cache-flags,$(BUILD_REGISTRY)/$(KFP_ANALYSIS_BASE_IMAGE_NAME)) -t "$(ANALYSIS_IMAGE)" -f resources/images/data-indexing/Containerfile resources/images/data-indexing; \
 	fi && \
 	echo "==> Building pipeline-tools image: $(PIPELINE_TOOLS_IMAGE)" && \
-	$(IMAGE_BUILD) -t "$(PIPELINE_TOOLS_IMAGE)" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools && \
+	$(IMAGE_BUILD) $(call image-cache-flags,$(BUILD_REGISTRY)/$(KFP_PIPELINE_TOOLS_IMAGE_NAME)) -t "$(PIPELINE_TOOLS_IMAGE)" -f resources/images/pipeline-tools/Containerfile resources/images/pipeline-tools && \
 	echo "==> Building console application image: $(CONSOLE_APP_IMAGE)" && \
-	$(IMAGE_BUILD) -t "$(CONSOLE_APP_IMAGE)" -f ui/Dockerfile . && \
+	$(IMAGE_BUILD) $(call image-cache-flags,$(BUILD_REGISTRY)/$(CONSOLE_APP_IMAGE_NAME)) -t "$(CONSOLE_APP_IMAGE)" -f ui/Dockerfile . && \
 	echo "==> Building console plugin image: $(CONSOLE_PLUGIN_IMAGE)" && \
-	$(IMAGE_BUILD) -t "$(CONSOLE_PLUGIN_IMAGE)" -f console-plugin/Dockerfile console-plugin
+	$(IMAGE_BUILD) $(call image-cache-flags,$(BUILD_REGISTRY)/$(CONSOLE_PLUGIN_IMAGE_NAME)) -t "$(CONSOLE_PLUGIN_IMAGE)" -f console-plugin/Dockerfile console-plugin
 
 push-all-images:
 	@[ -n "$(or $(VERSION),$(CONSOLE_IMAGE_TAG))" ] || { echo "Set VERSION or CONSOLE_IMAGE_TAG to push console images" >&2; exit 1; }
