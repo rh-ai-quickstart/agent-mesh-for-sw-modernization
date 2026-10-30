@@ -1,0 +1,40 @@
+{{- $config := include "agent-model.config" . | fromYaml -}}
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ include "agent-model.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "agent-model.fullname" . }}
+    opendatahub.io/dashboard: "true"
+  annotations:
+    openshift.io/display-name: {{ $config.displayName | quote }}
+    serving.kserve.io/deploymentMode: {{ $config.serving.deploymentMode | quote }}
+    {{- with $config.serving.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  predictor:
+    minReplicas: {{ $config.replicaCount }}
+    maxReplicas: {{ $config.replicaCount }}
+    deploymentStrategy:
+      type: Recreate
+    serviceAccountName: {{ include "agent-model.fullname" . }}
+    nodeSelector:
+      {{- toYaml $config.nodeSelector | nindent 6 }}
+    tolerations:
+      {{- toYaml $config.tolerations | nindent 6 }}
+    model:
+      runtime: {{ include "agent-model.fullname" . }}
+      modelFormat:
+        name: pytorch
+      resources:
+        {{- toYaml $config.resources | nindent 8 }}
+    volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: {{ include "agent-model.fullname" . }}-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ $config.shmSize }}

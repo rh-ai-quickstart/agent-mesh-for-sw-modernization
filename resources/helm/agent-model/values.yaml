@@ -1,0 +1,91 @@
+# Select qwen (default) or muse-glimmer with --set modelVariant=...
+modelVariant: qwen
+
+# Fixed replica count prevents scale-to-zero/model reloads.
+replicaCount: 1
+serving:
+  deploymentMode: RawDeployment
+  annotations: {}
+
+image:
+  repository: vllm/vllm-openai
+  pullPolicy: IfNotPresent
+model:
+  maxModelLen: 16384
+  gpuMemoryUtilization: "0.90"
+  tensorParallelSize: 1
+  extraArgs: []
+
+huggingFace:
+  existingSecret: ""
+  tokenKey: HF_TOKEN
+
+# Tolerations permit placement; use nodeSelector to constrain the GPU pool.
+nodeSelector: {}
+cache:
+  # Empty uses the cluster's default storage class.
+  storageClassName: ""
+  accessMode: ReadWriteOnce
+  size: 50Gi
+
+# Profile defaults are merged with the top-level values above. Override any
+# profile setting at the top level, e.g. --set model.maxModelLen=8192.
+profiles:
+  qwen:
+    displayName: Qwen3.5 9B FP8 Dynamic
+    image:
+      tag: v0.27.1
+    model:
+      name: RedHatAI/Qwen3.5-9B-FP8-dynamic
+      revision: 790f0576d2d77dd5322aa0603a470bd9e3a3d1f6
+      dtype: bfloat16
+      languageModelOnly: true
+      # Avoid CUDA graph memory; trades throughput for headroom on A10G.
+      enforceEager: true
+      maxNumSeqs: 1
+      maxNumBatchedTokens: 1024
+      toolCallParser: qwen3_coder
+      reasoningParser: qwen3
+    # g5.2xlarge has 32 GiB physical RAM, with less allocatable to pods.
+    resources:
+      requests:
+        cpu: "4"
+        memory: 20Gi
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "8"
+        memory: 26Gi
+        nvidia.com/gpu: "1"
+    tolerations:
+      - key: g5-gpu
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+    shmSize: 2Gi
+    extraEnv: []
+  muse-glimmer:
+    displayName: Muse Glimmer 30B FP8
+    image:
+      tag: muse-glimmer
+    model:
+      name: RedHatAI/Muse-Glimmer-30B-FP8-block
+      toolCallParser: muse_glimmer
+      reasoningParser: muse_glimmer
+    resources:
+      requests:
+        cpu: "4"
+        memory: 32Gi
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "8"
+        memory: 48Gi
+        nvidia.com/gpu: "1"
+    tolerations:
+      - key: g6e-gpu
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+    shmSize: 8Gi
+    extraEnv:
+      - name: TRANSFORMERS_CACHE
+        value: /model-cache/transformers

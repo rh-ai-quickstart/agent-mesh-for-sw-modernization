@@ -17,7 +17,7 @@ RELEASE               ?= agent-mesh-for-sw
 CHART_DIR             ?= resources/helm
 NAMESPACE             ?=
 WAIT_TIMEOUT          ?= 5m
-ADHOC_TIMEOUT         ?= 20m
+MODEL_TIMEOUT         ?= 20m
 # Fall back to origin and the local branch when no upstream is configured.
 GIT_LOCAL_BRANCH    	?= $(shell git branch --show-current 2>/dev/null)
 GIT_REPO_REMOTE     	?= $(or $(shell git config --get "branch.$(GIT_LOCAL_BRANCH).remote" 2>/dev/null),origin)
@@ -32,6 +32,7 @@ PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
 DEPLOY_EMBEDDING_MODEL ?= false
+AGENT_MODEL            ?=
 DEPLOY_OTEL            ?= false
 # When false, install assumes the project namespace already exists and is
 # provisioned with its required OpenShift AI metadata by an administrator.
@@ -223,6 +224,7 @@ HELM_UPGRADE_ARGS = agent-mesh-for-sw resources/helm \
 	uninstall \
 	clean-mlflow \
 	deploy-embedding-model \
+	deploy-agent-model \
 	prepare-workbench-images \
 	deploy-notebooks \
 	apply-secrets \
@@ -303,6 +305,7 @@ help-all:
 	@echo "  uninstall                   Remove the application stack and PVC-backed data"
 	@echo "  clean-mlflow                Mark quickstart MLflow data for deletion (ARGS=--dry-run previews)"
 	@echo "  deploy-embedding-model      Deploy the e5-mistral embedding model"
+	@echo "  deploy-agent-model          Deploy the selected agent model (AGENT_MODEL=qwen or muse-glimmer)"
 	@echo "  prepare-workbench-images    Register project workbench images with OpenShift AI"
 	@echo "  deploy-notebooks            Deploy the data generation and indexing notebooks"
 	@echo "  apply-secrets               Create or update application secrets"
@@ -381,6 +384,7 @@ help-all:
 	@echo "  E2E_UI_PYTHON               Python version for Playwright tests (default: 3.12)"
 	@echo "  RUN_PIPELINES               Include real pipeline runs in E2E tests (default: false)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
+	@echo "  AGENT_MODEL                 Model for deploy-agent-model: qwen or muse-glimmer (required)"
 	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  MANAGE_NAMESPACE           Create namespace and apply metadata (default: true; false for pre-provisioned namespaces)"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
@@ -394,7 +398,7 @@ help-all:
 	@echo "  INDEX_FORCE                 Import an identical archive again (default: false)"
 	@echo "  QUESTION_FILE               Required input file for run-adhoc-query"
 	@echo "  WAIT_TIMEOUT                Resource readiness timeout (default: $(WAIT_TIMEOUT))"
-	@echo "  ADHOC_TIMEOUT               Ad-hoc query timeout (default: $(ADHOC_TIMEOUT))"
+	@echo "  MODEL_TIMEOUT               Ad-hoc query and model rollout timeout (default: $(MODEL_TIMEOUT))"
 	@echo ""
 	@echo "See .env.template for additional deployment, pipeline, and image configuration."
 
@@ -552,6 +556,21 @@ uninstall:
 	fi; \
 	echo "==> Agent Mesh uninstall complete. Namespace $(KFP_NAMESPACE) was preserved."
 
+deploy-agent-model:
+	@[ -n "$(strip $(AGENT_MODEL))" ] || { echo "Error: Set AGENT_MODEL=qwen or AGENT_MODEL=muse-glimmer." >&2; exit 1; }
+	@[ -n "$(KFP_NAMESPACE)" ] || { echo "Error: KFP_NAMESPACE is not set." >&2; exit 1; }
+	@echo "==> Deploying $(AGENT_MODEL) agent model..." && \
+		helm upgrade --install agent-model resources/helm/agent-model \
+			--namespace "$(KFP_NAMESPACE)" \
+			$(HELM_CREATE_NAMESPACE_ARG) \
+			--reset-values \
+			--set-string "modelVariant=$(AGENT_MODEL)" && \
+		echo "==> Waiting for agent model deployment..." && \
+		oc wait deployment/agent-model-predictor -n "$(KFP_NAMESPACE)" \
+			--for=create --timeout="$(WAIT_TIMEOUT)" && \
+		oc rollout status deployment/agent-model-predictor -n "$(KFP_NAMESPACE)" \
+			--timeout="$(MODEL_TIMEOUT)"
+
 deploy-embedding-model:
 	@echo "==> Deploying e5-mistral embedding model..." && \
 		helm upgrade --install e5-mistral resources/helm/e5-mistral \
@@ -559,7 +578,7 @@ deploy-embedding-model:
 			$(HELM_CREATE_NAMESPACE_ARG) && \
 		echo "==> Waiting for e5-mistral deployment..." && \
 		oc rollout status deployment/e5-mistral -n "$(KFP_NAMESPACE)" \
-			--timeout="$(WAIT_TIMEOUT)"
+			--timeout="$(MODEL_TIMEOUT)"
 
 prepare-workbench-images:
 	@set -e; \
@@ -1102,7 +1121,7 @@ run-adhoc-query:
 	JOB_EXIT=0; \
 	echo "==> Waiting for query to complete..."; \
 	oc wait "job/run-adhoc-query-$$JOB_ID" -n "$(KFP_NAMESPACE)" \
-		--for=condition=complete --timeout="$(ADHOC_TIMEOUT)" || JOB_EXIT=$$?; \
+		--for=condition=complete --timeout="$(MODEL_TIMEOUT)" || JOB_EXIT=$$?; \
 	echo "==> Ad-hoc query job logs..."; \
 	LOG_EXIT=0; \
 	oc logs "job/run-adhoc-query-$$JOB_ID" -n "$(KFP_NAMESPACE)" \

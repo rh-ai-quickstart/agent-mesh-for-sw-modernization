@@ -1,0 +1,115 @@
+{{- $config := include "agent-model.config" . | fromYaml -}}
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ include "agent-model.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/apiProtocol: REST
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    openshift.io/display-name: {{ printf "%s (vLLM)" $config.displayName | quote }}
+spec:
+  multiModel: false
+  supportedModelFormats:
+    - name: pytorch
+      autoSelect: false
+  # vLLM downloads the Hugging Face checkpoint directly into the cache PVC.
+  storageHelper:
+    disabled: true
+  containers:
+    - name: kserve-container
+      image: "{{ $config.image.repository }}:{{ $config.image.tag }}"
+      imagePullPolicy: {{ $config.image.pullPolicy }}
+      command:
+        - python3
+        - -m
+        - vllm.entrypoints.openai.api_server
+      args:
+        - --host=0.0.0.0
+        - --port=8000
+        - --model={{ $config.model.name }}
+        - --served-model-name={{ $config.model.name }}
+        - --tensor-parallel-size={{ $config.model.tensorParallelSize }}
+        {{- with $config.model.revision }}
+        - --revision={{ . }}
+        {{- end }}
+        {{- with $config.model.dtype }}
+        - --dtype={{ . }}
+        {{- end }}
+        - --generation-config=auto
+        {{- if $config.model.languageModelOnly }}
+        - --language-model-only
+        {{- end }}
+        {{- if $config.model.enforceEager }}
+        - --enforce-eager
+        {{- end }}
+        {{- with $config.model.maxNumSeqs }}
+        - --max-num-seqs={{ . }}
+        {{- end }}
+        {{- with $config.model.maxNumBatchedTokens }}
+        - --max-num-batched-tokens={{ . }}
+        {{- end }}
+        - --enable-auto-tool-choice
+        - --tool-call-parser={{ $config.model.toolCallParser }}
+        - --reasoning-parser={{ $config.model.reasoningParser }}
+        - --max-model-len={{ $config.model.maxModelLen }}
+        - --gpu-memory-utilization={{ $config.model.gpuMemoryUtilization }}
+        {{- range $config.model.extraArgs }}
+        - {{ . | quote }}
+        {{- end }}
+      ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+      env:
+        {{- if $config.huggingFace.existingSecret }}
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $config.huggingFace.existingSecret }}
+              key: {{ $config.huggingFace.tokenKey }}
+        {{- end }}
+        - name: HOME
+          value: /tmp
+        - name: HF_HOME
+          value: /model-cache
+        - name: XDG_CACHE_HOME
+          value: /model-cache/xdg
+        - name: VLLM_CACHE_ROOT
+          value: /model-cache/vllm
+        - name: TRITON_CACHE_DIR
+          value: /model-cache/triton
+        - name: NUMBA_CACHE_DIR
+          value: /tmp/numba
+        {{- with $config.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      # KServe agent probe rewriting requires numeric ports.
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        timeoutSeconds: 10
+        periodSeconds: 30
+        failureThreshold: 6
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        timeoutSeconds: 5
+        periodSeconds: 10
+        failureThreshold: 30
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        timeoutSeconds: 10
+        periodSeconds: 20
+        failureThreshold: 180
+      volumeMounts:
+        - name: model-cache
+          mountPath: /model-cache
+        - name: shm
+          mountPath: /dev/shm
