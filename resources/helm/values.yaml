@@ -103,6 +103,17 @@ rhoaiMcp:
       cpu: 500m
       memory: 512Mi
 
+skillAgent:
+  networkPolicy:
+    enabled: true
+    # Egress ports permitted from skill-agent pods.
+    # Adjust if using non-default ports.
+    egressPorts:
+      https: 443    # External LLM API endpoint
+      mlflow: 8443  # MLflow tracking server (OpenShift AI default)
+      mlmd: 8080    # KFP ML Metadata gRPC service (required by KFP executor)
+      minio: 9000   # In-namespace MinIO object store
+
 console:
   enabled: false
   replicas: 1

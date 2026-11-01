@@ -72,12 +72,14 @@ def get_pip_installable_git_url(
 ##############################################################################
 
 
-def inject_secret_as_env(secret_name: str):
-    """Decorator factory that injects ALL keys from a K8s secret as env vars.
+def inject_secret_as_env(secret_name: str, keys: list[str] | None = None):
+    """Decorator factory that injects keys from a K8s secret as env vars.
 
     Args:
         secret_name: Name of the Kubernetes Secret whose keys should be
                      exposed as environment variables of the same name.
+        keys: Explicit list of keys to inject.
+        If not present, injects the full secret.
     """
     import functools
 
@@ -113,13 +115,13 @@ def inject_secret_as_env(secret_name: str):
             try:
                 from kfp import kubernetes
 
-                keys = read_secret_keys()
+                inject_keys = keys if keys is not None else read_secret_keys()
 
-                if keys:
+                if inject_keys:
                     kubernetes.use_secret_as_env(
                         task,
                         secret_name=secret_name,
-                        secret_key_to_env={k: k for k in keys},
+                        secret_key_to_env={k: k for k in inject_keys},
                     )
 
             except ImportError:
@@ -130,6 +132,43 @@ def inject_secret_as_env(secret_name: str):
         return wrapper
 
     return decorator
+
+
+##############################################################################
+# Skill-component hardening
+##############################################################################
+
+
+def harden_skill_component(
+    component_fn=None,
+    *,
+    cpu_limit: str = "2",
+    memory_limit: str = "8G",
+    timeout_seconds: int = 1800,
+):
+    """
+    Decorator that hardens a KFP component for isolated skill execution.
+    """
+    import functools
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            task = fn(*args, **kwargs)
+            task.set_cpu_limit(cpu_limit).set_memory_limit(memory_limit)
+            try:
+                from kfp import kubernetes
+
+                kubernetes.add_pod_label(task, "skill-agent", "true")
+                kubernetes.set_timeout(task, timeout_seconds)
+            except ImportError:
+                pass
+            return task
+
+        return wrapper
+
+    # Support both @harden_skill_component and @harden_skill_component(...)
+    return decorator(component_fn) if component_fn is not None else decorator
 
 
 ##############################################################################

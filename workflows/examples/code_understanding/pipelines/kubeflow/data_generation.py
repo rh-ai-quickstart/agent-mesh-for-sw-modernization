@@ -3,11 +3,16 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
+from typing import NamedTuple  # noqa: E402
+
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Output  # noqa: E402
-
 from utils.kubeflow_utils import DATA_GENERATION_BASE_IMAGE  # noqa: E402
-from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
+from utils.kubeflow_utils import (  # noqa: E402
+    get_pip_installable_git_url,
+    harden_skill_component,
+    inject_secret_as_env,
+)
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -47,6 +52,38 @@ def prepare_environment_op(git_repo: str, git_branch: str, source_dir: Output[Da
 
 
 @inject_secret_as_env(secret_name="code-understanding-env")
+@harden_skill_component
+@dsl.component(
+    base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
+)
+def preflight_op(
+    git_repo: str,
+    git_branch: str,
+    source_dir: Input[Dataset],
+) -> NamedTuple("Outputs", [("languages", list), ("external_metadata_json", str)]):
+    """Runs preflight relevant skills."""
+    import json
+    from collections import namedtuple
+
+    from pipelines.base.data_generation import run_preflight
+    from utils import code_utils
+    from utils.kubeflow_utils import read_from_input_artifact, setup_logging
+
+    setup_logging()
+
+    Outputs = namedtuple("Outputs", ["languages", "external_metadata_json"])
+
+    with read_from_input_artifact(source_dir) as tmp_source:
+        git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
+        result = run_preflight(tmp_source, git_slug)
+
+    return Outputs(
+        languages=result.languages,
+        external_metadata_json=json.dumps(result.external_metadata),
+    )
+
+
+@inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
@@ -56,11 +93,15 @@ def generate_code_and_meta_op(
     git_branch: str,
     source_dir: Input[Dataset],
     target_dir: Output[Dataset],
+    languages: list,
+    external_metadata_json: str,
     multi_repo: bool = False,
 ):
-    """Detects languages and generates code metadata for all detected languages."""
+    """Generates code metadata for all detected languages."""
+    import json
+    import logging
 
-    from pipelines.base.data_generation import detect_languages, generate_code_and_meta
+    from pipelines.base.data_generation import generate_code_and_meta
     from utils.kubeflow_utils import (
         read_from_input_artifact,
         setup_logging,
@@ -69,8 +110,6 @@ def generate_code_and_meta_op(
 
     setup_logging()
 
-    import logging
-
     with (
         read_from_input_artifact(source_dir) as tmp_source,
         write_to_output_artifact(target_dir) as tmp_target,
@@ -78,17 +117,7 @@ def generate_code_and_meta_op(
 
         try:
 
-            from pipelines.base.data_generation import load_external_metadata
-            from utils import code_utils
-
-            git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
-
-            external_metadata = load_external_metadata(
-                git_slug=git_slug,
-                source_path=tmp_source,
-            )
-
-            languages = detect_languages(tmp_source, git_slug=git_slug)
+            external_metadata = json.loads(external_metadata_json)
 
             for language in languages:
 
@@ -153,10 +182,18 @@ def _run_pipeline(
         git_branch=git_branch,
     )
 
+    pre = preflight_op(
+        git_repo=git_repo,
+        git_branch=git_branch,
+        source_dir=prep.outputs["source_dir"],
+    )
+
     gen = generate_code_and_meta_op(
         git_repo=git_repo,
         git_branch=git_branch,
         source_dir=prep.outputs["source_dir"],
+        languages=pre.outputs["languages"],
+        external_metadata_json=pre.outputs["external_metadata_json"],
         multi_repo=multi_repo,
     )
 

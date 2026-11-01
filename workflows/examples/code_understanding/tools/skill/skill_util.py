@@ -41,9 +41,16 @@ async def _run_as_agent(
     ).get_tools()
     if extra_tools:
         tools = tools + extra_tools
+    from loaders.default_asset_loader import DefaultAssetLoader
+
+    system_prompt, _ = DefaultAssetLoader().download_prompt("skills/skills-system-prompt")
+    if not system_prompt:
+        raise RuntimeError(
+            "skills-system-prompt could not be loaded; aborting to prevent prompt injection"
+        )
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", "You are a helpful assistant."),
+            ("system", system_prompt),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
         ]
@@ -149,21 +156,20 @@ def run_skill(
 ) -> str | None:
     """
     Run a single skill against repo_dir.
-
-    Returns the path to the generated report file, or None if no report was written.
     """
-    from utils.tool_utils import get_register_enrichments_tool, get_read_asset_tool
-
     logging.info("Running skill: %s", skill.name)
 
     instructions = load_skill_instructions(skill.name, skill.repo)
-    if skill.repo is None:
-        extra_tools = [
+    from utils.tool_utils import get_read_asset_tool, get_register_enrichments_tool
+
+    extra_tools = (
+        [
             get_read_asset_tool(repo_dir, git_slug),
             get_register_enrichments_tool(repo_dir, git_slug),
         ]
-    else:
-        extra_tools = None
+        if skill.repo is None
+        else None
+    )
     coro = _run_as_agent(
         repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp, extra_tools=extra_tools
     )

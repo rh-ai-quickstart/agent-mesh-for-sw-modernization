@@ -3,6 +3,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
+from dataclasses import dataclass  # noqa: E402
+
 from utils.otel_utils import enable_telemetry  # noqa: E402
 
 
@@ -109,7 +111,6 @@ def generate_raw_dataset(
     import os
 
     import pandas as pd
-
     from utils import code_utils
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -183,10 +184,9 @@ def get_parsed_code_metadata(df, language, config=False):
     from datetime import datetime
 
     from datasets import Dataset
-    from sdg_hub.core.flow import Flow
-
     from flows.flow_extensions import CustomDeleteColumnsBlock  # noqa: F401
     from loaders.default_asset_loader import DefaultAssetLoader
+    from sdg_hub.core.flow import Flow
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -236,7 +236,7 @@ def get_parsed_code_metadata(df, language, config=False):
 def load_external_metadata(
     git_slug: str,
     source_path: str,
-    skill: str = "external-metadata",
+    skill: str | None = "external-metadata",
 ) -> list[dict]:
     """Loads all JSON files from source_path/.enrichments/.code_metadata/ and returns them as a
     list of dicts.
@@ -247,8 +247,8 @@ def load_external_metadata(
     Args:
         git_slug:       Repository slug (e.g. "open-sdg-sdg-data-canada").
         source_path:    Path to the repository root.
-        skill:          Composite skill name to invoke before loading. The skill is run
-                        first; if its report already exists in target_dir it is skipped.
+        skill:          Composite skill name to invoke before loading. Pass ``None``
+                        to skip skill execution and only load existing enrichment files.
                         Defaults to "external-metadata".
     """
     import json
@@ -261,7 +261,8 @@ def load_external_metadata(
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     logging.info("Loading external metadata...")
-    logging.info(f"Using skill: {skill}")
+    if skill:
+        logging.info(f"Using skill: {skill}")
 
     parent_dir = os.path.join(source_path, code_utils.ENRICHMENTS_DIR)
     code_metadata_dir = os.path.join(parent_dir, code_utils.CODE_METADATA_DIR)
@@ -657,7 +658,12 @@ def generate_git_slug(git_repo: str, git_branch: str) -> str:
 
 
 def detect_languages(source_path: str, git_slug: str) -> list:
-    """Returns the list of programming languages detected in source_path."""
+    """Returns the list of programming languages detected in source_path.
+
+    When ALLOW_DYNAMIC_LANGUAGE_SUPPORT is enabled and no preconfigured
+    languages are found, falls back to running the add-languages skill and
+    reading the language mappings it produces.
+    """
     import logging
 
     from tools.skill.skill_util import run_local_skill
@@ -667,36 +673,69 @@ def detect_languages(source_path: str, git_slug: str) -> list:
 
     languages = code_utils.get_detected_languages_for_repo(source_path)
 
+    if not languages and os.getenv("ALLOW_DYNAMIC_LANGUAGE_SUPPORT", "false").lower() == "true":
+
+        logging.info(
+            "No preconfigured languages detected; falling back to dynamic language detection"
+        )
+
+        try:
+            run_local_skill("add-languages", source_path, git_slug=git_slug)
+        except Exception:
+            logging.error("add-languages skill failed", exc_info=True)
+
+        mappings_path = os.path.join(source_path, code_utils.LANGUAGE_MAPPINGS_ASSET_PATH)
+
+        if os.path.exists(mappings_path):
+
+            import json
+
+            with open(mappings_path) as f:
+                mappings = json.load(f)
+
+            code_utils.merge_language_mappings(mappings)
+            languages = code_utils.get_mapped_languages()
+
     if not languages:
-
-        if os.getenv("ALLOW_DYNAMIC_LANGUAGE_SUPPORT", "false").lower() == "true":
-
-            logging.info(
-                "No preconfigured languages detected; Falling back to dynamic language detection"
-            )
-
-            try:
-                run_local_skill("add-languages", source_path, git_slug=git_slug)
-            except Exception:
-                logging.error("add-languages skill failed", exc_info=True)
-
-            mappings_path = os.path.join(source_path, code_utils.LANGUAGE_MAPPINGS_ASSET_PATH)
-
-            if os.path.exists(mappings_path):
-
-                import json
-
-                with open(mappings_path) as f:
-                    mappings = json.load(f)
-
-                code_utils.merge_language_mappings(mappings)
-                languages = code_utils.get_mapped_languages()
-
-        if not languages:
-
-            raise Exception(f"No supported languages detected in source_path='{source_path}'.")
+        raise Exception(f"No supported languages detected in source_path='{source_path}'.")
 
     return languages
+
+
+@dataclass
+class PreflightResult:
+    languages: list
+    external_metadata: list
+
+
+def run_preflight(source_path: str, git_slug: str) -> PreflightResult:
+    """Runs all preflight steps for the repository.
+
+    Steps:
+    1) Run external-metadata composite skill (non-fatal if it fails)
+    2) Run detect_languages
+    3) Run add-languages skill as a fallback when detect_languages fails
+    (if ALLOW_DYNAMIC_LANGUAGE_SUPPORT is enabled)
+    4) Load external metadata enrichments
+    """
+    import logging
+
+    from tools.skill.skill_util import run_composite_skill
+
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+    try:
+        run_composite_skill(source_path, "external-metadata", git_slug=git_slug)
+    except Exception:
+        logging.error("Composite skill 'external-metadata' failed", exc_info=True)
+
+    languages = detect_languages(source_path, git_slug=git_slug)
+    external_metadata = load_external_metadata(
+        git_slug=git_slug,
+        source_path=source_path,
+        skill=None,
+    )
+    return PreflightResult(languages=languages, external_metadata=external_metadata)
 
 
 ##############################################################################
@@ -734,14 +773,9 @@ class DataGenerationPipeline:
                 git_branch=git_branch,
             )
 
-            languages = detect_languages(source_path, git_slug=git_slug)
+            preflight = run_preflight(source_path, git_slug)
 
-            external_metadata = load_external_metadata(
-                git_slug=git_slug,
-                source_path=source_path,
-            )
-
-            for language in languages:
+            for language in preflight.languages:
 
                 for config in [False, True]:
 
@@ -753,7 +787,7 @@ class DataGenerationPipeline:
                         target_path=target_path,
                         config=config,
                         multi_repo=multi_repo,
-                        external_metadata=external_metadata,
+                        external_metadata=preflight.external_metadata,
                     )
 
             logging.info("Data generation pipeline complete.")

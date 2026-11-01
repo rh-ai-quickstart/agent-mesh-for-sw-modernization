@@ -1,0 +1,47 @@
+{{- if .Values.skillAgent.networkPolicy.enabled }}
+---
+# Egress NetworkPolicy for KFP pods labelled skill-agent: "true".
+# All other egress is denied.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: skill-agent-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      skill-agent: "true"
+  policyTypes:
+    - Egress
+  egress:
+    # DNS — required for any hostname lookup
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # External HTTPS — LLM API endpoint
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.https }}
+    # MLflow tracking server
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.mlflow }}
+    # KFP ML Metadata gRPC service — in-namespace only (required by KFP executor)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.mlmd }}
+    # MinIO object store — in-namespace only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.minio }}
+{{- end }}
