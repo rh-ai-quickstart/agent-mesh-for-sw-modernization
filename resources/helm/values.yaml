@@ -112,11 +112,10 @@ skillAgent:
     # Egress ports permitted from skill-agent pods.
     # Adjust if using non-default ports.
     egressPorts:
-      # Backend port of the CoreDNS pods (post-DNAT).
-      # OVN-Kubernetes evaluates NetworkPolicy ACLs after DNAT, so this must be
-      # the pod's listening port, not the ClusterIP service port (53).
-      # OpenShift default: 5353  |  vanilla Kubernetes default: 53
+      # Backend port of the CoreDNS pods (post-DNAT)
       dns: 5353
+      # Kubernetes API server backend port (post-DNAT)
+      kubeapi: 6443
       https: 443    # External LLM API endpoint
       mlflow: 8443  # MLflow tracking server (OpenShift AI default)
       mlmd: 8080    # KFP ML Metadata gRPC service (required by KFP executor)

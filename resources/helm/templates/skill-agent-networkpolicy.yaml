@@ -24,6 +24,10 @@ spec:
           port: {{ .Values.skillAgent.networkPolicy.egressPorts.dns }}
         - protocol: TCP
           port: {{ .Values.skillAgent.networkPolicy.egressPorts.dns }}
+    # Kubernetes API server — required by KFP executor to read secrets
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.kubeapi }}
     # External HTTPS — LLM API endpoint
     - ports:
         - protocol: TCP
