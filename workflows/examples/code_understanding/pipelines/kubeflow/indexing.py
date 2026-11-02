@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Metrics, Output  # noqa: E402
-
 from utils.kubeflow_utils import INDEXING_BASE_IMAGE  # noqa: E402
 from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
 
@@ -74,7 +73,6 @@ def graphrag_evaluation_op(
     import logging
 
     import pandas as pd
-
     from utils.kubeflow_utils import read_from_input_artifact, setup_logging
 
     setup_logging()
@@ -110,7 +108,6 @@ def run_indexing_multi_repo_op(
     """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
 
     import pandas as pd
-
     from pipelines.base.indexing import IndexingPipeline
     from utils.kubeflow_utils import setup_logging, write_to_output_artifact
 
@@ -142,7 +139,7 @@ def _run_pipeline(
         multi_repo=multi_repo,
     )
 
-    eval_task = graphrag_evaluation_op(
+    graphrag_evaluation_op(
         graphrag_dir=task.outputs["graphrag_dir"],
         git_repo=git_repo,
         git_branch=git_branch,

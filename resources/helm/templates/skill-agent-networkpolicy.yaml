@@ -52,4 +52,22 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.skillAgent.networkPolicy.egressPorts.minio }}
+    # RHOAI MCP server — in-namespace only (required when rhoaiMcp.enabled=true)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.rhoaiMcp }}
+    # OpenTelemetry collector — in-namespace only (HTTP and gRPC OTLP)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.otelHttp }}
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.otelGrpc }}
 {{- end }}

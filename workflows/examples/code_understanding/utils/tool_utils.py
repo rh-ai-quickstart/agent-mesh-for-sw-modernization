@@ -109,10 +109,9 @@ def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None
         parent_dir = os.path.dirname(path)
         if parent_dir and enrichments_dir:
             try:
-                DefaultAssetLoader().download_dir(parent_dir,
-                                                  os.path.join(enrichments_dir,
-                                                               parent_dir),
-                                                  git_slug=git_slug)
+                DefaultAssetLoader().download_dir(
+                    parent_dir, os.path.join(enrichments_dir, parent_dir), git_slug=git_slug
+                )
                 content = load_local_enrichments(enrichments_dir, path)
             except Exception:
                 pass

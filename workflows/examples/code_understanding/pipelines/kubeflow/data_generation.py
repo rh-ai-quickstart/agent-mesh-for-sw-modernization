@@ -60,22 +60,39 @@ def preflight_op(
     git_repo: str,
     git_branch: str,
     source_dir: Input[Dataset],
+    multi_repo: bool = False,
 ) -> NamedTuple("Outputs", [("languages", list), ("external_metadata_json", str)]):
     """Runs preflight relevant skills."""
     import json
+    import logging
+    import signal
+    import traceback
     from collections import namedtuple
 
     from pipelines.base.data_generation import run_preflight
     from utils import code_utils
-    from utils.kubeflow_utils import read_from_input_artifact, setup_logging
+    from utils.kubeflow_utils import read_from_input_artifact, setup_logging, sigterm_handler
 
     setup_logging()
+    signal.signal(signal.SIGTERM, sigterm_handler)
 
     Outputs = namedtuple("Outputs", ["languages", "external_metadata_json"])
 
     with read_from_input_artifact(source_dir) as tmp_source:
         git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
-        result = run_preflight(tmp_source, git_slug)
+        try:
+            result = run_preflight(tmp_source, git_slug)
+        except Exception:
+            logging.error(
+                "Preflight failed for repo=%s branch=%s git_slug=%s:\n%s",
+                git_repo,
+                git_branch,
+                git_slug,
+                traceback.format_exc(),
+            )
+            if not multi_repo:
+                raise
+            return Outputs(languages=[], external_metadata_json=json.dumps([]))
 
     return Outputs(
         languages=result.languages,
@@ -119,31 +136,31 @@ def generate_code_and_meta_op(
 
             external_metadata = json.loads(external_metadata_json)
 
-            for language in languages:
-
-                for config in [False, True]:
-
-                    generate_code_and_meta(
-                        git_repo=git_repo,
-                        git_branch=git_branch,
-                        language=language,
-                        source_path=tmp_source,
-                        target_path=tmp_target,
-                        config=config,
-                        multi_repo=multi_repo,
-                        external_metadata=external_metadata,
-                    )
+            generate_code_and_meta(
+                git_repo=git_repo,
+                git_branch=git_branch,
+                languages=languages,
+                source_path=tmp_source,
+                target_path=tmp_target,
+                multi_repo=multi_repo,
+                external_metadata=external_metadata,
+            )
 
         except Exception as e:
 
-            if type(e).__name__ == "RateLimitError" or "429" in str(e):
+            is_rate_limit = type(e).__name__ == "RateLimitError" or "429" in str(e)
+            hint = " Consider reducing GRAPHRAG_PARALLEL_REPOS." if is_rate_limit else ""
+
+            if is_rate_limit or not multi_repo:
                 logging.error(
-                    f"Rate limit exceeded for repo '{git_repo}' (branch='{git_branch}'). "
-                    f"Consider reducing GRAPHRAG_PARALLEL_REPOS: {e}"
+                    f"Data generation failed for repo '{git_repo}' (branch='{git_branch}')"
+                    f" [{type(e).__name__}]: {e}{hint}"
                 )
                 raise
 
-            logging.error(f"Skipping repo '{git_repo}' (branch='{git_branch}'): {e}")
+            logging.error(
+                f"Skipping repo '{git_repo}' (branch='{git_branch}') [{type(e).__name__}]: {e}"
+            )
 
 
 @inject_secret_as_env(secret_name="code-understanding-env")
@@ -186,6 +203,7 @@ def _run_pipeline(
         git_repo=git_repo,
         git_branch=git_branch,
         source_dir=prep.outputs["source_dir"],
+        multi_repo=multi_repo,
     )
 
     gen = generate_code_and_meta_op(
@@ -201,7 +219,7 @@ def _run_pipeline(
 
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
-def _run_pipeline_multi_repo(repos: list = []):
+def _run_pipeline_multi_repo(repos: list = []):  # noqa: B006 — mutable default is safe here: KFP
     """Generates code metadata for all repositories in the repo list."""
 
     with dsl.ParallelFor(

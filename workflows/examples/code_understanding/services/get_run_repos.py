@@ -35,5 +35,8 @@ def get_run_repos(repos: list = None) -> list:
     if env_contents:
         return json.loads(env_contents)
 
-    logging.info("get_run_repos: no repo list found in repos or GIT_REPO_LIST_CONTENTS; returning empty list.")
+    logging.info(
+        "get_run_repos: no repo list found in repos or GIT_REPO_LIST_CONTENTS;"
+        " returning empty list."
+    )
     return []

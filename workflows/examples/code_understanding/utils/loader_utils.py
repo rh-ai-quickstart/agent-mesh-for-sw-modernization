@@ -16,8 +16,7 @@ def is_global_scoped_enrichment(path: str) -> bool:
     """Returns True if the path is global-scoped — i.e., at or under .enrichments/.assets."""
     parts = os.path.normpath(path).split(os.sep)
     return any(
-        parts[i] == ".enrichments" and parts[i + 1] == ".assets"
-        for i in range(len(parts) - 1)
+        parts[i] == ".enrichments" and parts[i + 1] == ".assets" for i in range(len(parts) - 1)
     )
 
 

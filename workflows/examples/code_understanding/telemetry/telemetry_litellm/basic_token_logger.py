@@ -15,7 +15,9 @@ class BasicTokenLogger(CustomLogger):
         self.step = 0
         self.totals = {}
         self._lock = threading.Lock()
-        self._track_cost = os.environ.get("RHOAI_MLFLOW_COST_MONITORING_ENABLED", "false").lower() == "true"
+        self._track_cost = (
+            os.environ.get("RHOAI_MLFLOW_COST_MONITORING_ENABLED", "false").lower() == "true"
+        )
 
     def log_tokens(self) -> None:
         pass

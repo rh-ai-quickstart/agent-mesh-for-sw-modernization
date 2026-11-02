@@ -120,6 +120,9 @@ skillAgent:
       mlflow: 8443  # MLflow tracking server (OpenShift AI default)
       mlmd: 8080    # KFP ML Metadata gRPC service (required by KFP executor)
       minio: 9000   # In-namespace MinIO object store
+      rhoaiMcp: 8000  # RHOAI MCP server (required when rhoaiMcp.enabled=true)
+      otelHttp: 4318  # OpenTelemetry collector HTTP OTLP endpoint
+      otelGrpc: 4317  # OpenTelemetry collector gRPC OTLP endpoint
 
 console:
   enabled: false

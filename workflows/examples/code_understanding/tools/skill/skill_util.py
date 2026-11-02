@@ -75,7 +75,9 @@ async def _run_as_agent(
                 ).ainvoke({"input": instructions})
                 return
         except Exception as exc:
-            logging.warning("Could not load rhoai-mcp tools: %s", exc)
+            logging.warning(
+                "RHOAI MCP requested but unavailable — skill ran WITHOUT MCP tools: %s", exc
+            )
 
     agent = create_tool_calling_agent(llm, tools, prompt)
     await AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=50).ainvoke(

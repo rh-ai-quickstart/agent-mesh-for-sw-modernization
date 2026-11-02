@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from contextlib import contextmanager
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -139,15 +140,30 @@ def inject_secret_as_env(secret_name: str, keys: list[str] | None = None):
 ##############################################################################
 
 
+def sigterm_handler(signum, frame):
+    logging.error(
+        "SIGTERM received — Kubernetes is terminating this pod "
+        "(node eviction, pod preemption, or manual deletion). "
+        "Exiting with code 143."
+    )
+    sys.exit(143)
+
+
 def harden_skill_component(
     component_fn=None,
     *,
     cpu_limit: str = "2",
     memory_limit: str = "8G",
-    timeout_seconds: int = 1800,
+    timeout_seconds: int | None = None,
 ):
     """
     Decorator that hardens a KFP component for isolated skill execution.
+
+    Args:
+        cpu_limit:       CPU limit for the component pod (default: "2").
+        memory_limit:    Memory limit for the component pod (default: "8G").
+        timeout_seconds: KFP task timeout in seconds. Pass an integer to enforce a
+                         deadline (e.g. 1800 for 30 min). Defaults to None (no timeout).
     """
     import functools
 
@@ -160,7 +176,8 @@ def harden_skill_component(
                 from kfp import kubernetes
 
                 kubernetes.add_pod_label(task, "skill-agent", "true")
-                kubernetes.set_timeout(task, timeout_seconds)
+                if timeout_seconds is not None:
+                    kubernetes.set_timeout(task, timeout_seconds)
             except ImportError:
                 pass
             return task

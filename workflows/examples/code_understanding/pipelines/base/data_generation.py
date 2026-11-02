@@ -220,7 +220,7 @@ def get_parsed_code_metadata(df, language, config=False):
         converted_df = converted_dataset.to_pandas()
 
         converted_df.to_csv(
-            f"data_{language}_{'config_' if config else '_'}"
+            f"data_{language}_{'config_' if config else ''}"
             f"{str(int(datetime.now().timestamp()))}.csv"
         )
 
@@ -239,10 +239,8 @@ def load_external_metadata(
     skill: str | None = "external-metadata",
 ) -> list[dict]:
     """Loads all JSON files from source_path/.enrichments/.code_metadata/ and returns them as a
-    list of dicts.
-
-    Each JSON file may contain a single object (appended as one record) or a top-level
-    array (each element appended as its own record), mirroring JSONL semantics.
+    list of dicts. Each JSON file must contain a JSON object; files containing other
+    types are skipped with a warning.
 
     Args:
         git_slug:       Repository slug (e.g. "open-sdg-sdg-data-canada").
@@ -292,7 +290,8 @@ def load_external_metadata(
                 else:
                     logging.warning(
                         f"Skipping {filename} in external metadata processing: "
-                        f"expected a JSON object, got {type(data).__name__}"
+                        f"expected a JSON object, got {type(data).__name__}. "
+                        "File contents will be ignored."
                     )
             except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
@@ -542,8 +541,7 @@ def save_code_and_metadata_files(
         raise e
 
 
-@enable_telemetry
-def generate_code_and_meta(
+def generate_code_and_meta_for_language(
     git_repo: str,
     git_branch: str,
     language: str,
@@ -648,6 +646,51 @@ def generate_code_and_meta(
             content=json.dumps(result),
             tags={"git_slug": git_slug, "category": "data-generation", "multi_repo": multi_repo},
         )
+
+
+@enable_telemetry
+def generate_code_and_meta(
+    git_repo: str,
+    git_branch: str,
+    languages: list,
+    source_path: str,
+    target_path: str,
+    multi_repo: bool = False,
+    external_metadata: list | None = None,
+):
+    """Generates code metadata for all detected languages of a repository.
+
+    Raises ValueError if languages is empty in single-repo mode. In multi-repo
+    mode an empty list is treated as graceful degradation (e.g. preflight failed,
+    or no supported languages were detected) and the function returns without raising.
+    """
+    import logging
+
+    if not languages:
+        msg = (
+            f"No languages detected for repo={git_repo!r} branch={git_branch!r}: "
+            "preflight returned an empty language list "
+            "(check preflight logs for errors)."
+        )
+        if multi_repo:
+            logging.error(msg)
+            return
+        raise ValueError(msg)
+
+    for language in languages:
+
+        for config in [False, True]:
+
+            generate_code_and_meta_for_language(
+                git_repo=git_repo,
+                git_branch=git_branch,
+                language=language,
+                source_path=source_path,
+                target_path=target_path,
+                config=config,
+                multi_repo=multi_repo,
+                external_metadata=external_metadata,
+            )
 
 
 def generate_git_slug(git_repo: str, git_branch: str) -> str:
@@ -775,20 +818,15 @@ class DataGenerationPipeline:
 
             preflight = run_preflight(source_path, git_slug)
 
-            for language in preflight.languages:
-
-                for config in [False, True]:
-
-                    generate_code_and_meta(
-                        git_repo=git_repo,
-                        git_branch=git_branch,
-                        language=language,
-                        source_path=source_path,
-                        target_path=target_path,
-                        config=config,
-                        multi_repo=multi_repo,
-                        external_metadata=preflight.external_metadata,
-                    )
+            generate_code_and_meta(
+                git_repo=git_repo,
+                git_branch=git_branch,
+                languages=preflight.languages,
+                source_path=source_path,
+                target_path=target_path,
+                multi_repo=multi_repo,
+                external_metadata=preflight.external_metadata,
+            )
 
             logging.info("Data generation pipeline complete.")
 

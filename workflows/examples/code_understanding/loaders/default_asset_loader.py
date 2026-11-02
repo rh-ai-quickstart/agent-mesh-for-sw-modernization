@@ -116,7 +116,9 @@ class DefaultAssetLoader(AssetLoader):
         git_slug: str | None = None,
         enrichment_files: dict | None = None,
     ) -> str:
-        return self._loader.register_enrichments(repo_dir, git_slug, enrichment_files=enrichment_files)
+        return self._loader.register_enrichments(
+            repo_dir, git_slug, enrichment_files=enrichment_files
+        )
 
     def log_repos(self, run_repos: list) -> None:
 

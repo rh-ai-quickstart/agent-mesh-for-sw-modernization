@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Markdown, Output  # noqa: E402
-
 from utils.kubeflow_utils import ANALYSIS_BASE_IMAGE  # noqa: E402
 from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
 
@@ -76,7 +75,7 @@ def _run_pipeline(
     multi_repo: bool = False,
 ):
 
-    task = generate_migration_report_op(
+    generate_migration_report_op(
         graphrag_dir=graphrag_dir,
         git_repo=git_repo,
         git_branch=git_branch,
@@ -87,7 +86,7 @@ def _run_pipeline(
 @dsl.pipeline(name="graphrag-analysis-multi-repo-pipeline")
 def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
 
-    task = run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
+    run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
 
 
 ##############################################################################

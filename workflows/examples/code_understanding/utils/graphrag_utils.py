@@ -22,6 +22,11 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 import pandas as pd  # noqa: E402
 
 
+def is_empty_dir(path: str) -> bool:
+    """Returns True if the directory at *path* exists but contains no entries."""
+    return not any(os.scandir(path))
+
+
 class DependencyAnalyzer:
     """Query GraphRAG for dependency analysis"""
 

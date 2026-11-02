@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 RESULT_DIRECTORY_EXPERIMENT_SUFFIX = "/code-refactoring/assets/result-directories"
 INDEX_ARTIFACT_ROOT = "results/datasets/repos"
 MULTI_REPO_ARTIFACT_PATH = f"{INDEX_ARTIFACT_ROOT}/multi-repo"
@@ -233,6 +232,7 @@ def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 def repo_is_indexed(git_repo: str, git_branch: str, indexes: list[dict[str, Any]]) -> bool:
     from utils.code_utils import generate_slug_from_repo
+
     slug = generate_slug_from_repo(git_repo, git_branch)
     return any(item.get("git_slug") == slug and not item.get("multi_repo") for item in indexes)
 

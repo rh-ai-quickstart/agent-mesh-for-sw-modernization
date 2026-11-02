@@ -346,11 +346,11 @@ format:
 
 lint:
 	@echo "==> Running Flake8..."
-	uv run --project ui --frozen flake8 --extend-exclude=.venv --max-line-length=99 --extend-ignore=E203,W503 .
+	uv run --project ui --frozen flake8 --extend-exclude=.venv,temp --max-line-length=99 --extend-ignore=E203,W503 .
 	@echo "==> Checking Python formatting with Black..."
-	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' --check --diff .
+	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/|/temp/' --check --diff .
 	@echo "==> Checking Python import sorting with isort..."
-	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' --check-only --diff .
+	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' --skip-glob '*/temp/*' --check-only --diff .
 	@echo "==> Lint checks completed successfully."
 
 # ============================================================================

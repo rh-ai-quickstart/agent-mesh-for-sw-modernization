@@ -23,11 +23,10 @@ def generate_graphrag_index(
     import tracemalloc
 
     import nest_asyncio
-
     from loaders.default_asset_loader import DefaultAssetLoader
     from pipelines.base.data_generation import generate_git_slug
     from pipelines.graphrag import run_graphrag
-    from utils.graphrag_utils import DependencyAnalyzer
+    from utils.graphrag_utils import DependencyAnalyzer, is_empty_dir
 
     tracemalloc.start()
 
@@ -40,6 +39,12 @@ def generate_graphrag_index(
     status = "fail"
 
     try:
+
+        if is_empty_dir(codebase_path):
+            raise ValueError(
+                f"Codebase directory '{codebase_path}' is empty — data generation likely failed "
+                "(check generate-code-and-meta-op pod logs)."
+            )
 
         logging.info("Starting process...")
 

@@ -16,7 +16,6 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from kfp import dsl  # noqa: E402
-
 from utils.kubeflow_utils import compile_all_and_exit  # noqa: E402
 from utils.pipeline_utils import uses_kfp  # noqa: E402
 

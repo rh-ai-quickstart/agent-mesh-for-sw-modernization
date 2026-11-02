@@ -12,6 +12,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+import mlflow  # noqa: E402, F401  - pre-warm: avoids first-import races across threads
 from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
@@ -21,8 +22,6 @@ from starlette.background import BackgroundTask  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.middleware.body_limit import RequestBodyLimitMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
-
-import mlflow  # noqa: E402, F401  - pre-warm: fully initializes mlflow before concurrent request threads can race on first import
 
 import cluster  # noqa: E402
 import downloads  # noqa: E402
@@ -117,12 +116,14 @@ def set_namespace(body: NamespaceRequest, response: Response) -> dict[str, str]:
 @app.get("/api/catalog")
 def get_catalog() -> dict[str, Any]:
     from api import repositories_service
+
     return {"repos": repositories_service.get_catalog_repos()}
 
 
 @app.get("/api/indexes")
 def get_indexes() -> dict[str, Any]:
     from api import repositories_service
+
     data = indexes.list_indexed_repos()
     catalog_entries = repositories_service.get_catalog_repos()
     options = indexes.queryable_repos(data.get("indexes") or [], catalog_entries)
