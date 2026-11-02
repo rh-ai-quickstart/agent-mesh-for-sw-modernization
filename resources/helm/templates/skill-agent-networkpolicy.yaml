@@ -14,12 +14,16 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # DNS — required for any hostname lookup
-    - ports:
+    # DNS — target the CoreDNS pods by namespace.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.skillAgent.networkPolicy.dnsNamespace }}
+      ports:
         - protocol: UDP
-          port: 53
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.dns }}
         - protocol: TCP
-          port: 53
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.dns }}
     # External HTTPS — LLM API endpoint
     - ports:
         - protocol: TCP
