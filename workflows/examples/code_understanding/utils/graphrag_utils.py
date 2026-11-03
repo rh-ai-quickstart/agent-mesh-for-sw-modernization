@@ -448,12 +448,7 @@ class DependencyAnalyzer:
         from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_result_directory
 
-        artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
-            DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
-            git_slug=git_slug,
-            multi_repo=multi_repo,
-        )
-        output_dir = os.path.join(download_dir, os.path.basename(artifact_path))
+        output_dir = os.path.join(download_dir, "output")
 
         try:
             download_result_directory(
