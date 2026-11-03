@@ -178,6 +178,7 @@ def log_uploaded_index(client: Any, metadata: dict[str, Any], directory: Path) -
         "multi_repo": bool(metadata["multi_repo"]),
         "uploaded": True,
         "run_id": run_id,
+        "kfp_run_id": "",
         "indexed_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -228,8 +229,12 @@ def list_indexed_repos() -> dict[str, Any]:
 
 
 def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Map git_slug -> index metadata."""
-    return {item["git_slug"]: item for item in indexes if item.get("git_slug")}
+    """Map git_slug -> single-repo index metadata (multi_repo entries excluded)."""
+    return {
+        item["git_slug"]: item
+        for item in indexes
+        if item.get("git_slug") and not item.get("multi_repo")
+    }
 
 
 def repo_is_indexed(git_repo: str, git_branch: str, indexes: list[dict[str, Any]]) -> bool:

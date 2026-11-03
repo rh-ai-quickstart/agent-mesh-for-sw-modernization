@@ -667,7 +667,7 @@
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
-      animateLatest: false, indexesLoading: true,
+      animateLatest: false, indexesLoading: true, indexesError: false,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -887,7 +887,9 @@
       $("analysis-loading").classList.add("hidden");
       const opts = state.queryable.filter(o => o.key !== "__multi_repo__");
       if (!opts.length) {
-        $("analysis-empty").textContent = "No indexed repositories found. Run the full indexing pipeline from the Indexing tab first.";
+        $("analysis-empty").textContent = state.indexesError
+          ? "Failed to load indexed repositories. Check the status panel."
+          : "No indexed repositories found. Run the full indexing pipeline from the Indexing tab first.";
         $("analysis-empty").classList.remove("hidden");
         $("analysis-repo-row").classList.add("hidden");
         return;
@@ -908,9 +910,13 @@
 
     function renderIndexedSelect() {
       const opts = state.queryable.filter(o => o.key !== "__multi_repo__");
+      const prevKey = $("analysis-repo").value;
       $("analysis-repo").innerHTML = opts.map(o =>
         `<option value="${esc(o.key)}">${esc(o.label)}</option>`
       ).join("");
+      if (prevKey && opts.some(o => o.key === prevKey)) {
+        $("analysis-repo").value = prevKey;
+      }
       updateAnalysisControls();
     }
 
@@ -1418,6 +1424,7 @@
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
         state.indexesLoading = false;
+        state.indexesError = false;
         if ($("indexes")) {
           $("indexes").innerHTML = state.indexes.length
             ? state.indexes.map(indexCard).join("")
@@ -1452,6 +1459,7 @@
         if (!state.thinking) banner("");
       } catch (e) {
         state.indexesLoading = false;
+        state.indexesError = true;
         updateAnalysisControls();
         banner(String(e.message || e), true);
       }

@@ -749,7 +749,7 @@ def detect_languages(source_path: str, git_slug: str) -> list:
                 mappings = json.load(f)
 
             code_utils.merge_language_mappings(mappings)
-            languages = code_utils.get_mapped_languages()
+            languages = list(mappings.get("file_extensions", {}).keys())
 
     if not languages:
         raise Exception(f"No supported languages detected in source_path='{source_path}'.")

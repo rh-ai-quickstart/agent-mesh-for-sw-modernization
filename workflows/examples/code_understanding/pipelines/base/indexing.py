@@ -157,7 +157,7 @@ def evaluate_graphrag_index(
 
     except Exception as e:
 
-        logging.warning(f"GraphRAG index evaluation failed: {e}")
+        logging.warning(f"GraphRAG index evaluation failed: {e}", exc_info=True)
 
 
 ##############################################################################
@@ -226,7 +226,7 @@ class IndexingPipeline:
 
             except Exception as e:
 
-                logging.warning(f"GraphRAG index evaluation failed: {e}")
+                logging.warning(f"GraphRAG index evaluation failed: {e}", exc_info=True)
 
         return {
             "codebase_path": codebase_path,

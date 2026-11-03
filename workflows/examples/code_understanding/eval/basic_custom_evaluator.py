@@ -289,7 +289,7 @@ Respond ONLY with valid JSON in this exact format:
         DefaultAssetLoader().log_results(
             result_file,
             artifact_path=artifact_path,
-            tags={"category": "evaluation", "git_slug": slug, "multi_repo": multi_repo},
+            tags={"category": "evaluation", "git_slug": slug, "multi_repo": str(multi_repo)},
         )
 
         return df
