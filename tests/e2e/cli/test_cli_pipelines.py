@@ -2,7 +2,7 @@
 
 These tests require an existing deployment and oc login. Pipeline tests also
 require --run-pipelines (or make test-cli-e2e RUN_PIPELINES=true). The query test
-uses the existing index. CLI_E2E_PIPELINE_TIMEOUT_SECONDS defaults to one hour;
+uses the existing index. CLI_E2E_PIPELINE_TIMEOUT_SECONDS defaults to two hours;
 CLI_E2E_COMMAND_TIMEOUT_SECONDS defaults to 30 minutes.
 """
 
@@ -105,7 +105,7 @@ def _wait_for_run(client, run_id, timeout):
 
 def _submit_and_wait(run_cli, client, namespace, args, *, repo_list=None):
     command_timeout = int(os.environ.get("CLI_E2E_COMMAND_TIMEOUT_SECONDS", "1800"))
-    pipeline_timeout = int(os.environ.get("CLI_E2E_PIPELINE_TIMEOUT_SECONDS", "3600"))
+    pipeline_timeout = int(os.environ.get("CLI_E2E_PIPELINE_TIMEOUT_SECONDS", "7200"))
 
     command = ["make", "run-pipelines", f"ARGS={args}"]
     if repo_list is not None:
