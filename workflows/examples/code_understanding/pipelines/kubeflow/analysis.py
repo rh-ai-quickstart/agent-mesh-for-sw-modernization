@@ -31,6 +31,7 @@ def generate_migration_report_op(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
 
     from pipelines.base.analysis import write_migration_report
@@ -45,12 +46,15 @@ def generate_migration_report_op(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
 
 @inject_secret_as_env(secret_name="code-understanding-env")
 @dsl.component(base_image=ANALYSIS_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def run_analysis_multi_repo_op(graphrag_dir: Input[Dataset], report: Output[Markdown]):
+def run_analysis_multi_repo_op(
+    graphrag_dir: Input[Dataset], report: Output[Markdown], pipeline_run_id: str = ""
+):
     """Runs migration report generation across the combined multi-repo GraphRAG index."""
 
     from pipelines.base.analysis import write_migration_report
@@ -59,7 +63,9 @@ def run_analysis_multi_repo_op(graphrag_dir: Input[Dataset], report: Output[Mark
     setup_logging()
 
     with read_from_input_artifact(graphrag_dir) as tmp_graphrag:
-        write_migration_report(tmp_graphrag, report.path, multi_repo=True)
+        write_migration_report(
+            tmp_graphrag, report.path, multi_repo=True, pipeline_run_id=pipeline_run_id
+        )
 
 
 ##############################################################################
@@ -73,6 +79,7 @@ def _run_pipeline(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
 
     generate_migration_report_op(
@@ -80,13 +87,17 @@ def _run_pipeline(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
-    )
+        pipeline_run_id=pipeline_run_id,
+    ).set_caching_options(enable_caching=False)
 
 
 @dsl.pipeline(name="graphrag-analysis-multi-repo-pipeline")
-def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
+def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset], pipeline_run_id: str = ""):
 
-    run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
+    run_analysis_multi_repo_op(
+        graphrag_dir=graphrag_dir,
+        pipeline_run_id=pipeline_run_id,
+    ).set_caching_options(enable_caching=False)
 
 
 ##############################################################################

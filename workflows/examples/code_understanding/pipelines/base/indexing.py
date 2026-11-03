@@ -13,8 +13,12 @@ def generate_graphrag_index(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Generates a GraphRAG index from the provided codebase."""
+    if pipeline_run_id:
+        return
+
     import json
     import logging
     import os
@@ -122,9 +126,16 @@ def generate_graphrag_index(
 
 @enable_telemetry
 def evaluate_graphrag_index(
-    graphrag_source_path: str, git_repo: str, git_branch: str, multi_repo: bool = False
+    graphrag_source_path: str,
+    git_repo: str,
+    git_branch: str,
+    multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Evaluates a GraphRAG index using DefaultCustomEvaluator.evaluate_with_dataset."""
+    if pipeline_run_id:
+        return None
+
     import logging
     import os
 
@@ -224,8 +235,16 @@ class IndexingPipeline:
             "fail_message": "",
         }
 
-    def run_multi_repo(self, parent_target_path: str, graphrag_source_path: str = None):
+    def run_multi_repo(
+        self,
+        parent_target_path: str,
+        graphrag_source_path: str = None,
+        pipeline_run_id: str = "",
+    ):
         """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
+        if pipeline_run_id:
+            return
+
         import logging
         import os
 

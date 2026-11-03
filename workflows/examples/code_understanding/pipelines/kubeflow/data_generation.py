@@ -33,7 +33,9 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 @dsl.component(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
 )
-def prepare_environment_op(git_repo: str, git_branch: str, source_dir: Output[Dataset]):
+def prepare_environment_op(
+    git_repo: str, git_branch: str, source_dir: Output[Dataset], pipeline_run_id: str = ""
+):
     """Clones the repository and archives it as a gzip tarball."""
 
     from pipelines.base.data_generation import prepare_environment
@@ -42,12 +44,12 @@ def prepare_environment_op(git_repo: str, git_branch: str, source_dir: Output[Da
     setup_logging()
 
     with write_to_output_artifact(source_dir) as tmp_source, use_ephemeral_space() as tmp_target:
-
         prepare_environment(
             source_path=tmp_source,
             target_path=tmp_target,
             git_repo=git_repo,
             git_branch=git_branch,
+            pipeline_run_id=pipeline_run_id,
         )
 
 
@@ -61,6 +63,7 @@ def preflight_op(
     git_branch: str,
     source_dir: Input[Dataset],
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ) -> NamedTuple("Outputs", [("languages", list), ("external_metadata_json", str)]):
     """Runs preflight relevant skills."""
     import json
@@ -81,7 +84,7 @@ def preflight_op(
     with read_from_input_artifact(source_dir) as tmp_source:
         git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
         try:
-            result = run_preflight(tmp_source, git_slug)
+            result = run_preflight(tmp_source, git_slug, pipeline_run_id=pipeline_run_id)
         except Exception:
             logging.error(
                 "Preflight failed for repo=%s branch=%s git_slug=%s:\n%s",
@@ -113,6 +116,7 @@ def generate_code_and_meta_op(
     languages: list,
     external_metadata_json: str,
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Generates code metadata for all detected languages."""
     import json
@@ -132,7 +136,6 @@ def generate_code_and_meta_op(
         read_from_input_artifact(source_dir) as tmp_source,
         write_to_output_artifact(target_dir) as tmp_target,
     ):
-
         try:
 
             external_metadata = json.loads(external_metadata_json)
@@ -145,6 +148,7 @@ def generate_code_and_meta_op(
                 target_path=tmp_target,
                 multi_repo=multi_repo,
                 external_metadata=external_metadata,
+                pipeline_run_id=pipeline_run_id,
             )
 
         except Exception as e:
@@ -194,11 +198,13 @@ def _run_pipeline(
     git_repo: str = os.getenv("GIT_REPO", ""),
     git_branch: str = os.getenv("GIT_BRANCH", "main"),
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ) -> Dataset:
 
     prep = prepare_environment_op(
         git_repo=git_repo,
         git_branch=git_branch,
+        pipeline_run_id=pipeline_run_id,
     )
 
     pre = preflight_op(
@@ -206,6 +212,7 @@ def _run_pipeline(
         git_branch=git_branch,
         source_dir=prep.outputs["source_dir"],
         multi_repo=multi_repo,
+        pipeline_run_id=pipeline_run_id,
     )
 
     gen = generate_code_and_meta_op(
@@ -215,13 +222,16 @@ def _run_pipeline(
         languages=pre.outputs["languages"],
         external_metadata_json=pre.outputs["external_metadata_json"],
         multi_repo=multi_repo,
+        pipeline_run_id=pipeline_run_id,
     )
 
     return gen.outputs["target_dir"]
 
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
-def _run_pipeline_multi_repo(repos: list = []):  # noqa: B006 — mutable default is safe here: KFP
+def _run_pipeline_multi_repo(  # noqa: B006 — mutable default is safe here: KFP
+    repos: list = [], pipeline_run_id: str = ""
+):
     """Generates code metadata for all repositories in the repo list."""
 
     with dsl.ParallelFor(
@@ -232,6 +242,7 @@ def _run_pipeline_multi_repo(repos: list = []):  # noqa: B006 — mutable defaul
             git_repo=repo.git_repo,
             git_branch=repo.git_branch,
             multi_repo=True,
+            pipeline_run_id=pipeline_run_id,
         )
 
 

@@ -26,7 +26,7 @@ from services.update_repos import log_repos  # noqa: E402
 
 
 def submit_pipeline_run(
-    repos: list[dict[str, str]], namespace: str | None = None
+    repos: list[dict[str, str]], namespace: str | None = None, pipeline_run_id: str = ""
 ) -> dict[str, Any]:
     if not repos:
         raise ValueError("Select at least one repository.")
@@ -39,10 +39,12 @@ def submit_pipeline_run(
     pipeline_name = "single_repo" if single else "multi_repo"
     run_name = f"{pipeline_name}_{timestamp}"
     mode = "single-repo" if single else "multi-repo"
+    enable_caching = bool(pipeline_run_id)
 
     params: dict[str, Any] = {
         **({"git_repo": git_repo, "git_branch": git_branch} if single else {}),
         **({"repos": json.dumps(repos)} if not single else {}),
+        "pipeline_run_id": pipeline_run_id,
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
     }
@@ -52,7 +54,9 @@ def submit_pipeline_run(
     except Exception:
         logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
 
-    run = _trigger_run(pipeline_name, run_name, params, namespace=namespace)
+    run = _trigger_run(
+        pipeline_name, run_name, params, namespace=namespace, enable_caching=enable_caching
+    )
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}
 
 

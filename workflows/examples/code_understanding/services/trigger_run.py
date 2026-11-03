@@ -12,6 +12,7 @@ def trigger_run(
     run_name: str,
     params: dict[str, str],
     namespace: str | None = None,
+    enable_caching: bool = False,
 ) -> Any:
     """Look up a pipeline, resolve its latest version, and submit a run."""
     client = create_client(namespace=namespace)
@@ -24,6 +25,6 @@ def trigger_run(
         pipeline_id=pipeline_id,
         version_id=version_id,
         params=params,
-        enable_caching=False,
+        enable_caching=enable_caching,
     )
     return run

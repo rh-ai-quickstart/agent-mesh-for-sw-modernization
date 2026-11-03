@@ -196,9 +196,21 @@ def write_migration_report(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Run the migration report and write the result to report_path."""
     import os
+
+    if pipeline_run_id:
+        from utils.loader_utils import download_graphrag_output_directory
+
+        download_graphrag_output_directory(
+            graphrag_source_path,
+            pipeline_run_id,
+            git_repo=git_repo,
+            git_branch=git_branch,
+            multi_repo=multi_repo,
+        )
 
     migration_report = AnalysisPipeline().run(
         graphrag_source_path, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo

@@ -151,6 +151,41 @@ def download_result_directory(
     )
 
 
+def download_graphrag_output_directory(
+    graphrag_source_path: str,
+    pipeline_run_id: str,
+    git_repo: str = "",
+    git_branch: str = "",
+    multi_repo: bool = False,
+):
+    """Downloads a previous run's GraphRAG index into graphrag_source_path/output/.
+
+    Fetches the indexing artifact tagged with pipeline_run_id from the backing store
+    and moves it into the expected output/ subdirectory so that downstream analysis
+    can read it as if it had just been generated.
+    """
+    import shutil
+
+    from loaders.default_asset_loader import DefaultAssetLoader
+    from pipelines.base.data_generation import generate_git_slug
+
+    git_slug = generate_git_slug(git_repo, git_branch) if git_repo else None
+    artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
+        DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+        git_slug=git_slug,
+        multi_repo=multi_repo,
+    )
+    download_dir = os.path.join(graphrag_source_path, os.path.basename(artifact_path))
+    download_result_directory(
+        git_slug=git_slug,
+        download_dir=download_dir,
+        results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+        multi_repo=multi_repo,
+        asset_tags={"pipeline_run_id": pipeline_run_id, "category": "indexing"},
+    )
+    shutil.move(download_dir, os.path.join(graphrag_source_path, "output"))
+
+
 def download_code_metadata_directories(git_repos: list, parent_target_path: str):
     """Downloads generated code metadata for each repo in git_repos to
     parent_target_path/<slug>."""

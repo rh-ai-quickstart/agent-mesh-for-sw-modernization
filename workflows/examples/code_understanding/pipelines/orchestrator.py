@@ -43,6 +43,7 @@ def single_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
 
     if uses_kfp():
@@ -51,6 +52,7 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         idx = IndexingPipeline.run(
@@ -58,6 +60,7 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         AnalysisPipeline.run(
@@ -65,6 +68,7 @@ def single_repo_pipeline(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
     else:
@@ -107,19 +111,23 @@ def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     repos: str = "[]",  # JSON-encoded list; avoids KFP v2 parameterType: LIST runtime drop
+    pipeline_run_id: str = "",
 ):
 
     if uses_kfp():
 
         rp = DataGenerationPipeline.get_repo_list(repos=repos)
 
-        dg = DataGenerationPipeline.run_multi_repo(repos=rp.output)
+        dg = DataGenerationPipeline.run_multi_repo(
+            repos=rp.output, pipeline_run_id=pipeline_run_id
+        )
 
         idx = IndexingPipeline.run_multi_repo(
             parent_target_path=parent_target_path,
+            pipeline_run_id=pipeline_run_id,
         ).after(dg)
 
-        AnalysisPipeline.run_multi_repo(graphrag_dir=idx.output)
+        AnalysisPipeline.run_multi_repo(graphrag_dir=idx.output, pipeline_run_id=pipeline_run_id)
 
     else:
 

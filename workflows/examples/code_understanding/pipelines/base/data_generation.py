@@ -51,10 +51,19 @@ def reset_environment(source_path: str, target_path: str):
     shutil.rmtree(target_path, ignore_errors=True)
 
 
-def prepare_environment(source_path: str, target_path: str, git_repo: str, git_branch: str):
+def prepare_environment(
+    source_path: str,
+    target_path: str,
+    git_repo: str,
+    git_branch: str,
+    pipeline_run_id: str = "",
+):
     """Prepares the environment at the start of the pipeline."""
     import logging
     import os
+
+    if pipeline_run_id:
+        return
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -654,6 +663,7 @@ def generate_code_and_meta(
     target_path: str,
     multi_repo: bool = False,
     external_metadata: list | None = None,
+    pipeline_run_id: str = "",
 ):
     """Generates code metadata for all detected languages of a repository.
 
@@ -664,6 +674,9 @@ def generate_code_and_meta(
     import logging
 
     from exceptions import EmptyLanguagesError
+
+    if pipeline_run_id:
+        return
 
     if not languages:
         msg = (
@@ -750,7 +763,7 @@ class PreflightResult:
     external_metadata: list
 
 
-def run_preflight(source_path: str, git_slug: str) -> PreflightResult:
+def run_preflight(source_path: str, git_slug: str, pipeline_run_id: str = "") -> PreflightResult:
     """Runs all preflight steps for the repository.
 
     Steps:
@@ -761,6 +774,9 @@ def run_preflight(source_path: str, git_slug: str) -> PreflightResult:
     4) Load external metadata enrichments
     """
     import logging
+
+    if pipeline_run_id:
+        return PreflightResult(languages=[], external_metadata=[])
 
     from tools.skill.skill_util import run_composite_skill
 

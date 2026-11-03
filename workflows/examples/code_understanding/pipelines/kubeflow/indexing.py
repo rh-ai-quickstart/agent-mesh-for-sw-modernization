@@ -32,6 +32,7 @@ def graphrag_indexing_op(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
 
     from pipelines.base.indexing import generate_graphrag_index
@@ -54,6 +55,7 @@ def graphrag_indexing_op(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         result.log_metric("success", 1)
@@ -68,6 +70,7 @@ def graphrag_evaluation_op(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
 
     import logging
@@ -78,7 +81,7 @@ def graphrag_evaluation_op(
     setup_logging()
 
     if not git_repo or multi_repo:
-        logging.info("Skipping evaluation: git_repo not provided or multi_repo=True.")
+        logging.info("Skipping evaluation.")
         pd.DataFrame().to_csv(eval_results.path, index=False)
         return
 
@@ -91,6 +94,7 @@ def graphrag_evaluation_op(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
     df = results if isinstance(results, pd.DataFrame) else pd.DataFrame(results or [])
@@ -104,6 +108,7 @@ def run_indexing_multi_repo_op(
     parent_target_path: str,
     graphrag_dir: Output[Dataset],
     eval_results: Output[Dataset],
+    pipeline_run_id: str = "",
 ):
     """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
 
@@ -114,7 +119,11 @@ def run_indexing_multi_repo_op(
     setup_logging()
 
     with write_to_output_artifact(graphrag_dir) as tmp_graphrag:
-        IndexingPipeline().run_multi_repo(parent_target_path, graphrag_source_path=tmp_graphrag)
+        IndexingPipeline().run_multi_repo(
+            parent_target_path,
+            graphrag_source_path=tmp_graphrag,
+            pipeline_run_id=pipeline_run_id,
+        )
 
     pd.DataFrame().to_csv(eval_results.path, index=False)
 
@@ -130,6 +139,7 @@ def _run_pipeline(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ) -> Dataset:
 
     task = graphrag_indexing_op(
@@ -137,6 +147,7 @@ def _run_pipeline(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
+        pipeline_run_id=pipeline_run_id,
     )
 
     graphrag_evaluation_op(
@@ -144,15 +155,21 @@ def _run_pipeline(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
+        pipeline_run_id=pipeline_run_id,
     )
 
     return task.outputs["graphrag_dir"]
 
 
 @dsl.pipeline(name="graphrag-indexing-multi-repo-pipeline")
-def _run_indexing_multi_repo_pipeline(parent_target_path: str) -> Dataset:
+def _run_indexing_multi_repo_pipeline(
+    parent_target_path: str, pipeline_run_id: str = ""
+) -> Dataset:
 
-    task = run_indexing_multi_repo_op(parent_target_path=parent_target_path)
+    task = run_indexing_multi_repo_op(
+        parent_target_path=parent_target_path,
+        pipeline_run_id=pipeline_run_id,
+    )
     return task.outputs["graphrag_dir"]
 
 
