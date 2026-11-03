@@ -550,7 +550,8 @@
       <div id="banner" role="status" aria-live="polite"></div>
       <div class="cu-tabs">
         <button type="button" class="active" data-tab="repos">Repositories</button>
-        <button type="button" data-tab="pipelines">Analysis</button>
+        <button type="button" data-tab="pipelines">Indexing</button>
+        <button type="button" data-tab="analysis">Analysis</button>
         <button type="button" data-tab="chat">Chat</button>
       </div>
       <section id="tab-repos" class="cu-card">
@@ -573,19 +574,39 @@
         </div>
       </section>
       <section id="tab-pipelines" class="cu-card hidden">
-        <h2>Analysis</h2>
-        <p class="cu-muted">Generate a code analysis report for the selected repository or repositories.<span class="cu-help" id="help-pipelines">
+        <h2>Indexing</h2>
+        <p class="cu-muted">Generate a knowledge graph index for the selected repository or repositories.<span class="cu-help" id="help-pipelines">
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-pipelines-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <span class="cu-help-popover" role="tooltip">
-            Select a repository (or group of repositories) to analyze, then click "Run Analysis".<br/>
+            Select a repository (or group of repositories) to index, then click "Run Indexing".<br/>
             <strong>Note:</strong><br/>
-            &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong> process which involves the generation of a knowledge graph index, and may take up to 30 minutes or more to complete.<br/>
+            &bullet;&nbsp;Indexing is a <strong>time-consuming</strong> process which involves the generation of a knowledge graph, and may take up to 30 minutes or more to complete.<br/>
             &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
           </span>
         </span></p>
         <div class="cu-pipeline-row">
           <div class="cu-note hidden" id="pipeline-selection"></div>
-          <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Analysis</button>
+          <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Indexing</button>
+        </div>
+      </section>
+      <section id="tab-analysis" class="cu-card hidden">
+        <h2>Analysis</h2>
+        <p class="cu-muted">Generate a migration analysis report for an indexed repository.<span class="cu-help" id="help-analysis">
+          <button type="button" class="cu-help-btn" aria-label="Help" id="help-analysis-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+          <span class="cu-help-popover" role="tooltip">
+            Select an indexed repository and click "Run Analysis" to generate a migration report.<br/>
+            <strong>Note:</strong> Only repositories that have already been indexed are shown. Use the <strong>Indexing</strong> tab to index a repository first.
+          </span>
+        </span></p>
+        <p id="analysis-loading" class="cu-loading">Loading indexed repositories…</p>
+        <p id="analysis-empty" class="cu-muted hidden"></p>
+        <div id="analysis-repo-row" class="hidden">
+          <label class="cu-form-label" for="analysis-repo">Select repository</label>
+          <select class="cu-select" id="analysis-repo" style="max-width:28rem"></select>
+          <div class="cu-pipeline-row" style="margin-top:0.75rem">
+            <div id="analysis-note" class="cu-note hidden"></div>
+            <button type="button" class="cu-btn cu-btn-secondary" id="run-analysis" disabled>Run Analysis</button>
+          </div>
         </div>
         <div id="report-viewer" class="cu-report-viewer hidden">
           <h3 id="report-viewer-title"></h3>
@@ -605,7 +626,7 @@
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-chat-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <span class="cu-help-popover" role="tooltip">
             Submit queries about a repository (or group of repositories).<br/>
-            <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
+            <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Indexing</strong> tab.
           </span>
         </span></p>
         <p id="chat-repo-row" class="hidden">
@@ -646,7 +667,7 @@
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
-      animateLatest: false,
+      animateLatest: false, indexesLoading: true,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -845,6 +866,7 @@
         bar.classList.add("hidden");
         $("send").disabled = false;
         $("run-pipeline").disabled = false;
+        updateAnalysisControls();
         return;
       }
       bar.classList.remove("hidden");
@@ -852,6 +874,44 @@
       $("thinking-status").textContent = info.status || "Working on your request…";
       $("send").disabled = true;
       $("run-pipeline").disabled = true;
+      $("run-analysis").disabled = true;
+    }
+
+    function updateAnalysisControls() {
+      if (state.indexesLoading) {
+        $("analysis-loading").classList.remove("hidden");
+        $("analysis-empty").classList.add("hidden");
+        $("analysis-repo-row").classList.add("hidden");
+        return;
+      }
+      $("analysis-loading").classList.add("hidden");
+      const opts = state.queryable.filter(o => o.key !== "__multi_repo__");
+      if (!opts.length) {
+        $("analysis-empty").textContent = "No indexed repositories found. Run the full indexing pipeline from the Indexing tab first.";
+        $("analysis-empty").classList.remove("hidden");
+        $("analysis-repo-row").classList.add("hidden");
+        return;
+      }
+      $("analysis-empty").classList.add("hidden");
+      $("analysis-repo-row").classList.remove("hidden");
+      const selectedKey = $("analysis-repo").value;
+      const option = state.queryable.find(o => o.key === selectedKey);
+      const hasRunId = !!option?.kfp_run_id;
+      $("run-analysis").disabled = !hasRunId || !!state.thinking;
+      if (option && !hasRunId) {
+        $("analysis-note").textContent = "Re-analysis requires a run ID. Run a full indexing pass first.";
+        $("analysis-note").classList.remove("hidden");
+      } else {
+        $("analysis-note").classList.add("hidden");
+      }
+    }
+
+    function renderIndexedSelect() {
+      const opts = state.queryable.filter(o => o.key !== "__multi_repo__");
+      $("analysis-repo").innerHTML = opts.map(o =>
+        `<option value="${esc(o.key)}">${esc(o.label)}</option>`
+      ).join("");
+      updateAnalysisControls();
     }
 
     async function api(path, opts) {
@@ -902,9 +962,10 @@
       document.querySelectorAll(".cu-tabs button").forEach((b) => {
         b.classList.toggle("active", b.dataset.tab === name);
       });
-      ["repos", "pipelines", "chat"].forEach((tab) => {
+      ["repos", "pipelines", "analysis", "chat"].forEach((tab) => {
         $("tab-" + tab).classList.toggle("hidden", tab !== name);
       });
+      if (name === "analysis") updateAnalysisControls();
     }
 
     function indexCard(item) {
@@ -1193,7 +1254,7 @@
 
             showReport("analysis");
             $("report-viewer").classList.remove("hidden");
-            showTab("pipelines");
+            showTab("analysis");
           } catch (e) {
             banner(String(e.message || e), true);
           }
@@ -1356,6 +1417,7 @@
         if (!state.selected.size && state.defaultKey) state.selected.add(state.defaultKey);
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
+        state.indexesLoading = false;
         if ($("indexes")) {
           $("indexes").innerHTML = state.indexes.length
             ? state.indexes.map(indexCard).join("")
@@ -1385,9 +1447,12 @@
         $("chat-repo-row").classList.remove("hidden");
         renderRepos();
         renderChatSelect();
+        renderIndexedSelect();
         renderChat();
         if (!state.thinking) banner("");
       } catch (e) {
+        state.indexesLoading = false;
+        updateAnalysisControls();
         banner(String(e.message || e), true);
       }
     }
@@ -1580,6 +1645,30 @@
         banner(String(e.message || e), true);
       }
     };
+    $("run-analysis").onclick = async () => {
+      if (state.thinking) return;
+      const selectedKey = $("analysis-repo").value;
+      const option = state.queryable.find(o => o.key === selectedKey);
+      if (!option || !option.kfp_run_id) return;
+      $("report-viewer").classList.add("hidden");
+      $("report-viewer-title").textContent = "";
+      $("report-viewer-subtitle").textContent = "";
+      $("report-viewer-content").innerHTML = "";
+      setThinking({ kind: "pipeline", label: "Running analysis", status: "Submitting analysis job…" });
+      try {
+        const repos = [{ git_repo: option.git_repo, git_branch: option.git_branch }];
+        const result = await api("/api/v2/pipelines", {
+          method: "POST",
+          body: JSON.stringify({ repos, pipeline_run_id: option.kfp_run_id }),
+        });
+        setThinking({ kind: "pipeline", label: "Running analysis", status: `KFP run ${result.job_id} started` });
+        pollV2(result.job_id);
+      } catch (e) {
+        setThinking(null);
+        banner(String(e.message || e), true);
+      }
+    };
+    $("analysis-repo").addEventListener("change", () => updateAnalysisControls());
     $("chat-repo").addEventListener("change", () => {
       if ($("banner").dataset.reason === "no-chat-repo") {
         banner("");

@@ -61,6 +61,7 @@ def _run_index_metadata(run: Any) -> dict[str, Any]:
     slug = str(tags.get("git_slug") or "")
     multi = _as_bool(tags.get("multi_repo"))
     uploaded = _as_bool(tags.get(UPLOADED_TAG))
+    kfp_run_id = str(tags.get("pipeline_run_id") or "")
     try:
         artifact_path = index_artifact_path(slug, multi_repo=multi)
     except ValueError as exc:
@@ -73,6 +74,7 @@ def _run_index_metadata(run: Any) -> dict[str, Any]:
         "multi_repo": multi,
         "uploaded": uploaded,
         "run_id": str(getattr(run_info, "run_id", "")),
+        "kfp_run_id": kfp_run_id,
         "indexed_at": (
             datetime.fromtimestamp(started / 1000, tz=timezone.utc).isoformat() if started else ""
         ),
@@ -84,7 +86,7 @@ def _public_index_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     """Return index fields needed by the browser without exposing artifact layout."""
     return {
         key: metadata[key]
-        for key in ("git_slug", "multi_repo", "uploaded", "run_id", "indexed_at")
+        for key in ("git_slug", "multi_repo", "uploaded", "run_id", "kfp_run_id", "indexed_at")
     }
 
 
@@ -246,19 +248,27 @@ def queryable_repos(
     catalog: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     """Catalog entries that have a GraphRAG index, plus optional multi-repo index."""
+    from utils.code_utils import generate_slug_from_repo
+
+    lkp = index_lookup(indexes)
     options: list[dict[str, Any]] = []
     for item in catalog:
-        if repo_is_indexed(item["git_repo"], item["git_branch"], indexes):
-            short = item["git_repo"].rsplit("/", 1)[-1]
-            options.append(
-                {
-                    **item,
-                    "label": f"{short} @ {item['git_branch']}",
-                    "key": f"{item['git_repo']}|{item['git_branch']}",
-                    "use_global": False,
-                }
-            )
+        slug = generate_slug_from_repo(item["git_repo"], item["git_branch"])
+        idx_meta = lkp.get(slug)
+        if not idx_meta:
+            continue
+        short = item["git_repo"].rsplit("/", 1)[-1]
+        options.append(
+            {
+                **item,
+                "label": f"{short} @ {item['git_branch']}",
+                "key": f"{item['git_repo']}|{item['git_branch']}",
+                "use_global": False,
+                "kfp_run_id": idx_meta.get("kfp_run_id", ""),
+            }
+        )
     if multi_repo_indexed(indexes):
+        multi_meta = next((i for i in indexes if i.get("multi_repo")), {})
         options.append(
             {
                 "git_repo": "",
@@ -266,6 +276,7 @@ def queryable_repos(
                 "label": "Combined multi-repo index",
                 "key": "__multi_repo__",
                 "use_global": True,
+                "kfp_run_id": multi_meta.get("kfp_run_id", ""),
             }
         )
     return options
