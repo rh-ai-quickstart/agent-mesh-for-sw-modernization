@@ -431,29 +431,42 @@ class DependencyAnalyzer:
     ):
         """Downloads GraphRAG index artifacts and prepares settings.
 
+        Artifacts are downloaded into a staging subdirectory named after the artifact
+        leaf, then moved into an ``output/`` subdirectory of ``download_dir`` so that
+        ``DependencyAnalyzer._setup_search`` can find them at
+        ``{download_dir}/output/*.parquet``.  ``settings.yaml`` is written to
+        ``download_dir``.
+
         Args:
-            download_dir: Root directory of the GraphRAG source. Artifacts are
-                downloaded into a subdirectory named after the artifact leaf and
-                settings.yaml is written here.
+            download_dir: Root directory of the GraphRAG source.  After this call,
+                parquet files are at ``{download_dir}/output/`` and
+                ``settings.yaml`` is at ``{download_dir}/settings.yaml``.
             git_slug: Repository slug used to scope the artifact lookup.
             multi_repo: Whether the index spans multiple repositories.
             git_repo: Repository URL, used in error messages.
 
         Raises:
-            Exception: If the index artifacts cannot be downloaded.
+            Exception: If the index artifacts cannot be downloaded or staged.
         """
         import os
+        import shutil
         import traceback
 
         from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_result_directory
 
-        output_dir = os.path.join(download_dir, "output")
+        artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
+            DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+            git_slug=git_slug,
+            multi_repo=multi_repo,
+        )
+
+        artifact_download_dir = os.path.join(download_dir, os.path.basename(artifact_path))
 
         try:
             download_result_directory(
                 git_slug=git_slug,
-                download_dir=output_dir,
+                download_dir=artifact_download_dir,
                 results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
                 multi_repo=multi_repo,
                 asset_tags={
@@ -466,6 +479,19 @@ class DependencyAnalyzer:
         except Exception:
             logging.debug(traceback.format_exc())
             raise
+
+        # DependencyAnalyzer._setup_search reads from {root_dir}/output/*.parquet, so move
+        # the downloaded artifact directory into an output/ subdirectory of download_dir.
+        output_dir = os.path.join(download_dir, "output")
+        try:
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir)
+            shutil.move(artifact_download_dir, output_dir)
+        except Exception as e:
+            raise RuntimeError(
+                f"Downloaded index to '{artifact_download_dir}' but could not stage it "
+                f"at '{output_dir}': {e}"
+            ) from e
 
         DependencyAnalyzer.prepare_settings(template_dir=output_dir, output_dir=download_dir)
 
