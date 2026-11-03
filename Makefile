@@ -12,6 +12,7 @@ GATEWAY_HOST        	:= $(shell oc get gateway data-science-gateway -n openshift
 PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
+PIPELINE_RUN_ID     	?=
 DEPLOY_EMBEDDING_MODEL ?= false
 # Local development uses Podman by default. GitHub Actions sets CI=true and
 # provides Docker Buildx; callers can override this with CONTAINER_ENGINE.
@@ -152,6 +153,7 @@ help-all:
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
+	@echo "  PIPELINE_RUN_ID             KFP run ID of a previous run (required for --analysis-only)"
 	@echo "  ARGS                        Arguments passed to run-pipelines"
 	@echo "  QUESTION_FILE               Required input file for run-adhoc-query"
 	@echo ""
@@ -527,6 +529,8 @@ run-pipelines:
 		--type=merge -p '{"stringData":{"GIT_REPO":"$(PIPELINE_GIT_REPO)"}}' || true && \
 	[ -n "$(PIPELINE_GIT_BRANCH)" ] && oc patch secret code-understanding-env -n $$KFP_NAMESPACE \
 		--type=merge -p '{"stringData":{"GIT_BRANCH":"$(PIPELINE_GIT_BRANCH)"}}' || true && \
+	[ -n "$(PIPELINE_RUN_ID)" ]     && oc patch secret code-understanding-env -n $$KFP_NAMESPACE \
+		--type=merge -p '{"stringData":{"PIPELINE_RUN_ID":"$(PIPELINE_RUN_ID)"}}' || true && \
 	if [ -n "$(PIPELINE_GIT_REPO_LIST)" ]; then \
 		[ -f "$(PIPELINE_GIT_REPO_LIST)" ] || { echo "Error: PIPELINE_GIT_REPO_LIST file not found: $(PIPELINE_GIT_REPO_LIST)" >&2; exit 1; } && \
 		echo "==> Injecting repo list from $(PIPELINE_GIT_REPO_LIST) into secret..." && \

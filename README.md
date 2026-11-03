@@ -90,8 +90,10 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
    ```make run-pipelines ARGS="--single-repo" PIPELINE_GIT_REPO=https://github.com/org/repo PIPELINE_GIT_BRANCH=main```
 
 2. To run the **Code Understanding** pipeline for multiple repositories:
-    - Run the following command, passing a local JSON file with the list of 
-      repositories:
+    Run the following command, using the default list of repositories:
+   ```make run-pipelines ARGS="--multi-repo"```
+
+   Or to override the default list of repositories, use a local JSON file:
    ```make run-pipelines ARGS="--multi-repo" PIPELINE_GIT_REPO_LIST=/path/to/repos.json```
    
    where `/path/to/repos.json` is a local file that follows the JSON structure shown below:
@@ -108,8 +110,17 @@ Ensure that you have access to OpenAI-compatible endpoints for the following mod
     ]
    ```
 
-  OR to use the default list of repositories:
-  ```make run-pipelines ARGS="--multi-repo"```
+3. (For Kubeflow Pipelines) To re-run **only the analysis stage** of a 
+   previous pipeline run, run the following:
+
+   For single-repo:
+   ```make run-pipelines ARGS="--single-repo --analysis-only" PIPELINE_RUN_ID=<kfp-run-id>```
+
+   OR for multi-repo:
+   ```make run-pipelines ARGS="--multi-repo --analysis-only" PIPELINE_RUN_ID=<kfp-run-id>```
+
+   The `PIPELINE_RUN_ID` can be retrieved from the run's **pipeline_run_id** 
+   input parameter on the OpenShift AI Home Page (under **Pipelines -> Runs**).
 
 ## Running Adhoc Queries
 1. To run adhoc queries about the indexed code, run the following:

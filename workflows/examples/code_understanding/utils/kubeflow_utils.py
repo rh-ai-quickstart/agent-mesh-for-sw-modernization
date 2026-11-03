@@ -196,8 +196,9 @@ def harden_skill_component(
 def get_kfp_run_id() -> str | None:
     """Return the KFP run ID for the current pod by reading the ``pipeline/runid`` label.
 
-    Uses ``KFP_POD_NAME`` (injected via downward API) to look up the pod via the
-    Kubernetes API. Returns ``None`` if the label is absent or the API call fails.
+    Uses ``KFP_POD_NAME`` if set (e.g. injected via downward API), otherwise falls
+    back to ``HOSTNAME`` (Kubernetes sets the container hostname to the pod name by
+    default). Returns ``None`` if the label is absent or the API call fails.
     """
     try:
         from kubernetes import client as k8s_client
@@ -205,7 +206,7 @@ def get_kfp_run_id() -> str | None:
 
         k8s_config.load_incluster_config()
 
-        pod_name = os.environ.get("KFP_POD_NAME", "").strip()
+        pod_name = (os.environ.get("KFP_POD_NAME") or os.environ.get("HOSTNAME", "")).strip()
         ns = (os.environ.get("KFP_NAMESPACE") or os.environ.get("MLFLOW_NAMESPACE", "")).strip()
 
         if pod_name and ns:
