@@ -168,6 +168,7 @@ def download_graphrag_output_directory(
 
     from loaders.default_asset_loader import DefaultAssetLoader
     from pipelines.base.data_generation import generate_git_slug
+    from utils.graphrag_utils import DependencyAnalyzer
 
     git_slug = generate_git_slug(git_repo, git_branch) if git_repo else None
     artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
@@ -183,7 +184,9 @@ def download_graphrag_output_directory(
         multi_repo=multi_repo,
         asset_tags={"pipeline_run_id": pipeline_run_id, "category": "indexing"},
     )
-    shutil.move(download_dir, os.path.join(graphrag_source_path, "output"))
+    output_dir = os.path.join(graphrag_source_path, "output")
+    shutil.move(download_dir, output_dir)
+    DependencyAnalyzer.prepare_settings(template_dir=output_dir, output_dir=graphrag_source_path)
 
 
 def download_code_metadata_directories(git_repos: list, parent_target_path: str):

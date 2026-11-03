@@ -656,10 +656,20 @@
       (async () => {
         for (const node of nodes) {
           await new Promise(resolve => setTimeout(resolve, 0));
+          // Mark processed before attempting render so a failed node is never retried.
+          node.dataset.processed = "1";
           try {
+            const timeout = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("mermaid timeout")), 5000)
+            );
             const result = mermaid.run({ nodes: [node] });
-            if (result && typeof result.then === "function") await result.catch(() => {});
-          } catch (e) { /* leave raw diagram text visible */ }
+            if (result && typeof result.then === "function") {
+              await Promise.race([result, timeout]);
+            }
+          } catch (e) {
+            // Parse error or timeout — hide the unrenderable diagram block.
+            node.style.display = "none";
+          }
         }
       })();
     }
