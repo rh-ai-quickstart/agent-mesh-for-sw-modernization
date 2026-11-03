@@ -118,6 +118,7 @@ def generate_code_and_meta_op(
     import json
     import logging
 
+    from exceptions import EmptyLanguagesError
     from pipelines.base.data_generation import generate_code_and_meta
     from utils.kubeflow_utils import (
         read_from_input_artifact,
@@ -149,9 +150,10 @@ def generate_code_and_meta_op(
         except Exception as e:
 
             is_rate_limit = type(e).__name__ == "RateLimitError" or "429" in str(e)
+            is_empty_languages = isinstance(e, EmptyLanguagesError)
             hint = " Consider reducing GRAPHRAG_PARALLEL_REPOS." if is_rate_limit else ""
 
-            if is_rate_limit or not multi_repo:
+            if is_rate_limit or is_empty_languages:
                 logging.error(
                     f"Data generation failed for repo '{git_repo}' (branch='{git_branch}')"
                     f" [{type(e).__name__}]: {e}{hint}"

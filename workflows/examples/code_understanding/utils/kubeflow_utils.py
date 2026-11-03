@@ -189,44 +189,34 @@ def harden_skill_component(
 
 
 ##############################################################################
-# Argo Workflow helpers
+# Pipeline run ID helpers
 ##############################################################################
 
 
-def get_argo_workflow_uid(kfp_trigger_id: str, namespace: str | None = None) -> str | None:
-    """Return the ARGO_WORKFLOW_UID for a KFP run.
+def get_kfp_run_id() -> str | None:
+    """Return the KFP run ID for the current pod by reading the ``pipeline/runid`` label.
 
-    Looks up the Argo Workflow labelled ``pipeline/runid=<kfp_trigger_id>`` and returns
-    its ``metadata.uid`` — the value written as ``pipeline_run_id`` on MLflow result
-    runs by ``get_pipeline_run_id()`` inside pipeline pods.
-
-    Returns None if the workflow cannot be found or the API call fails.
+    Uses ``KFP_POD_NAME`` (injected via downward API) to look up the pod via the
+    Kubernetes API. Returns ``None`` if the label is absent or the API call fails.
     """
     try:
         from kubernetes import client as k8s_client
         from kubernetes import config as k8s_config
 
-        try:
-            k8s_config.load_incluster_config()
-        except Exception:
-            k8s_config.load_kube_config()
+        k8s_config.load_incluster_config()
 
-        ns = namespace or os.getenv("KFP_NAMESPACE", "default")
-        items = (
-            k8s_client.CustomObjectsApi()
-            .list_namespaced_custom_object(
-                "argoproj.io",
-                "v1alpha1",
-                ns,
-                "workflows",
-                label_selector=f"pipeline/runid={kfp_trigger_id}",
-            )
-            .get("items", [])
-        )
-        return items[0]["metadata"]["uid"] if items else None
+        pod_name = os.environ.get("KFP_POD_NAME", "").strip()
+        ns = (os.environ.get("KFP_NAMESPACE") or os.environ.get("MLFLOW_NAMESPACE", "")).strip()
+
+        if pod_name and ns:
+            pod = k8s_client.CoreV1Api().read_namespaced_pod(pod_name, ns)
+            kfp_run_id = (pod.metadata.labels or {}).get("pipeline/runid", "").strip()
+            return kfp_run_id or None
 
     except Exception:
-        return None
+        pass
+
+    return None
 
 
 ##############################################################################

@@ -380,11 +380,8 @@ def generate_code_comment(
         if metadata.get("methods"):
             lines.append("\n Methods:")
             lines.extend(
-                [
-                    "- "
-                    + (method.get("method_name", method) if isinstance(method, dict) else method)
-                    for method in metadata["methods"]
-                ]
+                f"- {method.get('method_name', method) if isinstance(method, dict) else method}"
+                for method in metadata["methods"]
             )
 
         if config:
@@ -660,11 +657,13 @@ def generate_code_and_meta(
 ):
     """Generates code metadata for all detected languages of a repository.
 
-    Raises ValueError if languages is empty in single-repo mode. In multi-repo
+    Raises EmptyLanguagesError if languages is empty in single-repo mode. In multi-repo
     mode an empty list is treated as graceful degradation (e.g. preflight failed,
     or no supported languages were detected) and the function returns without raising.
     """
     import logging
+
+    from exceptions import EmptyLanguagesError
 
     if not languages:
         msg = (
@@ -675,7 +674,7 @@ def generate_code_and_meta(
         if multi_repo:
             logging.error(msg)
             return
-        raise ValueError(msg)
+        raise EmptyLanguagesError(msg)
 
     for language in languages:
 
