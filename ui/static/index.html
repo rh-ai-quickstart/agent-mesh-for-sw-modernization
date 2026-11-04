@@ -471,6 +471,11 @@
     .cu-md-table th { background: #f0f4f8; font-weight: 600; }
     .cu-md-table tr:nth-child(even) td { background: #f9fbfd; }
     .cu-md pre.mermaid { background: transparent; color: inherit; padding: 0; }
+    .cu-diagram-err { position: relative; display: inline-flex; align-items: center; gap: 0.3rem; cursor: default; color: var(--cu-gold); font-size: 0.85rem; font-weight: 600; padding: 0.15rem 0.4rem; border: 1px solid var(--cu-gold); border-radius: 3px; background: #fffbe6; }
+    .cu-diagram-flyover { position: fixed; z-index: 9999; max-width: 480px; min-width: 220px; background: #fff; border: 1px solid var(--cu-border); border-left: 4px solid var(--cu-gold); border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.13); padding: 0.65rem 0.85rem; font-size: 0.82rem; pointer-events: none; }
+    .cu-diagram-flyover-title { color: var(--cu-gold); font-weight: 700; margin-bottom: 0.3rem; }
+    .cu-diagram-flyover-msg { color: var(--cu-gray); margin-bottom: 0.5rem; word-break: break-word; }
+    .cu-diagram-flyover-src { margin: 0; white-space: pre-wrap; color: var(--cu-charcoal); font-size: 0.78rem; max-height: 260px; overflow-y: auto; }
     .gridjs-td { vertical-align: top; }
     .cu-row-fail td.gridjs-td { background-color: #fff0f0 !important; }
     .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
@@ -667,8 +672,31 @@
               await Promise.race([result, timeout]);
             }
           } catch (e) {
-            // Parse error or timeout — hide the unrenderable diagram block.
-            node.style.display = "none";
+            // Parse error or timeout — replace the block with a small warning badge;
+            // hovering over it opens a flyover showing the error and diagram source.
+            const src = node.textContent || "";
+            const msg = (e && e.message) ? e.message : String(e);
+            const badge = document.createElement("span");
+            badge.className = "cu-diagram-err";
+            badge.textContent = "\u26a0 Diagram error";
+            let fly = null;
+            badge.addEventListener("mouseenter", ev => {
+              fly = document.createElement("div");
+              fly.className = "cu-diagram-flyover";
+              fly.innerHTML =
+                `<div class="cu-diagram-flyover-title">\u26a0 Diagram could not be rendered</div>` +
+                `<div class="cu-diagram-flyover-msg">${msg.replace(/</g, "&lt;")}</div>` +
+                `<pre class="cu-diagram-flyover-src">${src.replace(/</g, "&lt;")}</pre>`;
+              document.body.appendChild(fly);
+              const r = badge.getBoundingClientRect();
+              const fw = fly.offsetWidth, fh = fly.offsetHeight;
+              const top = r.bottom + 6 + fh > window.innerHeight ? r.top - fh - 6 : r.bottom + 6;
+              const left = Math.min(r.left, window.innerWidth - fw - 10);
+              fly.style.top = top + "px";
+              fly.style.left = Math.max(6, left) + "px";
+            });
+            badge.addEventListener("mouseleave", () => { if (fly) { fly.remove(); fly = null; } });
+            node.replaceWith(badge);
           }
         }
       })();
