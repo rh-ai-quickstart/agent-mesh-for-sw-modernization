@@ -641,8 +641,9 @@ class MlFlowAssetLoader(AssetLoader):
             logging.warning("Failed to log repo list to asset store", exc_info=True)
 
     def load_run_repos(self, run_id: str | None = None) -> list:
-        """Loads the repo list from MLflow, scoped by run_id (or get_pipeline_run_id()) if set,
-        falling back to GIT_REPO_LIST_CONTENTS."""
+        """Loads the repo list from MLflow, scoped by run_id if set,
+        falling back to GIT_REPO_LIST_CONTENTS.
+        """
         import json
 
         from utils.pipeline_utils import get_pipeline_run_id
@@ -652,11 +653,19 @@ class MlFlowAssetLoader(AssetLoader):
         if pipeline_run_id:
             asset_tags["pipeline_run_id"] = pipeline_run_id
 
-        return self.download(
-            "repos/repo_list.json",
-            experiment_name=self.RESULT_ASSET_EXPERIMENT,
-            asset_tags=asset_tags,
-        ) or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]")
+        try:
+            uris = self._get_absolute_artifact_uris(
+                "repos/repo_list.json",
+                experiment_name=self.RESULT_ASSET_EXPERIMENT,
+                tags=asset_tags,
+            )
+            repos = self._download_and_merge_enrichments(uris)
+            if repos is not None:
+                return repos
+        except Exception:
+            logging.debug("load_run_repos: no pipeline-scoped repo list found", exc_info=True)
+
+        return json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]")
 
     def load_catalog_repos(self) -> list:
         """Downloads the full repo catalog from MLflow, trying enrichments first and falling
