@@ -28,13 +28,16 @@ spec:
               git -C /opt/app-root/src remote add origin "{{ .Values.repoUrl }}" 2>/dev/null || true
               git -C /opt/app-root/src fetch --depth=1 origin "{{ .Values.repoRef }}"
               git -C /opt/app-root/src reset --hard FETCH_HEAD
-              PYTHONPATH=/opt/app-root/src/workflows/examples \
-              python workflows/examples/code_understanding/scripts/upload_prebuilt_index.py \
+              python workflows/examples/code_understanding/scripts/transfer_index.py import \
                 --bundle "{{ .Values.prebuiltIndex.bundlePath }}"
           workingDir: /opt/app-root/src
           env:
+            - name: KFP_NAMESPACE
+              value: "{{ .Values.namespace }}"
             - name: MLFLOW_TRACKING_INSECURE_TLS
               value: "true"
+            - name: MLFLOW_TRACKING_AUTH
+              value: "kubernetes-namespaced"
             - name: MLFLOW_NAMESPACE
               value: "{{ .Values.namespace }}"
             {{- if .Values.mlflowGatewayHost }}

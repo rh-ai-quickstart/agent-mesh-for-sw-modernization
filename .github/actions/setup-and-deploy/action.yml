@@ -1,0 +1,153 @@
+name: Setup and Deploy Quickstart
+description: Prepare runner, clone quickstart repo, and deploy to OpenShift or KinD
+
+inputs:
+  repo_url:
+    description: GitHub repo URL to clone
+    required: true
+  ref:
+    description: Branch/tag/SHA to check out
+    required: false
+    default: main
+  submodules:
+    description: Whether to clone submodules
+    required: false
+    default: 'false'
+  use_kind:
+    description: Use KinD instead of OpenShift
+    required: false
+    default: 'false'
+  deploy_command:
+    description: Command to deploy the application
+    required: true
+  namespace:
+    description: Kubernetes namespace
+    required: false
+    default: quickstart-ci-project-1
+  setup_commands:
+    description: Pre-deploy setup commands
+    required: false
+    default: ''
+  kind_pre_deploy_command:
+    description: Pre-deploy setup for KinD
+    required: false
+    default: ''
+  extra_deploy_args:
+    description: Extra args appended to deploy command
+    required: false
+    default: ''
+  kind_extra_deploy_args:
+    description: Extra args appended to deploy command only when using KinD
+    required: false
+    default: ''
+  build_images:
+    description: Build and push images to local KinD registry (only valid with use_kind)
+    required: false
+    default: 'false'
+  build_images_command:
+    description: Command to build images
+    required: false
+    default: 'make build-all-images'
+  push_images_command:
+    description: Command to push images to local registry
+    required: false
+    default: 'make push-all-images'
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare Runner
+      uses: ./.github/actions/prepare-runner
+
+    - name: Export namespace
+      shell: bash
+      run: echo "NAMESPACE=${{ inputs.namespace }}" >> "$GITHUB_ENV"
+
+    - name: Validate build_images requires use_kind
+      if: inputs.build_images == 'true' && inputs.use_kind != 'true'
+      shell: bash
+      run: |
+        echo "::error::build_images can only be used when use_kind is 'true'"
+        exit 1
+
+    - name: Validate OpenShift secrets
+      if: inputs.use_kind != 'true'
+      shell: bash
+      run: |
+        if [ -z "${PROD_TOKEN}" ]; then
+          echo "::error::PROD_TOKEN secret is missing or empty."
+          exit 1
+        fi
+        if [ -z "${PROD_SERVER}" ]; then
+          echo "::error::PROD_SERVER secret is missing or empty."
+          exit 1
+        fi
+
+    - name: Clone quickstart
+      uses: ./.github/actions/clone-quickstart
+      with:
+        repo_url: ${{ inputs.repo_url }}
+        ref: ${{ inputs.ref }}
+        submodules: ${{ inputs.submodules }}
+
+    - name: Setup OpenShift
+      if: inputs.use_kind != 'true'
+      uses: ./.github/actions/setup-openshift
+      with:
+        namespace: ${{ inputs.namespace }}
+        setup_commands: ${{ inputs.setup_commands }}
+
+    - name: Print environment versions
+      if: inputs.use_kind != 'true'
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        echo "=== OpenShift Version ==="
+        oc version || true
+
+        echo ""
+        echo "=== OpenShift AI Operator Version ==="
+        oc get csv -n "$NAMESPACE" \
+          -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.version}{"\n"}{end}' 2>/dev/null \
+          | grep -iE 'rhods|rhoai|opendatahub' \
+          || echo "(OpenShift AI operator not found)"
+
+    - name: Setup KinD
+      if: inputs.use_kind == 'true'
+      uses: ./.github/actions/setup-kind
+      with:
+        namespace: ${{ inputs.namespace }}
+        pre_deploy_command: ${{ inputs.kind_pre_deploy_command || inputs.setup_commands }}
+        build_images: ${{ inputs.build_images }}
+        build_images_command: ${{ inputs.build_images_command }}
+        push_images_command: ${{ inputs.push_images_command }}
+
+    - name: Deploy application
+      if: inputs.build_images != 'true'
+      shell: bash
+      working-directory: ./quickstart
+      env:
+        DEPLOY_COMMAND: ${{ inputs.deploy_command }}
+        EXTRA_DEPLOY_ARGS: ${{ inputs.extra_deploy_args }} ${{ inputs.use_kind == 'true' && inputs.kind_extra_deploy_args || '' }}
+        NAMESPACE: ${{ inputs.namespace }}
+      run: eval "$DEPLOY_COMMAND" $EXTRA_DEPLOY_ARGS
+
+    - name: Deploy application (local images)
+      if: inputs.build_images == 'true'
+      shell: bash
+      working-directory: ./quickstart
+      env:
+        DEPLOY_COMMAND: ${{ inputs.deploy_command }}
+        EXTRA_DEPLOY_ARGS: ${{ inputs.extra_deploy_args }} ${{ inputs.use_kind == 'true' && inputs.kind_extra_deploy_args || '' }}
+        NAMESPACE: ${{ inputs.namespace }}
+        REGISTRY: localhost:5001
+      run: eval "$DEPLOY_COMMAND" $EXTRA_DEPLOY_ARGS
+
+    - name: Verify deployment
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        echo "=== Pod Status ==="
+        oc get pods -n "$NAMESPACE"

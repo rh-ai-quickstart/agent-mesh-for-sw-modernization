@@ -1,0 +1,151 @@
+name: Create Dev Version Bump PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New version; leave empty to increment the patch version
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: create-dev-version-bump-pr-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  create-version-bump-pr:
+    name: Create version bump PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v5
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Bump release version
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_version="$(python3 scripts/bump_release.py --verify | sed -n 's/^version=//p')"
+          if [[ -z "$current_version" ]]; then
+            echo "::error::Could not read the current version from scripts/bump_release.py"
+            exit 1
+          fi
+
+          new_version="$(python3 - "$current_version" "$REQUESTED_VERSION" <<'PY'
+          import re
+          import sys
+
+          current = sys.argv[1]
+          requested = sys.argv[2].strip()
+          version_pattern = re.compile(
+              r"v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+          )
+
+          def parse(value):
+              match = version_pattern.fullmatch(value)
+              if match is None:
+                  raise SystemExit(
+                      "Version must be semver (MAJOR.MINOR.PATCH), optionally "
+                      f"prefixed with v: {value}"
+                  )
+              return tuple(int(part) for part in match.groups())
+
+          current_parts = parse(current)
+          if requested:
+              new_parts = parse(requested)
+          else:
+              new_parts = (*current_parts[:2], current_parts[2] + 1)
+
+          if new_parts <= current_parts:
+              raise SystemExit(
+                  f"New version must be later than the current version {current}."
+              )
+
+          prefix = "v" if current.startswith("v") else ""
+          print(prefix + ".".join(str(part) for part in new_parts))
+          PY
+          )"
+
+          python3 scripts/bump_release.py "$new_version"
+          python3 scripts/bump_release.py --verify
+
+          if git diff --quiet; then
+            has_changes=false
+          else
+            has_changes=true
+          fi
+
+          {
+            echo "current-version=$current_version"
+            echo "new-version=$new_version"
+            echo "has-changes=$has_changes"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare version bump branch
+        id: branch
+        if: steps.version.outputs.has-changes == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branch="chore/bump-dev-version-to-$NEW_VERSION"
+          expected_sha="$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          python3 scripts/bump_release.py --print-manifest-paths --null | xargs -0 git add --
+          git commit -m "chore: increment dev version to $NEW_VERSION"
+          git push --force-with-lease="refs/heads/$branch:$expected_sha" \
+            origin "HEAD:refs/heads/$branch"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update version bump PR
+        if: steps.version.outputs.has-changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          CURRENT_VERSION: ${{ steps.version.outputs.current-version }}
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          title="chore: increment dev version to $NEW_VERSION"
+          body_file="$(mktemp)"
+          {
+            echo "## Summary"
+            echo
+            printf 'This PR increments the dev version from `%s` to `%s`.\n' \
+              "$CURRENT_VERSION" "$NEW_VERSION"
+            echo
+            echo "## Files updated"
+            echo
+            python3 scripts/bump_release.py --print-manifest-paths | sed 's|^|- `|; s|$|`|'
+          } > "$body_file"
+
+          existing_pr="$(gh pr list --base dev --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing_pr" ]]; then
+            gh pr edit "$existing_pr" --title "$title" --body-file "$body_file"
+            pr_url="$(gh pr view "$existing_pr" --json url --jq '.url')"
+          else
+            pr_url="$(gh pr create --base dev --head "$BRANCH" --title "$title" --body-file "$body_file")"
+          fi
+
+          echo "Version bump PR - $pr_url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: No version changes
+        if: steps.version.outputs.has-changes == 'false'
+        run: echo "No version changes were generated."

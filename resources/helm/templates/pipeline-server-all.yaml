@@ -1,21 +1,9 @@
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: dashboard-dspa-secret
-  namespace: {{ .Values.namespace }}
-type: Opaque
-stringData:
-  AWS_ACCESS_KEY_ID: {{ .Values.minio.rootUser }}
-  AWS_SECRET_ACCESS_KEY: {{ .Values.minio.rootPassword }}
----
+{{- $storage := index .Values "aws-compatible-storage" }}
 apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
 kind: DataSciencePipelinesApplication
 metadata:
   name: dspa
   namespace: {{ .Values.namespace }}
-  annotations:
-    helm.sh/resource-policy: keep
 spec:
   apiServer:
     deploy: true
@@ -37,16 +25,16 @@ spec:
     disableHealthCheck: false
     enableExternalRoute: false
     externalStorage:
-      host: minio-api-{{ .Values.namespace }}.{{ .Values.clusterDomain }}
-      port: "443"
-      scheme: https
-      secure: true
-      region: {{ .Values.minio.region }}
-      bucket: {{ .Values.minio.bucket }}pipelines
+      host: {{ include "agent-mesh.awsCompatibleStorage.fullname" . }}.{{ .Values.namespace }}.svc.cluster.local
+      port: {{ include "agent-mesh.awsCompatibleStorage.apiPort" . | quote }}
+      scheme: http
+      secure: false
+      region: {{ $storage.s3.region }}
+      bucket: {{ .Values.pipelineStorage.bucket }}
       s3CredentialsSecret:
         accessKey: AWS_ACCESS_KEY_ID
         secretKey: AWS_SECRET_ACCESS_KEY
-        secretName: dashboard-dspa-secret
+        secretName: {{ include "agent-mesh.awsCompatibleStorage.secretName" . }}
   persistenceAgent:
     deploy: true
     numWorkers: 2
@@ -54,4 +42,3 @@ spec:
   scheduledWorkflow:
     cronScheduleTimezone: UTC
     deploy: true
-

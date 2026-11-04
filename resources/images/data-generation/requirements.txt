@@ -24,9 +24,6 @@ pytesseract==0.3.13
 jsonpath_ng==1.7.0
 validators==0.35.0
 datasets==4.4.1
-pytesseract==0.3.13
-jsonpath_ng==1.7.0
-validators==0.35.0
 pypdfium2==4.30.0
 deepeval==3.6.8
 evaluate==0.4.6
@@ -38,6 +35,16 @@ opentelemetry-exporter-otlp-proto-http==1.40.0
 opentelemetry-exporter-otlp-proto-grpc==1.40.0
 kfp==2.17.0
 PyYAML==6.0.2
+
+# Pin compatible transitive versions to reduce resolver backtracking against
+# the older LangChain, LangGraph, and Docling versions above.
+docling-core==2.50.1
+langgraph-prebuilt==0.5.1
+langgraph-sdk==0.3.15
+sentence-transformers==5.7.0
+transformers==4.57.6
+fastapi==0.141.1
+
 #chromadb==1.0.15
 #langchain-chroma==0.2.4
 #training-hub

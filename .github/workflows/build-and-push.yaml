@@ -1,0 +1,169 @@
+# Self-contained image build and publish workflow.
+name: Build and push images
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch whose images should be built
+        required: true
+        default: main
+        type: choice
+        options:
+          - main
+          - dev
+      force_build_all:
+        description: Build and publish every image even when the optional Make target says none are needed
+        required: true
+        default: 'FALSE'
+        type: choice
+        options:
+          - 'FALSE'
+          - 'TRUE'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ inputs.target_branch || github.ref_name }}
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: quay.io/rh-ai-quickstart
+  FORCE_BUILD_ALL: ${{ inputs.force_build_all || 'FALSE' }}
+  IMAGE_REPOSITORIES: >-
+    quay.io/rh-ai-quickstart/agent-mesh-for-sw-modernization-data-generation
+    quay.io/rh-ai-quickstart/agent-mesh-for-sw-modernization-data-indexing
+    quay.io/rh-ai-quickstart/agent-mesh-for-sw-modernization-pipeline-tools
+    quay.io/rh-ai-quickstart/agent-mesh-for-sw-modernization-console-app
+    quay.io/rh-ai-quickstart/agent-mesh-for-sw-modernization-console-plugin
+
+jobs:
+  build-and-push:
+    if: github.repository_owner == 'rh-ai-quickstart' && github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.target_branch || github.sha }}
+          fetch-depth: 0
+
+      - name: Check whether image publishing is needed
+        id: image-check
+        env:
+          IMAGE_CHANGE_BASE: ${{ github.event.before }}
+        run: |
+          MAKE_STATUS=0
+          MAKE_DATABASE="$(make -qp 2>/dev/null)" || MAKE_STATUS=$?
+          if [ "${MAKE_STATUS}" -gt 1 ]; then
+            echo "Unable to inspect Makefile targets (make exited ${MAKE_STATUS})." >&2
+            exit "${MAKE_STATUS}"
+          fi
+
+          if grep -Eq '^build-push-images-needed::?([[:space:]]|$)' <<< "${MAKE_DATABASE}"; then
+            echo "Found build-push-images-needed; checking whether images need publishing."
+            TARGET_STATUS=0
+            if make build-push-images-needed; then
+              TARGET_STATUS=0
+            else
+              TARGET_STATUS=$?
+            fi
+
+            if [ "${FORCE_BUILD_ALL}" = "TRUE" ]; then
+              echo "FORCE_BUILD_ALL=TRUE; building and publishing all images regardless of the optional target result."
+              echo "needed=true" >> "$GITHUB_OUTPUT"
+            elif [ "${TARGET_STATUS}" -eq 0 ]; then
+              echo "Image build and push are needed."
+              echo "needed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Image build and push are not needed; skipping them."
+              echo "needed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No build-push-images-needed target found; proceeding with image publishing."
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract image tags
+        id: version
+        if: steps.image-check.outputs.needed == 'true'
+        env:
+          TARGET_BRANCH: ${{ inputs.target_branch || github.ref_name }}
+        run: |
+          BASE_VERSION=$(make version)
+          if [[ ! "${BASE_VERSION}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "make version must return a valid OCI tag (1-128 characters, starting with a letter, number, or underscore)." >&2
+            exit 1
+          fi
+          if [ "${TARGET_BRANCH}" = "main" ]; then
+            TAG_BASE="${BASE_VERSION}"
+          elif [ "${TARGET_BRANCH}" = "dev" ]; then
+            TAG_BASE="${BASE_VERSION}-dev"
+          else
+            echo "Unsupported target branch: ${TARGET_BRANCH}" >&2
+            exit 1
+          fi
+          COMMIT_SHA=$(git rev-parse HEAD)
+          VERSIONS="${TAG_BASE} ${TAG_BASE}-${COMMIT_SHA}"
+          if [ "${TARGET_BRANCH}" = "main" ]; then
+            VERSIONS="${VERSIONS} latest"
+          else
+            VERSIONS="${VERSIONS} dev"
+          fi
+          for TAG in ${VERSIONS}; do
+            if [[ ! "${TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+              echo "Derived image tag is not a valid OCI tag: ${TAG}" >&2
+              exit 1
+            fi
+          done
+          echo "versions=${VERSIONS}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.image-check.outputs.needed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Quay.io
+        if: steps.image-check.outputs.needed == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Build all images
+        if: steps.image-check.outputs.needed == 'true'
+        env:
+          VERSIONS: ${{ steps.version.outputs.versions }}
+          # Each image repository gets its own cache, isolated by branch.
+          IMAGE_CACHE_TAG: buildcache-${{ inputs.target_branch || github.ref_name }}
+        run: |
+          IFS=' ' read -ra VERSIONS <<< "${VERSIONS}"
+          VERSION="${VERSIONS[0]}" REGISTRY="${REGISTRY}" make build-all-images
+
+      - name: Push all images
+        if: steps.image-check.outputs.needed == 'true'
+        env:
+          VERSIONS: ${{ steps.version.outputs.versions }}
+        run: |
+          IFS=' ' read -ra VERSIONS <<< "${VERSIONS}"
+          VERSION="${VERSIONS[0]}" REGISTRY="${REGISTRY}" make push-all-images
+
+      - name: Tag pushed images
+        if: steps.image-check.outputs.needed == 'true'
+        env:
+          IMAGE_TAGS: ${{ steps.version.outputs.versions }}
+        run: |
+          IFS=' ' read -ra VERSIONS <<< "${IMAGE_TAGS}"
+          PRIMARY_TAG="${VERSIONS[0]}"
+          for IMAGE in ${IMAGE_REPOSITORIES}; do
+            for TAG in "${VERSIONS[@]:1}"; do
+              echo "Tagging ${IMAGE}:${PRIMARY_TAG} as ${IMAGE}:${TAG}"
+              docker buildx imagetools create --tag "${IMAGE}:${TAG}" "${IMAGE}:${PRIMARY_TAG}"
+            done
+          done

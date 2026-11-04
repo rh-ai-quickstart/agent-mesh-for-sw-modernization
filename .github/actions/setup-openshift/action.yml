@@ -1,0 +1,33 @@
+name: Setup OpenShift
+description: Log into OpenShift and run any pre-deploy setup commands
+
+inputs:
+  working_dir:
+    description: Directory to run commands in
+    required: false
+    default: ./quickstart
+  namespace:
+    description: OpenShift namespace/project to deploy into
+    required: true
+  setup_commands:
+    description: Pre-deploy setup commands (newline-separated)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Log into OpenShift cluster
+      shell: bash
+      run: |
+        oc login --token="$PROD_TOKEN" --server="$PROD_SERVER"
+
+    - name: Run setup commands
+      if: inputs.setup_commands != ''
+      shell: bash
+      working-directory: ${{ inputs.working_dir }}
+      env:
+        SETUP_COMMANDS: ${{ inputs.setup_commands }}
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        eval "$SETUP_COMMANDS"

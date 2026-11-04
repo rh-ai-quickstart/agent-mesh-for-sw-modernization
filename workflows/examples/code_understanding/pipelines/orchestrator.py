@@ -20,7 +20,7 @@ from utils.pipeline_utils import uses_kfp  # noqa: E402
 
 if uses_kfp():
 
-    from pipelines.kubeflow.analysis import AnalysisPipeline
+    from pipelines.kubeflow.analysis import AnalysisPipeline, load_existing_index_op
     from pipelines.kubeflow.data_generation import DataGenerationPipeline
     from pipelines.kubeflow.indexing import IndexingPipeline
 
@@ -42,29 +42,42 @@ def single_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     multi_repo: bool = False,
+    analysis_only: bool = False,
 ):
 
     if uses_kfp():
 
-        dg = DataGenerationPipeline.run(
-            git_repo=git_repo,
-            git_branch=git_branch,
-            multi_repo=multi_repo,
-        )
+        with dsl.If(analysis_only == True):  # noqa: E712 - KFP requires a comparison expression
+            existing_index = load_existing_index_op(
+                git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
+            )
+            AnalysisPipeline.run(
+                graphrag_dir=existing_index.outputs["graphrag_dir"],
+                git_repo=git_repo,
+                git_branch=git_branch,
+                multi_repo=multi_repo,
+            )
 
-        idx = IndexingPipeline.run(
-            codebase_dir=dg.output,
-            git_repo=git_repo,
-            git_branch=git_branch,
-            multi_repo=multi_repo,
-        )
+        with dsl.Else():
+            dg = DataGenerationPipeline.run(
+                git_repo=git_repo,
+                git_branch=git_branch,
+                multi_repo=multi_repo,
+            )
 
-        AnalysisPipeline.run(
-            graphrag_dir=idx.output,
-            git_repo=git_repo,
-            git_branch=git_branch,
-            multi_repo=multi_repo,
-        )
+            idx = IndexingPipeline.run(
+                codebase_dir=dg.output,
+                git_repo=git_repo,
+                git_branch=git_branch,
+                multi_repo=multi_repo,
+            )
+
+            AnalysisPipeline.run(
+                graphrag_dir=idx.output,
+                git_repo=git_repo,
+                git_branch=git_branch,
+                multi_repo=multi_repo,
+            )
 
     else:
 
@@ -77,21 +90,31 @@ def single_repo_pipeline(
             os.getenv("KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"), git_slug
         )
 
-        DataGenerationPipeline().run(
-            git_repo=git_repo,
-            git_branch=git_branch,
-            source_path=source_path,
-            target_path=target_path,
-            multi_repo=multi_repo,
-        )
+        if analysis_only:
+            from utils.graphrag_utils import DependencyAnalyzer
 
-        IndexingPipeline().run(
-            codebase_path=target_path,
-            graphrag_source_path=graphrag_source_path,
-            git_repo=git_repo,
-            git_branch=git_branch,
-            multi_repo=multi_repo,
-        )
+            DependencyAnalyzer.download_graphrag_directory(
+                download_dir=graphrag_source_path,
+                git_slug=git_slug,
+                multi_repo=multi_repo,
+                git_repo=git_repo,
+            )
+        else:
+            DataGenerationPipeline().run(
+                git_repo=git_repo,
+                git_branch=git_branch,
+                source_path=source_path,
+                target_path=target_path,
+                multi_repo=multi_repo,
+            )
+
+            IndexingPipeline().run(
+                codebase_path=target_path,
+                graphrag_source_path=graphrag_source_path,
+                git_repo=git_repo,
+                git_branch=git_branch,
+                multi_repo=multi_repo,
+            )
 
         AnalysisPipeline().run(
             graphrag_source_path=graphrag_source_path,
@@ -105,30 +128,51 @@ def single_repo_pipeline(
 def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
+    analysis_only: bool = False,
 ):
 
     if uses_kfp():
 
-        dg = DataGenerationPipeline.run_multi_repo()
+        with dsl.If(analysis_only == True):  # noqa: E712 - KFP requires a comparison expression
+            existing_index = load_existing_index_op(multi_repo=True)
+            AnalysisPipeline.run_multi_repo(
+                graphrag_dir=existing_index.outputs["graphrag_dir"],
+            )
 
-        idx = IndexingPipeline.run_multi_repo(
-            parent_target_path=parent_target_path,
-        ).after(dg)
+        with dsl.Else():
+            dg = DataGenerationPipeline.run_multi_repo()
 
-        AnalysisPipeline.run_multi_repo(
-            graphrag_dir=idx.output,
-        )
+            idx = IndexingPipeline.run_multi_repo(
+                parent_target_path=parent_target_path,
+            ).after(dg)
+
+            AnalysisPipeline.run_multi_repo(
+                graphrag_dir=idx.output,
+            )
 
     else:
 
-        # git_repos = DefaultAssetLoader().download("repos/repo_list.json")
-        git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS"))
+        if analysis_only:
+            from utils.graphrag_utils import DependencyAnalyzer
 
-        DataGenerationPipeline().run_multi_repo(git_repos)
+            graphrag_source_path = os.getenv(
+                "KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"
+            )
+            DependencyAnalyzer.download_graphrag_directory(
+                download_dir=graphrag_source_path,
+                git_slug="",
+                multi_repo=True,
+            )
+            AnalysisPipeline().run(graphrag_source_path=graphrag_source_path, multi_repo=True)
+        else:
+            # git_repos = DefaultAssetLoader().download("repos/repo_list.json")
+            git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS"))
 
-        IndexingPipeline().run_multi_repo(parent_target_path=parent_target_path)
+            DataGenerationPipeline().run_multi_repo(git_repos)
 
-        AnalysisPipeline().run_multi_repo()
+            IndexingPipeline().run_multi_repo(parent_target_path=parent_target_path)
+
+            AnalysisPipeline().run_multi_repo()
 
 
 ##############################################################################

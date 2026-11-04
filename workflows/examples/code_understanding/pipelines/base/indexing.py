@@ -233,8 +233,14 @@ class IndexingPipeline:
                 "KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"
             )
 
-        # git_repos = DefaultAssetLoader().download("repos/repo_list.json") or []
-        git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS")) or []
+        if kfp_run_id := os.getenv("KFP_RUN_ID"):
+            from services.get_repo_list import get_multi_repo_list
+
+            # Use the same per-run selection as data generation. The environment
+            # list is a local-run default and may name entirely different repos.
+            git_repos = get_multi_repo_list(kfp_run_id)
+        else:
+            git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS")) or []
 
         download_code_metadata_directories(git_repos, parent_target_path)
 

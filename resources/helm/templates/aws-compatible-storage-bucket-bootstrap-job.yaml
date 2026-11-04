@@ -1,0 +1,111 @@
+{{- $storage := index .Values "aws-compatible-storage" }}
+{{- if and $storage.enabled .Values.awsCompatibleStorageBuckets.create }}
+{{- $storageName := include "agent-mesh.awsCompatibleStorage.fullname" . }}
+{{- $jobConfig := dict "applicationBucket" .Values.applicationStorage.bucket "pipelineBucket" .Values.pipelineStorage.bucket "tempoEnabled" .Values.otel.enabled "tempoBucket" .Values.otel.tempo.bucket "image" .Values.jobImages.python }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-bucket-bootstrap-%s" ($storageName | trunc 37 | trimSuffix "-") ($jobConfig | toJson | sha256sum | trunc 8) }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: agent-mesh-for-sw
+    app.kubernetes.io/component: storage-bootstrap
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: agent-mesh-for-sw
+        app.kubernetes.io/component: storage-bootstrap
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      restartPolicy: OnFailure
+      containers:
+        - name: create-buckets
+          image: {{ .Values.jobImages.python }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: HOME
+              value: /tmp
+            - name: STORAGE_NAME
+              value: {{ $storageName | quote }}
+            - name: S3_ENDPOINT
+              value: {{ printf "http://%s:%s" $storageName (include "agent-mesh.awsCompatibleStorage.apiPort" .) | quote }}
+            - name: S3_REGION
+              value: {{ $storage.s3.region | quote }}
+            - name: APPLICATION_BUCKET
+              value: {{ .Values.applicationStorage.bucket | quote }}
+            - name: PIPELINE_BUCKET
+              value: {{ .Values.pipelineStorage.bucket | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: TEMPO_BUCKET
+              value: {{ .Values.otel.tempo.bucket | quote }}
+            {{- end }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "agent-mesh.awsCompatibleStorage.secretName" . }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "agent-mesh.awsCompatibleStorage.secretName" . }}
+                  key: AWS_SECRET_ACCESS_KEY
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              pip install --no-cache-dir -q boto3
+              python3 <<'PY'
+              import os
+              import time
+
+              import boto3
+              from botocore.client import Config
+              from botocore.exceptions import ClientError
+
+              endpoint = os.environ["S3_ENDPOINT"]
+              client = boto3.client(
+                  "s3",
+                  endpoint_url=endpoint,
+                  region_name=os.environ["S3_REGION"],
+                  config=Config(s3={"addressing_style": "path"}),
+              )
+
+              for attempt in range(60):
+                  try:
+                      existing = {bucket["Name"] for bucket in client.list_buckets()["Buckets"]}
+                      break
+                  except Exception as error:
+                      if attempt == 59:
+                          raise
+                      print(f"{os.environ['STORAGE_NAME']} is not ready ({error}); retrying in 5 seconds")
+                      time.sleep(5)
+
+              names = {
+                  os.environ.get("APPLICATION_BUCKET", "").strip(),
+                  os.environ.get("PIPELINE_BUCKET", "").strip(),
+                  os.environ.get("TEMPO_BUCKET", "").strip(),
+              }
+              for name in sorted(names - {""}):
+                  if name in existing:
+                      print(f"Bucket {name} already exists")
+                      continue
+                  try:
+                      client.create_bucket(Bucket=name)
+                      print(f"Created bucket {name}")
+                  except ClientError as error:
+                      code = error.response.get("Error", {}).get("Code")
+                      if code not in {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}:
+                          raise
+                      print(f"Bucket {name} already exists")
+              PY
+{{- end }}

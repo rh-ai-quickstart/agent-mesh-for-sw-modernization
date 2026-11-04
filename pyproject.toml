@@ -1,0 +1,53 @@
+[project]
+name = "agent-mesh-dev"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    # Keep the SDK and skinny distributions aligned for native export schema v2.
+    "mlflow[kubernetes]==3.14.0",
+    "mlflow-skinny==3.14.0",
+    # MLflow kubeconfig auth requires the pre-31 authorization token key.
+    "kubernetes==30.1.0",
+    "databricks-mlflow-export-import==1.2.1",
+]
+
+[dependency-groups]
+test = [
+    "fastapi>=0.115.6",
+    "graphrag==2.6.0",
+    "httpx2>=2.0.0",
+    "jsonpath-ng>=1.7.0",
+    "kfp==2.17.0",
+    "kfp-kubernetes==2.14.3",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.40.0",
+    "playwright==1.48.0",
+    "PyGithub>=2.0.0",
+    "pydantic>=2.0.0",
+    "pytest>=8,<9",
+    "pytest-playwright==0.5.2",
+    "pyyaml==6.0.2",
+    "uvicorn[standard]>=0.34.0",
+]
+lint = [
+    "black>=26.0.0",
+    "flake8>=7.0.0",
+    "isort>=7.0.0",
+]
+
+[tool.black]
+line-length = 99
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 99
+src_paths = ["ui"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = [".", "workflows/examples"]
+markers = [
+    "pipeline: deployed E2E tests that submit real pipeline or analysis runs (requires --run-pipelines)",
+]

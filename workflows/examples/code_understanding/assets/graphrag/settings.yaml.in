@@ -13,12 +13,12 @@ models:
     model: ${GRAPHRAG_LLM_ID}
     model_provider: ${GRAPHRAG_LLM_PROVIDER_SETTINGS_XML}
     model_supports_json: true
-    concurrent_requests: 25
+    concurrent_requests: 1
     async_mode: threaded #asyncio
     retry_strategy: native
     max_retries: 10
     tokens_per_minute: null           
-    requests_per_minute: null   
+    requests_per_minute: 20   
     # encoding_name: o200k_harmony 
   default_embedding_model:
     type: embedding # or azure_openai_embedding
@@ -37,8 +37,8 @@ models:
     async_mode: threaded # or asyncio
     retry_strategy: native
     max_retries: 10
-    tokens_per_minute: null              # set to null to disable rate limiting or auto for dynamic
-    requests_per_minute: null            # set to null to disable rate limiting or auto for dynamic
+    tokens_per_minute: null            # set to null to disable rate limiting or auto for dynamic
+    requests_per_minute: 20            # set to null to disable rate limiting or auto for dynamic
 
 ### Input settings ###
 

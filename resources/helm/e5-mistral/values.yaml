@@ -27,10 +27,6 @@ tolerations:
     operator: Equal
     value: "true"
     effect: NoSchedule
-  - key: g6e-gpu
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
 
 cache:
   storageClassName: gp3-csi

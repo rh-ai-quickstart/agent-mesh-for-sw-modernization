@@ -47,7 +47,15 @@ _spin "$MAKE_PID"
 wait "$MAKE_PID"
 STATUS=$?
 
-awk '/ADHOC RESULTS/{found=1} found{print}' "$TMPFILE" | while IFS= read -r line; do
+_output() {
+    if [ "$STATUS" -eq 0 ] && grep -q 'ADHOC RESULTS' "$TMPFILE"; then
+        awk '/ADHOC RESULTS/{found=1} found{print}' "$TMPFILE"
+    else
+        cat "$TMPFILE"
+    fi
+}
+
+_output | while IFS= read -r line; do
     for ((i=0; i<${#line}; i++)); do
         printf '%s' "${line:$i:1}"
         sleep 0.002

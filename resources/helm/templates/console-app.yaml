@@ -28,6 +28,8 @@ spec:
           env:
             - name: KFP_NAMESPACE
               value: "{{ .Values.namespace }}"
+            - name: MLFLOW_WORKSPACE
+              value: "{{ .Values.namespace }}"
             - name: KFP_HOST
               value: "https://ds-pipeline-dspa.{{ .Values.namespace }}.svc.cluster.local:8443"
             - name: AGENTMESH_REPO_URL
@@ -35,18 +37,13 @@ spec:
             - name: AGENTMESH_REPO_REF
               value: "{{ .Values.repoRef }}"
             - name: AGENTMESH_JOB_REPO_REF
-              value: "main"
+              value: "{{ .Values.repoRef }}"
             - name: PYTHONUNBUFFERED
               value: "1"
-            - name: INDEX_WORKSPACE_MAX_BYTES
-              value: "{{ .Values.indexWorkspace.maxBytes }}"
           envFrom:
             - secretRef:
                 name: code-understanding-env
                 optional: true
-          volumeMounts:
-            - name: console-tmp
-              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /api/health
@@ -63,15 +60,9 @@ spec:
             requests:
               cpu: 100m
               memory: 256Mi
-              ephemeral-storage: {{ .Values.indexWorkspace.ephemeralStorage.request }}
             limits:
               cpu: "1"
               memory: 1Gi
-              ephemeral-storage: {{ .Values.indexWorkspace.ephemeralStorage.limit }}
-      volumes:
-        - name: console-tmp
-          emptyDir:
-            sizeLimit: {{ .Values.indexWorkspace.ephemeralStorage.limit }}
 ---
 apiVersion: v1
 kind: Service
@@ -98,6 +89,9 @@ metadata:
   annotations:
     haproxy.router.openshift.io/timeout: 30m
 spec:
+  {{- with .Values.console.route.host }}
+  host: {{ . | quote }}
+  {{- end }}
   to:
     kind: Service
     name: code-understanding-console

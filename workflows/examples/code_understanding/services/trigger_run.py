@@ -12,7 +12,7 @@ from utils.service_utils import create_client, find_pipeline_id, latest_version_
 def trigger_run(
     pipeline_name: str,
     run_name: str,
-    params: dict[str, str],
+    params: dict[str, Any],
     repos: list[dict[str, str]] | None = None,
     namespace: str | None = None,
 ) -> Any:

@@ -28,13 +28,54 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(base_image=ANALYSIS_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
+def load_existing_index_op(
+    graphrag_dir: Output[Dataset],
+    git_repo: str = "",
+    git_branch: str = "main",
+    multi_repo: bool = False,
+):
+    """Load an MLflow index into the artifact format used by the analysis stage."""
+
+    from pipelines.base.data_generation import generate_git_slug
+    from utils.graphrag_utils import DependencyAnalyzer
+    from utils.kubeflow_utils import setup_logging, write_to_output_artifact
+
+    setup_logging()
+
+    if not multi_repo and not git_repo:
+        raise ValueError("git_repo is required to load a single-repository index")
+
+    git_slug = generate_git_slug(git_repo, git_branch) if not multi_repo else ""
+    index_label = "combined multi-repository" if multi_repo else f"{git_repo} @ {git_branch}"
+
+    with write_to_output_artifact(graphrag_dir) as tmp_graphrag:
+        try:
+            DependencyAnalyzer.download_graphrag_directory(
+                download_dir=tmp_graphrag,
+                git_slug=git_slug,
+                multi_repo=multi_repo,
+                git_repo=git_repo,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Could not load the existing index for {index_label}") from exc
+
+
+@inject_secret_as_env(secret_name="code-understanding-env")
+@inject_secret_as_env(secret_name="git-credentials")
+@dsl.component(base_image=ANALYSIS_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
 def generate_migration_report_op(
     graphrag_dir: Input[Dataset],
     report: Output[Markdown],
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    kfp_run_id: str = "",
 ):
+
+    import os
+
+    if kfp_run_id:
+        os.environ["KFP_RUN_ID"] = kfp_run_id
 
     from pipelines.base.analysis import write_migration_report
     from utils.kubeflow_utils import read_from_input_artifact, setup_logging
@@ -53,8 +94,15 @@ def generate_migration_report_op(
 
 @inject_secret_as_env(secret_name="code-understanding-env")
 @dsl.component(base_image=ANALYSIS_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL])
-def run_analysis_multi_repo_op(graphrag_dir: Input[Dataset], report: Output[Markdown]):
+def run_analysis_multi_repo_op(
+    graphrag_dir: Input[Dataset], report: Output[Markdown], kfp_run_id: str = ""
+):
     """Runs migration report generation across the combined multi-repo GraphRAG index."""
+
+    import os
+
+    if kfp_run_id:
+        os.environ["KFP_RUN_ID"] = kfp_run_id
 
     from pipelines.base.analysis import write_migration_report
     from utils.kubeflow_utils import read_from_input_artifact, setup_logging
@@ -78,17 +126,21 @@ def _run_pipeline(
     multi_repo: bool = False,
 ):
 
-    task = generate_migration_report_op(
-        graphrag_dir=graphrag_dir, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
+    generate_migration_report_op(
+        graphrag_dir=graphrag_dir,
+        git_repo=git_repo,
+        git_branch=git_branch,
+        multi_repo=multi_repo,
+        kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER,
     )
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
 
 
 @dsl.pipeline(name="graphrag-analysis-multi-repo-pipeline")
 def _run_multi_repo_pipeline(graphrag_dir: Input[Dataset]):
 
-    task = run_analysis_multi_repo_op(graphrag_dir=graphrag_dir)
-    task.set_env_variable("KFP_RUN_ID", dsl.PIPELINE_JOB_ID_PLACEHOLDER)
+    run_analysis_multi_repo_op(
+        graphrag_dir=graphrag_dir, kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER
+    )
 
 
 ##############################################################################

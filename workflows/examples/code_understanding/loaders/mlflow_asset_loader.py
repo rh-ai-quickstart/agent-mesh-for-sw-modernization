@@ -247,9 +247,11 @@ class MlFlowAssetLoader(AssetLoader):
 
             with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
 
-                if tags:
-
-                    mlflow.set_tags(tags)
+                result_tags = dict(tags or {})
+                if kfp_run_id := os.environ.get("KFP_RUN_ID"):
+                    result_tags["kfp_run_id"] = kfp_run_id
+                if result_tags:
+                    mlflow.set_tags(result_tags)
 
                 if is_dir:
 

@@ -1,5 +1,9 @@
 kfp==2.17.0
 kfp-kubernetes==2.14.3
 mlflow[kubernetes]==3.14.0
+# Keep the native transfer schema and Kubernetes authentication aligned with pyproject.toml.
+mlflow-skinny==3.14.0
+kubernetes==30.1.0
+databricks-mlflow-export-import==1.2.1
 jupyter==1.1.1
 PyYAML==6.0.2

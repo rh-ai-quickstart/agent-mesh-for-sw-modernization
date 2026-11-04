@@ -24,6 +24,8 @@ class Repo(BaseModel):
 
 class RunPipelinesRequest(BaseModel):
     repos: list[Repo] = Field(default_factory=list)
+    analysis_only: bool = False
+    multi_repo: bool = False
 
 
 @router.post("/pipelines")
@@ -33,7 +35,13 @@ async def post_pipeline_service(
 ) -> dict[str, Any]:
     repos = [r.model_dump() for r in body.repos]
     try:
-        return await asyncio.to_thread(pipeline_service.submit_pipeline_run, repos, cu_namespace)
+        return await asyncio.to_thread(
+            pipeline_service.submit_pipeline_run,
+            repos,
+            cu_namespace,
+            analysis_only=body.analysis_only,
+            multi_repo=body.multi_repo,
+        )
     except ValueError as exc:
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(exc)) from exc

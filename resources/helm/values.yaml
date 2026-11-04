@@ -5,18 +5,50 @@ clusterDomain: ""
 mlflowGatewayHost: ""
 deployNotebooks: false
 
+imageStreams:
+  enabled: false
+  registry: image-registry.openshift-image-registry.svc:5000
+  names:
+    dataGeneration: custom-data-generation
+    graphrag: custom-graphrag
+    analysis: custom-analysis
+
 repoUrl: ""
 repoRef: main
 
-minio:
-  rootUser: ""
-  rootPassword: ""
-  bucket: demo
-  region: us-east-1
-  # image: "quay.io/minio/minio:latest"
-  # mcImage: "quay.io/minio/mc:latest"
-  image: "docker.io/pgsty/silo:latest"
-  mcImage: "docker.io/pgsty/mc:latest"
+aws-compatible-storage:
+  enabled: true
+  fullnameOverride: s4
+  image:
+    repository: quay.io/rh-aiservices-bu/s4
+    tag: "0.3.2"
+    pullPolicy: IfNotPresent
+  s3:
+    accessKeyId: ""
+    secretAccessKey: ""
+    region: us-east-1
+  # The UI is not used by this quickstart; retain the internal /api health endpoint.
+  auth:
+    enabled: false
+  route:
+    enabled: false
+    s3Api:
+      enabled: false
+  storage:
+    data:
+      size: 50Gi
+
+pipelineStorage:
+  bucket: demopipelines
+
+applicationStorage:
+  bucket: data
+
+awsCompatibleStorageBuckets:
+  create: true
+
+jobImages:
+  python: registry.redhat.io/ubi9/python-311:latest
 
 dataGeneration:
   image:
@@ -24,7 +56,6 @@ dataGeneration:
     name: ""
     title: "Agent Mesh - Data Generation"
     tag: latest
-    digestRef: ""
   notebook:
     name: data-generation
     mlflowInstance: ""
@@ -35,7 +66,6 @@ graphrag:
     name: ""
     title: "Agent Mesh - GraphRAG Indexing"
     tag: latest
-    digestRef: ""
   notebook:
     name: graphrag-indexing
     mlflowInstance: ""
@@ -75,7 +105,9 @@ runPipelines:
   graphragSourcePath: "graph_rag_app/source"
 
 otel:
-  createBucket: false
+  enabled: false
+  namespace: ""
+  name: ""
   tempo:
     bucket: tempo
     storageSize: 10Gi
@@ -103,11 +135,19 @@ rhoaiMcp:
       cpu: 500m
       memory: 512Mi
 
+
 console:
   enabled: false
   replicas: 1
   image: ""
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
+  route:
+    host: ""
+  jobScripts:
+    enabled: false
+    runPipelines: ""
+    mlflowAssetLoader: ""
+    defaultAssetLoader: ""
 
 consolePlugin:
   enabled: false

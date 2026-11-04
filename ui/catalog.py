@@ -73,12 +73,6 @@ def load_catalog(extra: list[dict[str, str]] | None = None) -> list[dict[str, st
     return entries
 
 
-DEFAULT_REPO = {
-    "git_repo": "https://github.com/agapebondservant/tic-tac-toe-sample",
-    "git_branch": "main",
-}
-
-
 def default_repo_entry() -> dict[str, str] | None:
     """Return tic-tac-toe sample when present, else env preselect, else first catalog entry."""
     catalog = load_catalog()
