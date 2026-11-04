@@ -15,7 +15,7 @@ def test_data_generation_runs_code_and_config_passes(monkeypatch):
     )
     monkeypatch.setattr(data_generation, "prepare_environment", lambda **kwargs: None)
     monkeypatch.setattr(data_generation, "detect_languages", lambda path: ["python"])
-    monkeypatch.setattr(data_generation, "load_external_data", lambda path: {})
+    monkeypatch.setattr(data_generation, "load_external_metadata", lambda **kwargs: None)
     monkeypatch.setattr(
         data_generation,
         "generate_code_and_meta",

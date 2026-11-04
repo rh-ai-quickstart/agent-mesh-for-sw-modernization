@@ -62,6 +62,7 @@ def test_discovery_keeps_newest_run_for_slug(discovered_runs):
             "run_id": "new",
             "git_slug": "acme-widget-main",
             "multi_repo": False,
+            "uploaded": True,
             "indexed_at": "2023-11-14T22:13:21+00:00",
         }
     ]

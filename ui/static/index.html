@@ -550,14 +550,16 @@
       <div id="banner" role="status" aria-live="polite"></div>
       <div class="cu-tabs">
         <button type="button" class="active" data-tab="repos">Repositories</button>
-        <button type="button" data-tab="pipelines">Analysis</button>
+        <button type="button" data-tab="pipelines">Indexing</button>
+        <button type="button" data-tab="analysis">Analysis</button>
         <button type="button" data-tab="chat">Chat</button>
       </div>
       <section id="tab-repos" class="cu-card">
         <h2>Repositories</h2>
           <p class="cu-muted">
               Select <strong>1</strong> repository
-              for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.<br/>
+              for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.
+              Then run the full pipeline from the <strong>Indexing</strong> tab.<br/>
             </p>
         <div class="cu-actions">
           <div class="cu-note hidden" id="selection-note">0 selected</div>
@@ -573,11 +575,11 @@
         </div>
       </section>
       <section id="tab-pipelines" class="cu-card hidden">
-        <h2>Analysis</h2>
-        <p class="cu-muted">Generate a code analysis report for the selected repository or repositories.<span class="cu-help" id="help-pipelines">
+        <h2>Indexing</h2>
+        <p class="cu-muted">Run data generation, indexing, and analysis for the repositories selected in the Repositories tab.<span class="cu-help" id="help-pipelines">
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-pipelines-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <span class="cu-help-popover" role="tooltip">
-            Select a repository (or group of repositories) to analyze, then click "Run Analysis".<br/>
+            Select a repository (or group of repositories) in the Repositories tab, then click "Run Indexing".<br/>
             <strong>Note:</strong><br/>
             &bullet;&nbsp;Code analysis is a <strong>time-consuming</strong> process which involves the generation of a knowledge graph index, and may take up to 30 minutes or more to complete.<br/>
             &bullet;&nbsp;Any pre-existing index for this selection will be <strong>overwritten.</strong>
@@ -585,8 +587,19 @@
         </span></p>
         <div class="cu-pipeline-row">
           <div class="cu-note hidden" id="pipeline-selection"></div>
-          <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Analysis</button>
+          <button type="button" class="cu-btn cu-btn-secondary" id="run-pipeline">Run Indexing</button>
         </div>
+      </section>
+      <section id="tab-analysis" class="cu-card hidden">
+        <h2>Analysis</h2>
+        <p class="cu-muted">Generate a code analysis report using an existing index. Select one indexed repository or the combined multi-repo index below.</p>
+        <p id="analysis-repo-row" class="hidden">
+          <label class="cu-form-label" for="analysis-repo">Select repository</label>
+          <select class="cu-select" id="analysis-repo" disabled></select>
+        </p>
+        <p id="analysis-loading" class="cu-loading" role="status">Loading indexes…</p>
+        <p id="analysis-empty" class="cu-muted hidden" role="status">No indexed repositories available. Select repositories and run the pipeline in the Indexing tab first.</p>
+        <button type="button" class="cu-btn cu-btn-secondary" id="run-analysis" disabled>Run Analysis</button>
         <div id="report-viewer" class="cu-report-viewer hidden">
           <h3 id="report-viewer-title"></h3>
           <div id="report-viewer-subtitle"></div>
@@ -605,7 +618,7 @@
           <button type="button" class="cu-help-btn" aria-label="Help" id="help-chat-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
           <span class="cu-help-popover" role="tooltip">
             Submit queries about a repository (or group of repositories).<br/>
-            <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Analysis</strong> tab.
+            <strong>Note:</strong> Only indexed repositories are shown. If your repository (or group of repositories) is not shown in the list, it means it hasn't been indexed yet. Fix this by running Code Understanding on the <strong>Indexing</strong> tab.
           </span>
         </span></p>
         <p id="chat-repo-row" class="hidden">
@@ -647,6 +660,7 @@
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
       animateLatest: false,
+      indexesLoading: true, indexesError: "",
     };
 
     const $ = (id) => document.getElementById(id);
@@ -902,7 +916,7 @@
       document.querySelectorAll(".cu-tabs button").forEach((b) => {
         b.classList.toggle("active", b.dataset.tab === name);
       });
-      ["repos", "pipelines", "chat"].forEach((tab) => {
+      ["repos", "pipelines", "analysis", "chat"].forEach((tab) => {
         $("tab-" + tab).classList.toggle("hidden", tab !== name);
       });
     }
@@ -1277,6 +1291,25 @@
         `<option value="${esc(o.key)}">${esc(o.label)}</option>`
       ).join("");
     }
+    function renderIndexedSelect(id) {
+      const previous = $(id) ? $(id).value : "";
+      $(id).innerHTML = state.queryable.map((o) =>
+        `<option value="${esc(o.key)}">${esc(o.label)}</option>`
+      ).join("");
+      if (state.queryable.some((o) => o.key === previous)) $(id).value = previous;
+    }
+    function updateAnalysisControls() {
+      const available = state.queryable.length > 0;
+      const disabled = state.indexesLoading || !!state.indexesError || !!state.thinking;
+      $("analysis-loading").classList.toggle("hidden", !state.indexesLoading);
+      $("analysis-repo-row").classList.toggle("hidden", !available || !!state.indexesError);
+      $("analysis-empty").classList.toggle("hidden", state.indexesLoading || (available && !state.indexesError));
+      $("analysis-empty").textContent = state.indexesError
+        ? `Could not load indexes: ${state.indexesError}`
+        : "No indexed repositories available. Select repositories and run the pipeline in the Indexing tab first.";
+      $("analysis-repo").disabled = disabled || !available;
+      $("run-analysis").disabled = disabled || !available || !$("analysis-repo").value;
+    }
     function renderChat() {
       if (!state.chat.length && !state.thinking) {
         $("chat-log").innerHTML = `<p class="cu-muted" style="margin-bottom:0.25rem">What would you like to know?</p>
@@ -1329,6 +1362,8 @@
     }
 
     async function load() {
+      state.indexesLoading = true;
+      updateAnalysisControls();
       try {
         /* const [status, catalog, indexes, jobs] = await Promise.all([
           api("/api/status"), api("/api/catalog"), api("/api/indexes"), api("/api/jobs")).catch(() => ({ jobs: [] })),
@@ -1355,7 +1390,9 @@
         state.defaultKey = catalog.default_key;
         if (!state.selected.size && state.defaultKey) state.selected.add(state.defaultKey);
         state.indexes = indexes.indexes || [];
-        state.queryable = indexes.queryable || [];
+        state.indexesLoading = false;
+        state.indexesError = indexes.ok === false ? (indexes.message || "Index storage is unavailable.") : "";
+        state.queryable = state.indexesError ? [] : (indexes.queryable || []);
         if ($("indexes")) {
           $("indexes").innerHTML = state.indexes.length
             ? state.indexes.map(indexCard).join("")
@@ -1385,9 +1422,14 @@
         $("chat-repo-row").classList.remove("hidden");
         renderRepos();
         renderChatSelect();
+        renderIndexedSelect("analysis-repo");
+        updateAnalysisControls();
         renderChat();
         if (!state.thinking) banner("");
       } catch (e) {
+        state.indexesLoading = false;
+        state.indexesError = String(e.message || e);
+        updateAnalysisControls();
         banner(String(e.message || e), true);
       }
     }
@@ -1580,6 +1622,27 @@
         banner(String(e.message || e), true);
       }
     };
+    $("run-analysis").onclick = async () => {
+      if ($("run-analysis").disabled) return;
+      const option = state.queryable.find((o) => o.key === $("analysis-repo").value);
+      if (!option) return;
+      $("report-viewer").classList.add("hidden");
+      setThinking({ kind: "pipeline", label: "Running analysis pipeline", status: "Submitting analysis job…" });
+      try {
+        const body = {
+          repos: option.use_global ? [] : [{ git_repo: option.git_repo, git_branch: option.git_branch }],
+          analysis_only: true,
+          multi_repo: !!option.use_global,
+        };
+        const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify(body) });
+        setThinking({ kind: "pipeline", label: "Running analysis pipeline", status: `KFP run ${result.job_id} started` });
+        pollV2(result.job_id);
+      } catch (e) {
+        setThinking(null);
+        banner(String(e.message || e), true);
+      }
+    };
+    $("analysis-repo").addEventListener("change", () => updateAnalysisControls());
     $("chat-repo").addEventListener("change", () => {
       if ($("banner").dataset.reason === "no-chat-repo") {
         banner("");
