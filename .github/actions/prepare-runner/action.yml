@@ -1,0 +1,39 @@
+name: Prepare Runner
+description: Free disk space and check memory/swap status before running tests
+
+inputs:
+  swap-storage:
+    description: Enable swap storage (may slow down if heavily used)
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@v1.3.1
+      with:
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: false
+        swap-storage: ${{ inputs.swap-storage }}
+        tool-cache: false
+
+    - name: Install oc CLI
+      shell: bash
+      run: |
+        curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/local/bin oc kubectl
+
+    - name: Check memory and swap status
+      shell: bash
+      run: |
+        echo "=== Memory Status ==="
+        free -h
+        echo ""
+        echo "=== Swap Usage ==="
+        swapon --show || echo "No swap configured"
+        echo ""
+        echo "=== Disk Space ==="
+        df -h

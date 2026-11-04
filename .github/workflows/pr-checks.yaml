@@ -2,64 +2,73 @@ name: Pull Request - Quality Checks & Unit Tests
 
 on:
   pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 env:
-  # Keep these versions aligned with ui/Dockerfile. Move them to the Makefile
-  # when the test suite expands and shared test configuration is introduced.
   UV_VERSION: "0.12.11"
   PYTHON_VERSION: "3.11"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  code-quality:
-    name: Run code quality checks
+  code-quality-check:
+    name: Code Quality Check
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
 
-      - name: Run code quality checks
-        run: make lint
+      - run: make check-uv-version
+      - run: make check-lockfiles
+      - run: make deps-all
+      - run: make lint
 
-  unit-tests:
+  helm-export-validate:
+    name: Helm export validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.0
+
+      - uses: bmuschko/setup-kubeconform@v1
+
+      - name: Render and validate Helm manifests
+        run: make helm-export-validate-demo
+        env:
+          NAMESPACE: ci-demo
+          HF_TOKEN: mock_hf_token_for_ci
+
+  pull-request-tests:
     name: Run unit tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           version: ${{ env.UV_VERSION }}
 
-      - name: Run unit tests
-        run: make test-all
+      - run: make deps-all
+      - run: make test-all

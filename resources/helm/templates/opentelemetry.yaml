@@ -1,6 +1,7 @@
 {{- if .Values.otel.enabled }}
+{{- $storage := index .Values "aws-compatible-storage" }}
 ---
-# S3 credentials for TempoStack → MinIO
+# S3 credentials mirrored into the Tempo namespace for TempoStack → aws-compatible-storage.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -8,10 +9,10 @@ metadata:
   namespace: {{ .Values.otel.namespace }}
 type: Opaque
 stringData:
-  endpoint: {{ .Values.minio.endpoint }}
+  endpoint: {{ printf "http://%s.%s.svc.cluster.local:%s" (include "agent-mesh.awsCompatibleStorage.fullname" .) .Values.namespace (include "agent-mesh.awsCompatibleStorage.apiPort" .) }}
   bucket: {{ .Values.otel.tempo.bucket }}
-  access_key_id: {{ .Values.minio.rootUser | quote }}
-  access_key_secret: {{ .Values.minio.rootPassword | quote }}
+  access_key_id: {{ $storage.s3.accessKeyId | quote }}
+  access_key_secret: {{ $storage.s3.secretAccessKey | quote }}
 ---
 apiVersion: tempo.grafana.com/v1alpha1
 kind: TempoStack

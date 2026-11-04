@@ -1,0 +1,27 @@
+name: Cleanup Deployment
+description: Run cleanup command to tear down a deployed quickstart
+
+inputs:
+  cleanup_command:
+    description: Command to tear down the deployment
+    required: true
+  working_dir:
+    description: Directory to run cleanup in
+    required: false
+    default: ./quickstart
+
+runs:
+  using: composite
+  steps:
+    - name: Cleanup deployment
+      shell: bash
+      working-directory: ${{ inputs.working_dir }}
+      continue-on-error: true
+      env:
+        CLEANUP_COMMAND: ${{ inputs.cleanup_command }}
+      run: eval "$CLEANUP_COMMAND"
+
+    - name: Delete remaining resources
+      shell: bash
+      continue-on-error: true
+      run: oc delete pods,deployments,replicasets,statefulsets,services,jobs,cronjobs,daemonsets,pvc --all -n "$NAMESPACE"

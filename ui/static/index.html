@@ -703,7 +703,7 @@
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
-      animateLatest: false, indexesLoading: true, indexesError: false,
+      animateLatest: false, indexesLoading: true, indexesError: "",
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1472,7 +1472,7 @@
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
         state.indexesLoading = false;
-        state.indexesError = false;
+        state.indexesError = "";
         if ($("indexes")) {
           $("indexes").innerHTML = state.indexes.length
             ? state.indexes.map(indexCard).join("")
@@ -1507,7 +1507,7 @@
         if (!state.thinking) banner("");
       } catch (e) {
         state.indexesLoading = false;
-        state.indexesError = true;
+        state.indexesError = String(e.message || e);
         updateAnalysisControls();
         banner(String(e.message || e), true);
       }

@@ -1,0 +1,14 @@
+name: Nightly - agent-mesh-for-sw-modernization (main)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * *"
+
+jobs:
+  test:
+    uses: ./.github/workflows/test-agent-mesh-for-sw-modernization.yml
+    with:
+      branch: main
+      run_pipelines: ${{ vars.NIGHTLY_RUN_PIPELINES == 'true' }}
+    secrets: inherit

@@ -3,3 +3,11 @@ name: agent-mesh
 description: Agent Mesh for Software Modernization - Code Understanding
 type: application
 version: 0.1.0
+dependencies:
+  # Shared aws-compatible-storage chart (S4-backed) from ai-architecture-charts.
+  # fullnameOverride: s4 -> DNS http://s4:7480 / Secret s4-credentials.
+  # Source: https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage
+  - name: aws-compatible-storage
+    version: 0.1.0
+    repository: "https://rh-ai-quickstart.github.io/ai-architecture-charts"
+    condition: aws-compatible-storage.enabled

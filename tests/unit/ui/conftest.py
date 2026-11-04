@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-UI_DIR = Path(__file__).resolve().parents[1]
+UI_DIR = Path(__file__).resolve().parents[3] / "ui"
 if str(UI_DIR) not in sys.path:
     sys.path.insert(0, str(UI_DIR))
 

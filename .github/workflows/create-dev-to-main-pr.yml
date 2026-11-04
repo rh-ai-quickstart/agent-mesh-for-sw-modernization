@@ -1,0 +1,205 @@
+name: Create dev-to-main promotion PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_title:
+        description: PR title (optional)
+        required: false
+        default: ""
+        type: string
+      pr_description:
+        description: Additional PR description (optional)
+        required: false
+        default: ""
+        type: string
+      last_commit:
+        description: Last dev commit to promote (optional)
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: create-dev-to-main-pr
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Create promotion PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v5
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Check promotion commits
+        id: commits
+        env:
+          LAST_COMMIT: ${{ inputs.last_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main dev
+          target_commit="origin/dev"
+          is_partial=false
+
+          if [[ -n "$LAST_COMMIT" ]]; then
+            if ! git rev-parse --verify "$LAST_COMMIT^{commit}" >/dev/null 2>&1; then
+              echo "::error::Invalid commit: $LAST_COMMIT"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$LAST_COMMIT" origin/dev; then
+              echo "::error::Commit $LAST_COMMIT is not reachable from dev"
+              exit 1
+            fi
+            target_commit="$LAST_COMMIT"
+            is_partial=true
+          fi
+
+          target_commit_sha="$(git rev-parse "$target_commit^{commit}")"
+          target_commit_short="$(git rev-parse --short=7 "$target_commit_sha")"
+          commit_count="$(git rev-list origin/main.."$target_commit_sha" --count)"
+
+          if [[ "$commit_count" -eq 0 ]]; then
+            echo "has-commits=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          main_only_count="$(git rev-list origin/dev..origin/main --count)"
+          if [[ "$main_only_count" -gt 0 ]]; then
+            echo "::error::main has $main_only_count commit(s) not in dev; sync dev with main first"
+            exit 1
+          fi
+
+          {
+            echo "has-commits=true"
+            echo "is-partial=$is_partial"
+            echo "target-commit=$target_commit_sha"
+            echo "target-commit-short=$target_commit_short"
+            echo "commit-count=$commit_count"
+            echo "commits<<EOF"
+            git log origin/main.."$target_commit_sha" --pretty=format:"- %s (%h) by %an"
+            echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check version consistency and increment
+        id: version
+        if: steps.commits.outputs.has-commits == 'true'
+        env:
+          TARGET_COMMIT: ${{ steps.commits.outputs.target-commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 scripts/bump_release.py --verify --git-ref "$TARGET_COMMIT"
+          python3 scripts/bump_release.py --verify --git-ref origin/main
+
+          dev_version="$(python3 scripts/bump_release.py --verify --git-ref "$TARGET_COMMIT" | sed -n 's/^version=//p')"
+          main_version="$(python3 scripts/bump_release.py --verify --git-ref origin/main | sed -n 's/^version=//p')"
+
+          python3 - "$main_version" "$dev_version" <<'PY'
+          import sys
+
+          def parse(version):
+              if version.startswith("v"):
+                  version = version[1:]
+              parts = version.split(".")
+              if len(parts) != 3 or not all(
+                  part.isdigit() and (part == "0" or not part.startswith("0"))
+                  for part in parts
+              ):
+                  raise SystemExit(
+                      "Version must be semver (MAJOR.MINOR.PATCH), optionally "
+                      f"prefixed with v: {version}"
+                  )
+              return tuple(int(part) for part in parts)
+
+          main_version = parse(sys.argv[1])
+          dev_version = parse(sys.argv[2])
+          if dev_version <= main_version:
+              raise SystemExit(
+                  f"Dev version {sys.argv[2]} must be later than main version {sys.argv[1]}."
+              )
+          PY
+
+          {
+            echo "main-version=$main_version"
+            echo "dev-version=$dev_version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare temporary promotion branch
+        id: branch
+        if: steps.commits.outputs.has-commits == 'true'
+        env:
+          TARGET_COMMIT: ${{ steps.commits.outputs.target-commit }}
+          TARGET_COMMIT_SHORT: ${{ steps.commits.outputs.target-commit-short }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branch="dev-$TARGET_COMMIT_SHORT"
+          git push origin "$TARGET_COMMIT:refs/heads/$branch"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Create promotion pull request
+        if: steps.commits.outputs.has-commits == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          PR_TITLE: ${{ inputs.pr_title }}
+          PR_DESCRIPTION: ${{ inputs.pr_description }}
+          COMMIT_COUNT: ${{ steps.commits.outputs.commit-count }}
+          TARGET_COMMIT: ${{ steps.commits.outputs.target-commit }}
+          MAIN_VERSION: ${{ steps.version.outputs.main-version }}
+          DEV_VERSION: ${{ steps.version.outputs.dev-version }}
+          COMMITS: ${{ steps.commits.outputs.commits }}
+          IS_PARTIAL: ${{ steps.commits.outputs.is-partial }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing_pr="$(gh pr list --base main --head "$BRANCH" --state open --json url --jq '.[0].url // empty')"
+          if [[ -n "$existing_pr" ]]; then
+            echo "Promotion pull request already exists: $existing_pr"
+            exit 0
+          fi
+
+          title="${PR_TITLE:-Promote dev to main ($COMMIT_COUNT commits up to $TARGET_COMMIT)}"
+          body_file="$(mktemp)"
+          {
+            echo "## Summary"
+            echo
+            if [[ "$IS_PARTIAL" == "true" ]]; then
+              echo "This PR promotes a subset of changes from dev to main."
+            else
+              echo "This PR promotes changes from dev to main."
+            fi
+            echo
+            echo "- Commits included: $COMMIT_COUNT"
+            echo "- Last commit: $TARGET_COMMIT"
+            echo "- Version: $MAIN_VERSION -> $DEV_VERSION"
+            echo
+            if [[ -n "$PR_DESCRIPTION" ]]; then
+              echo "## Additional notes"
+              echo
+              echo "$PR_DESCRIPTION"
+              echo
+            fi
+            echo "## Commits"
+            echo
+            echo "$COMMITS"
+          } > "$body_file"
+
+          gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$body_file"
+
+      - name: No commits to promote
+        if: steps.commits.outputs.has-commits == 'false'
+        run: echo "No new dev commits to promote to main."
