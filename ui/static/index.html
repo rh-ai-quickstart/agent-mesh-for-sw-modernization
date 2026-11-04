@@ -661,8 +661,6 @@
       (async () => {
         for (const node of nodes) {
           await new Promise(resolve => setTimeout(resolve, 0));
-          // Mark processed before attempting render so a failed node is never retried.
-          node.dataset.processed = "1";
           try {
             const timeout = new Promise((_, reject) =>
               setTimeout(() => reject(new Error("mermaid timeout")), 5000)
