@@ -974,7 +974,7 @@
 
             showReport("analysis");
             $("report-viewer").classList.remove("hidden");
-            showTab("pipelines");
+            showTab("analysis");
           } catch (e) {
             banner(String(e.message || e), true);
           }
@@ -998,18 +998,6 @@
           }
         });
       });
-    }
-
-    function jobCard(job) {
-      const kind = (job.name || "").startsWith("cu-query-") ? "Query" : "Pipeline";
-      return `<article class="cu-job-card">
-        <span class="cu-job-dot ${esc(job.status)}"></span>
-        <div>
-          <div class="cu-job-kind">${esc(kind)}</div>
-          <div class="cu-job-name">${esc(job.name)}</div>
-        </div>
-        <span class="cu-chip ${job.status === "Succeeded" || job.status === "Skipped" ? "indexed" : ""}">${esc(job.status)}</span>
-      </article>`;
     }
 
     function renderRepos() {
