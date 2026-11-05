@@ -33,7 +33,7 @@ aws-compatible-storage:
   route:
     enabled: false
     s3Api:
-      enabled: false
+  enabled: true
   storage:
     data:
       size: 50Gi
@@ -119,8 +119,8 @@ indexWorkspace:
     limit: 12Gi
 
 rhoaiMcp:
-  enabled: false
-  image: ""
+  enabled: true
+  image: "quay.io/oawofolurh/rhoai-mcp:v1"
   imagePullPolicy: IfNotPresent
   authMode: auto
   logLevel: INFO

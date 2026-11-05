@@ -35,7 +35,10 @@ def test_extracts_index_bundle_from_file_object(tmp_path):
 @pytest.mark.parametrize(
     ("manifest", "message"),
     [
-        ({"git_slug": "acme-widget-main", "multi_repo": "false"}, "multi_repo must be a boolean"),
+        (
+            {"git_slug": "acme-widget-main", "multi_repo": "false"},
+            "multi_repo must be a boolean",
+        ),
         ({"git_slug": "../outside", "multi_repo": False}, "safe path component"),
         ({"multi_repo": False}, "git_slug must be a string"),
     ],

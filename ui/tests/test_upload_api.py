@@ -76,7 +76,14 @@ def test_upload_api_logs_index_and_cleans_workspace(monkeypatch, tmp_path, uploa
     assert payload["uploaded"] is True
     assert payload["run_id"] == "uploaded-run"
     assert payload["indexed_at"]
-    assert set(payload) == {"git_slug", "multi_repo", "uploaded", "run_id", "indexed_at"}
+    assert set(payload) == {
+        "git_slug",
+        "multi_repo",
+        "uploaded",
+        "run_id",
+        "kfp_run_id",
+        "indexed_at",
+    }
     assert client.run_tags == {
         "category": "indexing",
         "git_slug": "acme-widget-main",

@@ -1,77 +1,76 @@
-"""Report downloads must skip ad hoc query artifacts."""
+"""Report download contracts for HEAD's MlFlowAssetLoader-based fetch_reports."""
 
-from types import SimpleNamespace
+import os
+import sys
+from pathlib import Path
+from types import ModuleType
 
 from services import fetch_reports as reports
 
 
-def _run(run_id: str, kfp_run_id: str, adhoc_query: bool = False):
-    tags = {"kfp_run_id": kfp_run_id}
-    if adhoc_query:
-        tags["adhoc_query"] = "true"
-    return SimpleNamespace(info=SimpleNamespace(run_id=run_id), data=SimpleNamespace(tags=tags))
+def _inject_fake_loader(
+    monkeypatch,
+    *,
+    eval_files=None,
+    analysis_files=None,
+    raise_on=(),
+    fail_init=False,
+):
+    """Inject fake loaders into sys.modules to intercept fetch_reports' internal imports."""
+    raise_on = set(raise_on)
+
+    class FakeAssetLoader:
+        RESULTS_PATH_PREFIX_EVAL = "results/eval"
+        RESULTS_PATH_PREFIX_PIPELINES = "results/pipelines"
+        RESULT_ASSET_EXPERIMENT = "result-assets"
+
+        @staticmethod
+        def get_log_results_artifact_path(prefix, git_slug=None, multi_repo=False):
+            suffix = "multi_repo" if multi_repo else (git_slug or "unknown")
+            return f"{prefix}/{suffix}"
+
+    class FakeLoader(FakeAssetLoader):
+        def __init__(self):
+            if fail_init:
+                raise ConnectionError("MLflow is unavailable")
+
+        def download_dir(self, artifact_path, download_dir, experiment_name, asset_tags):
+            category = asset_tags.get("category", "")
+            if category in raise_on:
+                raise Exception(f"not found: {category}")
+            os.makedirs(download_dir, exist_ok=True)
+            files = eval_files if category == "evaluation" else analysis_files
+            for name, content in (files or {}).items():
+                (Path(download_dir) / name).write_text(content, encoding="utf-8")
+
+    loader_mod = ModuleType("loaders.mlflow_asset_loader")
+    loader_mod.MlFlowAssetLoader = FakeLoader
+    monkeypatch.setitem(sys.modules, "loaders.mlflow_asset_loader", loader_mod)
+
+    asset_mod = ModuleType("loaders.asset_loader")
+    asset_mod.AssetLoader = FakeAssetLoader
+    monkeypatch.setitem(sys.modules, "loaders.asset_loader", asset_mod)
 
 
-def test_fetch_reports_skips_query_run_and_downloads_report_file(monkeypatch, tmp_path):
-    report = tmp_path / "migration_report_repo-main.md"
-    report.write_text("# Current analysis", encoding="utf-8")
-    selected = []
+def test_fetch_reports_downloads_analysis_report(monkeypatch):
+    _inject_fake_loader(
+        monkeypatch,
+        analysis_files={"migration_report_repo-main.md": "# Current analysis"},
+    )
 
-    class Client:
-        def get_experiment_by_name(self, name):
-            return SimpleNamespace(experiment_id="51")
-
-        def search_runs(self, **kwargs):
-            assert "tags.\"kfp_run_id\" = 'selected-kfp'" in kwargs["filter_string"]
-            if "evaluation" in kwargs["filter_string"]:
-                return []
-            return [
-                _run("query", "selected-kfp", adhoc_query=True),
-                _run("report", "selected-kfp"),
-            ]
-
-        def list_artifacts(self, run_id, path):
-            selected.append(run_id)
-            assert run_id == "report"
-            if path.startswith("results/pipelines/"):
-                return [SimpleNamespace(path=f"{path}/{report.name}", is_dir=False)]
-            return []
-
-    def download_artifacts(**kwargs):
-        selected.append(kwargs["run_id"])
-        assert kwargs["artifact_path"].endswith(report.name)
-        return str(report)
-
-    monkeypatch.setattr(reports, "MlflowClient", Client)
-    monkeypatch.setattr(reports.mlflow.artifacts, "download_artifacts", download_artifacts)
-
-    evaluation, analysis = reports.fetch_reports("repo-main", False, "selected-kfp")
+    evaluation, analysis = reports.fetch_reports("selected-kfp", "repo-main", False)
 
     assert evaluation is None
     assert analysis == "# Current analysis"
-    assert selected == ["report", "report"]
 
 
-def test_fetch_reports_does_not_fall_back_to_another_kfp_run(monkeypatch):
-    class Client:
-        def get_experiment_by_name(self, name):
-            return SimpleNamespace(experiment_id="51")
+def test_fetch_reports_returns_none_when_download_fails(monkeypatch):
+    _inject_fake_loader(monkeypatch, raise_on=("evaluation", "analysis"))
 
-        def search_runs(self, **kwargs):
-            assert "tags.\"kfp_run_id\" = 'selected-kfp'" in kwargs["filter_string"]
-            return []
-
-        def list_artifacts(self, run_id, path):
-            raise AssertionError("Another run's artifacts must not be read")
-
-    monkeypatch.setattr(reports, "MlflowClient", Client)
-    assert reports.fetch_reports("repo-main", False, "selected-kfp") == (None, None)
+    assert reports.fetch_reports("selected-kfp", "repo-main", False) == (None, None)
 
 
-def test_fetch_reports_returns_no_reports_when_mlflow_is_unavailable(monkeypatch):
-    class Client:
-        def get_experiment_by_name(self, name):
-            raise ConnectionError("MLflow is unavailable")
+def test_fetch_reports_returns_no_reports_when_loader_unavailable(monkeypatch):
+    _inject_fake_loader(monkeypatch, fail_init=True)
 
-    monkeypatch.setattr(reports, "MlflowClient", Client)
-    assert reports.fetch_reports("repo-main", False, "selected-kfp") == (None, None)
+    assert reports.fetch_reports("selected-kfp", "repo-main", False) == (None, None)

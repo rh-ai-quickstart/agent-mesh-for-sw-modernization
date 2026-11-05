@@ -82,7 +82,7 @@ class MlFlowCustomEvaluator(CustomEvaluator):
                     },
                     {
                         "role": "user",
-                        "content": f"{repo_context}\n\n{input}" if repo_context else input,
+                        "content": (f"{repo_context}\n\n{input}" if repo_context else input),
                     },
                 ],
             )
@@ -116,7 +116,9 @@ class MlFlowCustomEvaluator(CustomEvaluator):
         try:
 
             analyzer = DependencyAnalyzer(
-                root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo
+                root_dir=graphrag_source_dir,
+                git_slug=git_slug or "",
+                multi_repo=multi_repo,
             )
 
             actual_answer, context_data = asyncio.run(
@@ -281,7 +283,11 @@ class MlFlowCustomEvaluator(CustomEvaluator):
 
         slug = git_slug or code_utils.generate_slug_from_repo(git_repo, git_branch)
 
-        _eval_tags = {"category": "evaluation", "git_slug": slug, "multi_repo": str(multi_repo)}
+        _eval_tags = {
+            "category": "evaluation",
+            "git_slug": slug,
+            "multi_repo": str(multi_repo),
+        }
 
         with mlflow.start_run(experiment_id=experiment.experiment_id, tags=_eval_tags):
 

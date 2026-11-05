@@ -123,7 +123,9 @@ def analysis_image() -> str:
     return f"{registry}/{name}:{tag}"
 
 
-def k8s_clients(ns: str | None = None) -> tuple[client.BatchV1Api, client.CoreV1Api, str]:
+def k8s_clients(
+    ns: str | None = None,
+) -> tuple[client.BatchV1Api, client.CoreV1Api, str]:
     try:
         config.load_incluster_config()
     except config.ConfigException:

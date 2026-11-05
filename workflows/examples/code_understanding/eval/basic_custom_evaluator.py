@@ -75,7 +75,9 @@ Respond ONLY with valid JSON in this exact format:
         try:
 
             analyzer = DependencyAnalyzer(
-                root_dir=graphrag_source_dir, git_slug=git_slug or "", multi_repo=multi_repo
+                root_dir=graphrag_source_dir,
+                git_slug=git_slug or "",
+                multi_repo=multi_repo,
             )
 
             actual_answer = asyncio.run(analyzer.query_with_llm(input))
@@ -94,7 +96,7 @@ Respond ONLY with valid JSON in this exact format:
                     },
                     {
                         "role": "user",
-                        "content": f"{repo_context}\n\n{input}" if repo_context else input,
+                        "content": (f"{repo_context}\n\n{input}" if repo_context else input),
                     },
                 ],
             )
@@ -289,7 +291,11 @@ Respond ONLY with valid JSON in this exact format:
         DefaultAssetLoader().log_results(
             result_file,
             artifact_path=artifact_path,
-            tags={"category": "evaluation", "git_slug": slug, "multi_repo": str(multi_repo)},
+            tags={
+                "category": "evaluation",
+                "git_slug": slug,
+                "multi_repo": str(multi_repo),
+            },
         )
 
         return df

@@ -55,7 +55,11 @@ def submit_pipeline_run(
         logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
 
     run = _trigger_run(
-        pipeline_name, run_name, params, namespace=namespace, enable_caching=enable_caching
+        pipeline_name,
+        run_name,
+        params,
+        namespace=namespace,
+        enable_caching=enable_caching,
     )
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}
 

@@ -331,9 +331,38 @@ apply-secrets:
 # Testing
 # ============================================================================
 
-test-all:
-	@echo "==> Running UI tests..."
-	uv run --project ui --frozen pytest ui/tests
+test-all: test-api test-ui-unit test-ui-downloads test-playwright test-workflows test-index-transfer test-release
+
+test-api:
+	@echo "==> Running API tests..."
+	uv run --project . --group test --frozen pytest tests/unit/api
+
+test-ui-unit:
+	@echo "==> Running UI unit tests..."
+	uv run --project . --group test --frozen pytest tests/unit/ui
+
+test-ui-downloads:
+	@echo "==> Running UI download/upload tests..."
+	PYTHONPATH=ui uv run --project . --group test --frozen pytest ui/tests
+
+test-playwright:
+	@echo "==> Running browser tests with mocked APIs..."
+	uv run --project . --group test --frozen playwright install chromium
+	uv run --project . --group test --frozen \
+		python -m pytest tests/playwright/ -v --tb=short --browser chromium
+
+test-workflows:
+	@echo "==> Running workflow pipeline tests..."
+	uv run --project . --group test --frozen \
+		pytest tests/unit/workflows
+
+test-index-transfer:
+	@echo "==> Running index transfer tests..."
+	uv run --project . --group test --frozen pytest tests/unit/index
+
+test-release:
+	@echo "==> Running release tests..."
+	uv run --project . --group test --frozen pytest tests/unit/release
 
 # ============================================================================
 # Utility commands

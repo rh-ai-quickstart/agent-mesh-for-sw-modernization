@@ -49,7 +49,11 @@ class AnalysisPipeline:
                 multi_repo=multi_repo,
             ),
             content=report,
-            tags={"git_slug": git_slug, "multi_repo": multi_repo, "category": "analysis"},
+            tags={
+                "git_slug": git_slug,
+                "multi_repo": multi_repo,
+                "category": "analysis",
+            },
         )
 
         return report
@@ -131,9 +135,7 @@ class AnalysisPipeline:
             graphrag_source_path, git_slug=git_slug, multi_repo=use_multi_repo
         )
 
-        postamble = (
-            "Provide as much detail as possible. Include the git repo url(s) in the report."
-        )
+        postamble = "Provide as much detail as possible. Include the git repo url(s) in the report."  # noqa: E501
 
         if use_multi_repo:
             postamble += (
@@ -204,7 +206,10 @@ def write_migration_report(
         )
 
     migration_report = AnalysisPipeline().run(
-        graphrag_source_path, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
+        graphrag_source_path,
+        git_repo=git_repo,
+        git_branch=git_branch,
+        multi_repo=multi_repo,
     )
     if dirname := os.path.dirname(report_path):
         os.makedirs(dirname, exist_ok=True)

@@ -86,7 +86,11 @@ def generate_graphrag_index(
         DefaultAssetLoader().log_results(
             f"{graphrag_source_path}/output",
             artifact_path=artifact_path,
-            tags={"git_slug": git_slug, "category": "indexing", "multi_repo": multi_repo},
+            tags={
+                "git_slug": git_slug,
+                "category": "indexing",
+                "multi_repo": multi_repo,
+            },
         )
 
         status = "success"
@@ -120,7 +124,11 @@ def generate_graphrag_index(
                 multi_repo=multi_repo,
             ),
             content=json.dumps(result),
-            tags={"git_slug": git_slug, "category": "indexing", "multi_repo": multi_repo},
+            tags={
+                "git_slug": git_slug,
+                "category": "indexing",
+                "multi_repo": multi_repo,
+            },
         )
 
 

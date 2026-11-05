@@ -13,7 +13,18 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 import mlflow  # noqa: E402, F401  - pre-warm: avoids first-import races across threads
-from fastapi import Cookie, FastAPI, File, HTTPException, Response, UploadFile  # noqa: E402
+
+# fmt: off
+from fastapi import (  # noqa: E402
+    Cookie,
+    FastAPI,
+    File,
+    HTTPException,
+    Response,
+    UploadFile,
+)
+
+# fmt: on
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402

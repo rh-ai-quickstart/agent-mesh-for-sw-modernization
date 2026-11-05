@@ -5,8 +5,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Metrics, Output  # noqa: E402
+
+# fmt: off
 from utils.kubeflow_utils import INDEXING_BASE_IMAGE  # noqa: E402
-from utils.kubeflow_utils import get_pip_installable_git_url, inject_secret_as_env  # noqa: E402
+from utils.kubeflow_utils import (  # noqa: E402
+    get_pip_installable_git_url,
+    inject_secret_as_env,
+)
+
+# fmt: on
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),

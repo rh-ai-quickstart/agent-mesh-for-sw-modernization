@@ -121,7 +121,11 @@ class AssetLoader(ABC):
 
     @abstractmethod
     def register_static_asset(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
         """Logs an artifact to the static asset store (same experiment as ``download``).
 

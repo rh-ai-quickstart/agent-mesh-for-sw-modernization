@@ -62,7 +62,12 @@ class MlflowTokenLogger(BasicTokenLogger):
         client.log_batch(
             self.run_id,
             metrics=[
-                Metric(key=k, value=float(v), timestamp=int(time.time() * 1000), step=self.step)
+                Metric(
+                    key=k,
+                    value=float(v),
+                    timestamp=int(time.time() * 1000),
+                    step=self.step,
+                )
                 for k, v in self.totals.items()
             ],
         )

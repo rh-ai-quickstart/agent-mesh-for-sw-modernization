@@ -35,7 +35,10 @@ async def post_pipeline_service(
     repos = [r.model_dump() for r in body.repos]
     try:
         return await asyncio.to_thread(
-            pipeline_service.submit_pipeline_run, repos, cu_namespace, body.pipeline_run_id
+            pipeline_service.submit_pipeline_run,
+            repos,
+            cu_namespace,
+            body.pipeline_run_id,
         )
     except ValueError as exc:
         logging.error(traceback.format_exc())
@@ -46,7 +49,9 @@ async def post_pipeline_service(
 
 
 @router.get("/pipelines/runs")
-async def list_pipeline_runs(cu_namespace: str | None = Cookie(default=None)) -> dict[str, Any]:
+async def list_pipeline_runs(
+    cu_namespace: str | None = Cookie(default=None),
+) -> dict[str, Any]:
     return {"runs": await asyncio.to_thread(pipeline_service.list_pipeline_runs, cu_namespace)}
 
 

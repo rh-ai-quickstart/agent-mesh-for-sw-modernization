@@ -650,7 +650,11 @@ def generate_code_and_meta_for_language(
                 multi_repo=multi_repo,
             ),
             content=json.dumps(result),
-            tags={"git_slug": git_slug, "category": "data-generation", "multi_repo": multi_repo},
+            tags={
+                "git_slug": git_slug,
+                "category": "data-generation",
+                "multi_repo": multi_repo,
+            },
         )
 
 
@@ -857,7 +861,11 @@ class DataGenerationPipeline:
 
             reset_environment(source_path, target_path)
 
-            result = {"git_slug": git_slug, "status": "error", "fail_message": error_message}
+            result = {
+                "git_slug": git_slug,
+                "status": "error",
+                "fail_message": error_message,
+            }
 
         return result
 

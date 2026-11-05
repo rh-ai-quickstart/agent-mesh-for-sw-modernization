@@ -1,8 +1,6 @@
 import os
 import subprocess
 import sys
-from contextlib import nullcontext
-from types import SimpleNamespace
 
 import yaml
 from conftest import REPO_ROOT, WORKFLOW_ROOT
@@ -30,34 +28,7 @@ def collect_task_names(value):
     return task_names
 
 
-def assert_single_repo_component_sets_run_id(executor, monkeypatch):
-    from pipelines.base import indexing
-    from utils import kubeflow_utils
-
-    observed_run_ids = []
-    monkeypatch.setenv("KFP_RUN_ID", "{{$.pipeline_job_uuid}}")
-    monkeypatch.setattr(
-        indexing,
-        "generate_graphrag_index",
-        lambda **kwargs: observed_run_ids.append(os.getenv("KFP_RUN_ID")),
-    )
-    monkeypatch.setattr(kubeflow_utils, "read_from_input_artifact", lambda _: nullcontext("code"))
-    monkeypatch.setattr(kubeflow_utils, "write_to_output_artifact", lambda _: nullcontext("graph"))
-
-    component = {}
-    exec(executor["command"][-1], component)
-    component["graphrag_indexing_op"](
-        codebase_dir=SimpleNamespace(),
-        graphrag_dir=SimpleNamespace(),
-        result=SimpleNamespace(log_metric=lambda *args: None),
-        git_repo="https://github.com/example/one",
-        git_branch="develop",
-        kfp_run_id="55ad44f8-955a-427f-ba30-fd8f3afef7bb",
-    )
-    assert observed_run_ids == ["55ad44f8-955a-427f-ba30-fd8f3afef7bb"]
-
-
-def test_all_pipelines_compile(tmp_path, monkeypatch):
+def test_all_pipelines_compile(tmp_path):
     env = os.environ | {
         "PYTHONPATH": str(WORKFLOW_ROOT),
         "KUBECONFIG": os.devnull,
@@ -88,8 +59,15 @@ def test_all_pipelines_compile(tmp_path, monkeypatch):
     generated = {path.name for path in tmp_path.glob("*.yaml")}
     assert generated == EXPECTED_PIPELINES
 
+    def _load_pipeline(path):
+        """Return first non-None document from a potentially multi-document YAML file."""
+        return next(
+            (d for d in yaml.safe_load_all(path.read_text()) if d is not None),
+            None,
+        )
+
     for path in tmp_path.glob("*.yaml"):
-        document = yaml.safe_load(path.read_text())
+        document = _load_pipeline(path)
         assert document["pipelineInfo"]["name"]
         assert document["root"]["dag"]["tasks"]
 
@@ -101,68 +79,25 @@ def test_all_pipelines_compile(tmp_path, monkeypatch):
         assert all(not image.endswith(":latest") for image in images)
 
     for mode in ("single", "multi"):
-        document = yaml.safe_load((tmp_path / f"{mode}_repo.yaml").read_text())
-        assert document["root"]["inputDefinitions"]["parameters"]["analysis_only"] == {
-            "defaultValue": False,
-            "isOptional": True,
-            "parameterType": "BOOLEAN",
-        }
-        root_task = next(iter(document["root"]["dag"]["tasks"].values()))
-        branches = document["components"][root_task["componentRef"]["name"]]["dag"]["tasks"]
-        condition = "inputs.parameter_values['pipelinechannel--analysis_only'] == true"
-        assert {task["triggerPolicy"]["condition"] for task in branches.values()} == {
-            condition,
-            f"!({condition})",
-        }
-        for branch in branches.values():
-            tasks = document["components"][branch["componentRef"]["name"]]["dag"]["tasks"]
-            analysis_tasks = [name for name in tasks if name.startswith("graphrag-analysis")]
-            assert len(analysis_tasks) == 1
-            report = tasks[analysis_tasks[0]]
-            if branch["triggerPolicy"]["condition"] == condition:
-                assert set(tasks) == {"load-existing-index-op", analysis_tasks[0]}
-                assert report["dependentTasks"] == ["load-existing-index-op"]
-                assert report["inputs"]["artifacts"]["graphrag_dir"] == {
-                    "taskOutputArtifact": {
-                        "outputArtifactKey": "graphrag_dir",
-                        "producerTask": "load-existing-index-op",
-                    }
-                }
-                lookup = tasks["load-existing-index-op"]["inputs"]["parameters"]
-                if mode == "single":
-                    assert lookup == {
-                        name: {"componentInputParameter": f"pipelinechannel--{name}"}
-                        for name in ("git_repo", "git_branch", "multi_repo")
-                    }
-                else:
-                    assert lookup["multi_repo"] == {"runtimeValue": {"constant": True}}
-            else:
-                generation = f"data-generation{'-multi-repo' if mode == 'multi' else ''}-pipeline"
-                indexing = f"graphrag-indexing{'-multi-repo' if mode == 'multi' else ''}-pipeline"
-                assert set(tasks) == {generation, indexing, analysis_tasks[0]}
-                assert tasks[indexing]["dependentTasks"] == [generation]
-                assert report["dependentTasks"] == [indexing]
+        document = _load_pipeline(tmp_path / f"{mode}_repo.yaml")
+        # pipeline_run_id (string) replaces analysis_only (bool) from ext-tools
+        params = document["root"]["inputDefinitions"]["parameters"]
+        assert "analysis_only" not in params
+        assert "pipeline_run_id" in params
+        assert params["pipeline_run_id"]["parameterType"] == "STRING"
+        # No ext-tools branching components
+        task_names = collect_task_names(document)
+        assert "load-existing-index-op" not in task_names
+        # multi-repo uses get-repo-list-op; single-repo does not
         if mode == "multi":
-            assert "get-repo-list-op" in collect_task_names(document)
+            assert "get-repo-list-op" in task_names
+        else:
+            assert "get-repo-list-op" not in task_names
+        # Indexing component receives pipeline_run_id (not kfp_run_id in HEAD)
         component_name = (
             "run-indexing-multi-repo-op" if mode == "multi" else "graphrag-indexing-op"
         )
-        pipeline_name = f"graphrag-indexing{'-multi-repo' if mode == 'multi' else ''}-pipeline"
         indexing_component = document["components"][f"comp-{component_name}"]
-        assert indexing_component["inputDefinitions"]["parameters"]["kfp_run_id"] == {
-            "defaultValue": "",
-            "isOptional": True,
-            "parameterType": "STRING",
-        }
-        indexing_task = document["components"][f"comp-{pipeline_name}"]["dag"]["tasks"][
-            component_name
-        ]
-        assert indexing_task["inputs"]["parameters"]["kfp_run_id"] == {
-            "runtimeValue": {"constant": "{{$.pipeline_job_uuid}}"}
-        }
-        executor = document["deploymentSpec"]["executors"][indexing_component["executorLabel"]][
-            "container"
-        ]
-        assert all(env["name"] != "KFP_RUN_ID" for env in executor.get("env", []))
-        if mode == "single":
-            assert_single_repo_component_sets_run_id(executor, monkeypatch)
+        indexing_params = indexing_component["inputDefinitions"]["parameters"]
+        assert "pipeline_run_id" in indexing_params
+        assert indexing_params["pipeline_run_id"]["parameterType"] == "STRING"

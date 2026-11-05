@@ -86,7 +86,14 @@ def _public_index_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     """Return index fields needed by the browser without exposing artifact layout."""
     return {
         key: metadata[key]
-        for key in ("git_slug", "multi_repo", "uploaded", "run_id", "kfp_run_id", "indexed_at")
+        for key in (
+            "git_slug",
+            "multi_repo",
+            "uploaded",
+            "run_id",
+            "kfp_run_id",
+            "indexed_at",
+        )
     }
 
 

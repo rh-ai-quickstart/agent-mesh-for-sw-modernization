@@ -223,7 +223,7 @@ class MlFlowAssetLoader(AssetLoader):
 
         if latest_path and merged is not None:
             with open(latest_path, "w") as f:
-                json.dump(merged, f) if isinstance(merged, (dict, list)) else f.write(merged)
+                (json.dump(merged, f) if isinstance(merged, (dict, list)) else f.write(merged))
 
         return merged
 
@@ -416,7 +416,11 @@ class MlFlowAssetLoader(AssetLoader):
             raise e
 
     def register_static_asset(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
         """Logs an artifact to STATIC_ASSET_EXPERIMENT so ``download`` can retrieve it."""
         import tempfile
@@ -553,7 +557,10 @@ class MlFlowAssetLoader(AssetLoader):
         import contextlib
         import tempfile as _tmp
 
-        from utils.loader_utils import get_global_scoped_enrichment_dir, sync_enrichments
+        from utils.loader_utils import (
+            get_global_scoped_enrichment_dir,
+            sync_enrichments,
+        )
 
         _ctx = (
             _tmp.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -598,7 +605,9 @@ class MlFlowAssetLoader(AssetLoader):
             # anchor_run is logged last so its start_time is the latest, ensuring
             # _mark_as_archived leaves exactly 1 unarchived global enrichment run.
             run_id = self.log_results(
-                enrichments_dir, artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS, tags=tags
+                enrichments_dir,
+                artifact_path=self.RESULTS_PATH_PREFIX_ENRICHMENTS,
+                tags=tags,
             )
             anchor_run = client.get_run(run_id)
 

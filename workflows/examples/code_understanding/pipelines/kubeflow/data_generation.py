@@ -7,12 +7,16 @@ from typing import NamedTuple  # noqa: E402
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Output  # noqa: E402
+
+# fmt: off
 from utils.kubeflow_utils import DATA_GENERATION_BASE_IMAGE  # noqa: E402
 from utils.kubeflow_utils import (  # noqa: E402
     get_pip_installable_git_url,
     harden_skill_component,
     inject_secret_as_env,
 )
+
+# fmt: on
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -31,19 +35,30 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(
-    base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
+    base_image=DATA_GENERATION_BASE_IMAGE,
+    packages_to_install=[_AGENTMESH_INSTALLABLE_URL],
 )
 def prepare_environment_op(
-    git_repo: str, git_branch: str, source_dir: Output[Dataset], pipeline_run_id: str = ""
+    git_repo: str,
+    git_branch: str,
+    source_dir: Output[Dataset],
+    pipeline_run_id: str = "",
 ):
     """Clones the repository and archives it as a gzip tarball."""
 
     from pipelines.base.data_generation import prepare_environment
-    from utils.kubeflow_utils import setup_logging, use_ephemeral_space, write_to_output_artifact
+    from utils.kubeflow_utils import (
+        setup_logging,
+        use_ephemeral_space,
+        write_to_output_artifact,
+    )
 
     setup_logging()
 
-    with write_to_output_artifact(source_dir) as tmp_source, use_ephemeral_space() as tmp_target:
+    with (
+        write_to_output_artifact(source_dir) as tmp_source,
+        use_ephemeral_space() as tmp_target,
+    ):
         prepare_environment(
             source_path=tmp_source,
             target_path=tmp_target,
@@ -56,7 +71,8 @@ def prepare_environment_op(
 @inject_secret_as_env(secret_name="code-understanding-env")
 @harden_skill_component
 @dsl.component(
-    base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
+    base_image=DATA_GENERATION_BASE_IMAGE,
+    packages_to_install=[_AGENTMESH_INSTALLABLE_URL],
 )
 def preflight_op(
     git_repo: str,
@@ -74,7 +90,11 @@ def preflight_op(
 
     from pipelines.base.data_generation import run_preflight
     from utils import code_utils
-    from utils.kubeflow_utils import read_from_input_artifact, setup_logging, sigterm_handler
+    from utils.kubeflow_utils import (
+        read_from_input_artifact,
+        setup_logging,
+        sigterm_handler,
+    )
 
     setup_logging()
     signal.signal(signal.SIGTERM, sigterm_handler)
@@ -106,7 +126,8 @@ def preflight_op(
 @inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(
-    base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
+    base_image=DATA_GENERATION_BASE_IMAGE,
+    packages_to_install=[_AGENTMESH_INSTALLABLE_URL],
 )
 def generate_code_and_meta_op(
     git_repo: str,
@@ -171,7 +192,8 @@ def generate_code_and_meta_op(
 
 @inject_secret_as_env(secret_name="code-understanding-env")
 @dsl.component(
-    base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
+    base_image=DATA_GENERATION_BASE_IMAGE,
+    packages_to_install=[_AGENTMESH_INSTALLABLE_URL],
 )
 def get_repo_list_op(repos: str = "[]") -> list:
     """Returns the repo list for this pipeline run and logs it to the asset store."""

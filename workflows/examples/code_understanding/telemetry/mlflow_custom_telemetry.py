@@ -30,7 +30,10 @@ class MlFlowCustomTelemetry(CustomTelemetry):
     def track(self):
         import litellm
 
-        from .telemetry_litellm.mlflow_token_logger import MlflowTokenLogger, get_mlflow_callback
+        from .telemetry_litellm.mlflow_token_logger import (
+            MlflowTokenLogger,
+            get_mlflow_callback,
+        )
 
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 

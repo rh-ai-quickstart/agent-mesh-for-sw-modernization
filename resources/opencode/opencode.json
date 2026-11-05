@@ -86,11 +86,12 @@
   "mcp": {
     "rhoai-mcp": {
       "type": "remote",
-      "url": "{env:RHOAI_MCP_URL}/mcp",
+       "url": "{env:RHOAI_MCP_URL}/sse",
       "enabled": true,
       "timeout": 30000,
       "headers": {
-        "Authorization": "Bearer {env:OCP_TOKEN}"
+        "Authorization": "Bearer {env:RHOAI_MCP_TOKEN}",
+        "Accept": "text/event-stream"
       }
     }
   }

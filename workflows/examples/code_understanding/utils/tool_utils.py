@@ -27,7 +27,7 @@ class SafeFileManagementToolkit:
                     text: Annotated[
                         str,
                         BeforeValidator(
-                            lambda v: v if isinstance(v, str) else (json.dumps(v) if v else "")
+                            lambda v: (v if isinstance(v, str) else (json.dumps(v) if v else ""))
                         ),
                     ]
 
@@ -110,7 +110,9 @@ def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None
         if parent_dir and enrichments_dir:
             try:
                 DefaultAssetLoader().download_dir(
-                    parent_dir, os.path.join(enrichments_dir, parent_dir), git_slug=git_slug
+                    parent_dir,
+                    os.path.join(enrichments_dir, parent_dir),
+                    git_slug=git_slug,
                 )
                 content = load_local_enrichments(enrichments_dir, path)
             except Exception:

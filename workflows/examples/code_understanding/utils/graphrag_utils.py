@@ -1,11 +1,13 @@
 import os
 import ssl
 
+
 def should_skip_tls() -> bool:
-    return (
-        os.getenv("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "false").lower() in ("true", "1", "yes")
-        or os.getenv("ENABLE_TLS_VERIFICATION", "true").lower() in ("false", "0", "no")
-    )
+    return os.getenv("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    ) or os.getenv("ENABLE_TLS_VERIFICATION", "true").lower() in ("false", "0", "no")
 
 
 if should_skip_tls():
@@ -19,14 +21,15 @@ if should_skip_tls():
 
     ssl.create_default_context = _unverified_context
 
-import logging
-from pathlib import Path
+import logging  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-import graphrag.api as api
-from graphrag.config.load_config import load_config
+import graphrag.api as api  # noqa: E402
+from graphrag.config.load_config import load_config  # noqa: E402
 
 if should_skip_tls():
     import litellm as _litellm
+
     _litellm.ssl_verify = False
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())

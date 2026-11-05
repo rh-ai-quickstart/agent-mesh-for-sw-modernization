@@ -76,7 +76,8 @@ async def _run_as_agent(
                 return
         except Exception as exc:
             logging.warning(
-                "RHOAI MCP requested but unavailable — skill ran WITHOUT MCP tools: %s", exc
+                "RHOAI MCP requested but unavailable — skill ran WITHOUT MCP tools: %s",
+                exc,
             )
 
     agent = create_tool_calling_agent(llm, tools, prompt)
