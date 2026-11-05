@@ -33,7 +33,7 @@ aws-compatible-storage:
   route:
     enabled: false
     s3Api:
-  enabled: true
+      enabled: false
   storage:
     data:
       size: 50Gi
