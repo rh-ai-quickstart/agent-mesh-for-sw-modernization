@@ -25,6 +25,7 @@ _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
 ##############################################################################
 
 
+@inject_secret_as_env(secret_name="code-understanding-env")
 @inject_secret_as_env(secret_name="git-credentials")
 @dsl.component(
     base_image=DATA_GENERATION_BASE_IMAGE, packages_to_install=[_AGENTMESH_INSTALLABLE_URL]
@@ -82,9 +83,15 @@ def generate_code_and_meta_op(
 
         try:
 
-            from pipelines.base.data_generation import load_external_data
+            from pipelines.base.data_generation import load_external_metadata
+            from utils import code_utils
 
-            external_metadata = load_external_data(tmp_source)
+            git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
+
+            external_metadata = load_external_metadata(
+                git_slug=git_slug,
+                source_path=tmp_source,
+            )
 
             languages = detect_languages(tmp_source)
 

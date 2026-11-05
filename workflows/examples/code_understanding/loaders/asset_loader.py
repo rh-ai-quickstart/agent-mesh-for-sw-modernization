@@ -13,8 +13,20 @@ class AssetLoader(ABC):
     RESULTS_PATH_PREFIX_PIPELINES = "results/pipelines"
     RESULTS_PATH_PREFIX_ADHOC_QUERIES = "results/adhoc_queries"
     RESULTS_PATH_PREFIX_METADATA = "results/metadata"
+    RESULTS_PATH_PREFIX_ENRICHMENTS = "results/enrichments"
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
+
+    @abstractmethod
+    def load_skill(self, name: str) -> tuple[str, dict]:
+        """Load a skill file by name.
+
+        Args:
+            name: Skill name, matching the file stem and the SKILL.md ``name`` field.
+
+        Returns:
+            Tuple of (body string, frontmatter metadata dict).
+        """
 
     @staticmethod
     def _get_prompt_body_and_metadata(raw: str) -> tuple[str, dict]:
@@ -66,8 +78,22 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+        """Downloads previously logged results to download_dir.
+
+        Args:
+            download_dir: Local directory path to download results into.
+            artifact_path: Subdirectory within the run's artifact store to download from.
+            tags: Optional key-value tags to filter which run to download from.
+        """
+
+    @abstractmethod
     def log_results(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
         """Logs pipeline output artifacts for the current run.
 

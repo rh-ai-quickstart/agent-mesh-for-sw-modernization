@@ -200,8 +200,28 @@ class MlFlowAssetLoader(AssetLoader):
 
             raise e
 
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+        """Downloads a previously logged result directory from MLflow to download_dir.
+
+        Silently skips if no prior results exist (e.g. on first run).
+        """
+        try:
+            self.download_dir(
+                artifact_path,
+                download_dir,
+                experiment_name=self.RESULT_DIRECTORY_ASSET_EXPERIMENT,
+                asset_tags=tags,
+            )
+            logging.info("Loaded prior results from %s to %s", artifact_path, download_dir)
+        except Exception as e:
+            logging.info("No prior results to load from %s: %s", artifact_path, e)
+
     def log_results(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
         """Logs pipeline output artifacts to a new MLflow run."""
         try:
@@ -331,6 +351,33 @@ class MlFlowAssetLoader(AssetLoader):
         except Exception as e:
 
             logging.error(f"Error registering prompt {prompt_path}: {e}")
+
+            raise e
+
+    def load_skill(self, name: str) -> tuple[str, dict]:
+        """Loads a skill from the MLflow prompt registry.
+
+        The skill must have been uploaded first via ``upload_all_assets``.
+
+        Args:
+            name: Skill name (must match the file stem under assets/prompts/skills/).
+
+        Returns:
+            Tuple of (body string, frontmatter metadata dict).
+        """
+        try:
+
+            prompt_name = self.get_prompt_name(f"skills/{name}")
+
+            prompt = mlflow.load_prompt(prompt_name)
+
+            body, meta = self._get_prompt_body_and_metadata(prompt.template)
+
+            return body, meta
+
+        except Exception as e:
+
+            logging.error(f"Error loading skill {name}: {e}")
 
             raise e
 

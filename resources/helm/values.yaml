@@ -112,6 +112,24 @@ otel:
     bucket: tempo
     storageSize: 10Gi
 
+rhoaiMcp:
+  enabled: false
+  image: ""
+  imagePullPolicy: IfNotPresent
+  authMode: auto
+  logLevel: INFO
+  readOnly: false
+  oidc:
+    enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+
 console:
   enabled: false
   replicas: 1

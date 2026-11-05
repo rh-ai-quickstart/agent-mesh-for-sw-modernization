@@ -47,6 +47,11 @@ def _run_index_metadata(run: Any) -> dict[str, Any]:
     }
 
 
+def _public_index_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Return index fields needed by the browser without exposing artifact layout."""
+    return {key: metadata[key] for key in ("git_slug", "multi_repo", "run_id", "indexed_at")}
+
+
 def create_mlflow_client() -> Any:
     """Create an MLflow client authenticated with the pod service account."""
     from mlflow.tracking import MlflowClient
@@ -97,10 +102,15 @@ def list_indexed_repos() -> dict[str, Any]:
             if key in seen:
                 continue
             seen.add(key)
-            indexes.append(metadata)
+            indexes.append(_public_index_metadata(metadata))
         return {"ok": True, "source": "mlflow", "indexes": indexes, "message": ""}
     except Exception as exc:
         return {"ok": False, "source": "mlflow", "indexes": [], "message": str(exc)}
+
+
+def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Map git_slug -> index metadata."""
+    return {item["git_slug"]: item for item in indexes if item.get("git_slug")}
 
 
 def repo_is_indexed(git_repo: str, git_branch: str, indexes: list[dict[str, Any]]) -> bool:
@@ -142,3 +152,10 @@ def queryable_repos(
             }
         )
     return options
+
+
+def default_query_key(options: list[dict[str, Any]]) -> str | None:
+    for option in options:
+        if "tic-tac-toe" in option.get("git_repo", ""):
+            return option["key"]
+    return options[0]["key"] if options else None

@@ -44,8 +44,16 @@ class DefaultAssetLoader(AssetLoader):
             return self._loader.download_dir(asset_dir_path, download_dir, **kwargs)
         return self._loader.download_dir(asset_dir_path, download_dir)
 
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+
+        return self._loader.load_results(download_dir, artifact_path, tags)
+
     def log_results(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
 
         return self._loader.log_results(results_path, artifact_path, tags, content)
@@ -63,6 +71,10 @@ class DefaultAssetLoader(AssetLoader):
     def upload_prompt(self, prompt_path: str):
 
         return self._loader.upload_prompt(prompt_path)
+
+    def load_skill(self, name: str) -> tuple[str, dict]:
+
+        return self._loader.load_skill(name)
 
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
 
