@@ -12,7 +12,8 @@ metadata:
   skills:
   - name: rhel10-code-compat
     source: repo
-    repo: https://github.com/agapebondservant/swe-mesh-skills
+    repo: https://github.com/rh-ai-quickstart/agent-mesh-for-sw-modernization
+    repo_branch: swe-mesh-skills
     enabled: true
     target_dir: .code_metadata
 ---

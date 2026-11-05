@@ -17,6 +17,7 @@ class SkillConfig:
     repo: str
     enabled: bool = True
     target_dir: str | None = None
+    repo_branch: str | None = None
 
 
 def fetch_skills(name: str) -> list[SkillConfig]:
@@ -30,16 +31,21 @@ def fetch_skills(name: str) -> list[SkillConfig]:
             repo=entry["repo"],
             enabled=entry.get("enabled", True),
             target_dir=entry.get("target_dir"),
+            repo_branch=entry.get("repo_branch"),
         )
         for entry in ((frontmatter.get("metadata") or {}).get("skills") or [])
     ]
 
 
-def load_skill_instructions(name: str, repo: str) -> str:
+def load_skill_instructions(name: str, repo: str, repo_branch: str | None = None) -> str:
     """Clone a skills repo and return the SKILL.md body for the named skill."""
     with tempfile.TemporaryDirectory(prefix=f"skill-{name}-") as skills_dir:
+        clone_cmd = ["git", "clone", "--depth", "1"]
+        if repo_branch:
+            clone_cmd += ["--branch", repo_branch]
+        clone_cmd += [repo, skills_dir]
         subprocess.run(
-            ["git", "clone", "--depth", "1", repo, skills_dir],
+            clone_cmd,
             check=True,
             capture_output=True,
         )
@@ -118,7 +124,7 @@ def run_skill(
 
     Returns the path to the generated report file, or None if no report was written.
     """
-    instructions = load_skill_instructions(skill.name, skill.repo)
+    instructions = load_skill_instructions(skill.name, skill.repo, skill.repo_branch)
     coro = _run_as_agent(repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp)
     try:
         loop = asyncio.get_running_loop()
@@ -162,7 +168,8 @@ def run_composite_skill(
     body, _ = DefaultAssetLoader().load_skill(composite_skill)
     enabled_skills = [s for s in fetch_skills(composite_skill) if s.enabled]
     skills_desc = "\n".join(
-        f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}" for s in enabled_skills
+        f"- name={s.name}, repo={s.repo}, repo_branch={s.repo_branch}, target_dir={s.target_dir}"
+        for s in enabled_skills
     )
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
