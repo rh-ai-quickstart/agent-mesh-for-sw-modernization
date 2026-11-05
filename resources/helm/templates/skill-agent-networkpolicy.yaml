@@ -52,6 +52,14 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.skillAgent.networkPolicy.egressPorts.minio }}
+    # S4 (S3-compatible) object store — in-namespace only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.s3 }}
     # RHOAI MCP server — in-namespace only (required when rhoaiMcp.enabled=true)
     - to:
         - namespaceSelector:
