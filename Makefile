@@ -384,7 +384,7 @@ help-all:
 	@echo "  E2E_UI_PYTHON               Python version for Playwright tests (default: 3.12)"
 	@echo "  RUN_PIPELINES               Include real pipeline runs in E2E tests (default: false)"
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
-	@echo "  AGENT_MODEL                 Model for deploy-agent-model: qwen or muse-glimmer (required)"
+	@echo "  AGENT_MODEL                 Deploy qwen or muse-glimmer during install or deploy-agent-model"
 	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  MANAGE_NAMESPACE           Create namespace and apply metadata (default: true; false for pre-provisioned namespaces)"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
@@ -450,6 +450,9 @@ install: _install-preflight
 	$(MAKE) prepare-workbench-images
 	@if [ "$(DEPLOY_EMBEDDING_MODEL)" = "true" ]; then \
 		$(MAKE) deploy-embedding-model; \
+	fi
+	@if [ -n "$(strip $(AGENT_MODEL))" ]; then \
+		$(MAKE) deploy-agent-model; \
 	fi
 	$(MAKE) apply-secrets
 	@set -e; \
@@ -623,6 +626,17 @@ apply-secrets:
 		: "$${EMBED_LLM_PROVIDER:=openai}"; \
 		: "$${EMBED_LLM_PROVIDER_SETTINGS_XML:=openai}"; \
 		export EMBED_LLM_TOKEN EMBED_LLM_API_BASE EMBED_LLM_ID EMBED_LLM_PROVIDER EMBED_LLM_PROVIDER_SETTINGS_XML; \
+	fi && \
+	if [ -n "$(strip $(AGENT_MODEL))" ]; then \
+		case "$(AGENT_MODEL)" in \
+			qwen) : "$${CODE_LLM_ID:=RedHatAI/Qwen3.5-9B-FP8-dynamic}" ;; \
+			muse-glimmer) : "$${CODE_LLM_ID:=RedHatAI/Muse-Glimmer-30B-FP8-block}" ;; \
+			*) echo "Error: AGENT_MODEL must be qwen or muse-glimmer." >&2; exit 1 ;; \
+		esac; \
+		: "$${CODE_LLM_TOKEN:=dummy}"; \
+		: "$${CODE_LLM_API_BASE:=http://agent-model-predictor:80/v1}"; \
+		: "$${CODE_LLM_PROVIDER:=openai}"; \
+		export CODE_LLM_TOKEN CODE_LLM_API_BASE CODE_LLM_ID CODE_LLM_PROVIDER; \
 	fi && \
 	\
 	echo "==> Applying git-credentials secret..." && \
