@@ -17,6 +17,7 @@ class SkillConfig:
     repo: str | None = None
     enabled: bool = True
     target_dir: str | None = None
+    repo_branch: str | None = None
 
 
 async def _run_as_agent(
@@ -97,16 +98,21 @@ def fetch_skills(name: str) -> list[SkillConfig]:
             repo=entry.get("repo"),
             enabled=entry.get("enabled", True),
             target_dir=entry.get("target_dir"),
+            repo_branch=entry.get("repo_branch"),
         )
         for entry in ((frontmatter.get("metadata") or {}).get("skills") or [])
     ]
 
 
-def load_external_skill_instructions(name: str, repo: str) -> str:
+def load_external_skill_instructions(name: str, repo: str, repo_branch: str | None = None) -> str:
     """Clone a skills repo and return the SKILL.md body for the named skill."""
     with tempfile.TemporaryDirectory(prefix=f"skill-{name}-") as skills_dir:
+        clone_cmd = ["git", "clone", "--depth", "1"]
+        if repo_branch:
+            clone_cmd += ["--branch", repo_branch]
+        clone_cmd += [repo, skills_dir]
         subprocess.run(
-            ["git", "clone", "--depth", "1", repo, skills_dir],
+            clone_cmd,
             check=True,
             capture_output=True,
         )
@@ -120,7 +126,9 @@ def load_external_skill_instructions(name: str, repo: str) -> str:
     return match.group(1).strip() if match else content.strip()
 
 
-def load_skill_instructions(name: str, repo: str | None = None) -> str:
+def load_skill_instructions(
+    name: str, repo: str | None = None, repo_branch: str | None = None
+) -> str:
     """Return the body of the named skill.
 
     When repo is None the skill is loaded from the asset loader.
@@ -132,7 +140,7 @@ def load_skill_instructions(name: str, repo: str | None = None) -> str:
         body, _ = DefaultAssetLoader().load_skill(name)
         return body
 
-    return load_external_skill_instructions(name, repo)
+    return load_external_skill_instructions(name, repo, repo_branch)
 
 
 def run_local_skill(
@@ -162,7 +170,7 @@ def run_skill(
     """
     logging.info("Running skill: %s", skill.name)
 
-    instructions = load_skill_instructions(skill.name, skill.repo)
+    instructions = load_skill_instructions(skill.name, skill.repo, skill.repo_branch)
     from utils.tool_utils import get_read_asset_tool, get_register_enrichments_tool
 
     extra_tools = (
@@ -220,7 +228,8 @@ def run_composite_skill(
     body, _ = DefaultAssetLoader().load_skill(composite_skill)
     enabled_skills = [s for s in fetch_skills(composite_skill) if s.enabled]
     skills_desc = "\n".join(
-        f"- name={s.name}, repo={s.repo}, target_dir={s.target_dir}" for s in enabled_skills
+        f"- name={s.name}, repo={s.repo}, repo_branch={s.repo_branch}, target_dir={s.target_dir}"
+        for s in enabled_skills
     )
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)

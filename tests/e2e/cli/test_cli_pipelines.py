@@ -14,8 +14,9 @@ from pathlib import Path
 import pytest
 from kfp_server_api import ApiException
 from urllib3.exceptions import HTTPError
-
-from ui.catalog import git_slug
+from workflows.examples.code_understanding.utils.code_utils import (
+    generate_slug_from_repo as git_slug,
+)
 
 REPO = "https://github.com/agapebondservant/tic-tac-toe-sample"
 BRANCH = "main"
