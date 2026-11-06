@@ -14,7 +14,11 @@ def is_pipeline_uploaded(pipeline_name: str) -> bool:
         filter=json.dumps(
             {
                 "predicates": [
-                    {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+                    {
+                        "key": "display_name",
+                        "operation": "EQUALS",
+                        "stringValue": pipeline_name,
+                    }
                 ]
             }
         )

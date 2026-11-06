@@ -14,10 +14,77 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 @dataclass
 class SkillConfig:
     name: str
-    repo: str
+    repo: str | None = None
     enabled: bool = True
     target_dir: str | None = None
     repo_branch: str | None = None
+
+
+async def _run_as_agent(
+    repo_dir: str,
+    instructions: str,
+    use_rhoai_mcp: bool = False,
+    extra_tools: list | None = None,
+) -> None:
+    from langchain.agents import AgentExecutor, create_tool_calling_agent
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_litellm import ChatLiteLLM
+    from utils.tool_utils import SafeFileManagementToolkit
+
+    llm = ChatLiteLLM(
+        model=f"{os.environ['CODE_LLM_PROVIDER']}/{os.environ['CODE_LLM_ID']}",
+        api_base=os.environ["CODE_LLM_API_BASE"],
+        api_key=os.environ["CODE_LLM_TOKEN"],
+    )
+    tools = SafeFileManagementToolkit(
+        root_dir=repo_dir,
+        selected_tools=["read_file", "write_file", "list_directory"],
+    ).get_tools()
+    if extra_tools:
+        tools = tools + extra_tools
+    from loaders.default_asset_loader import DefaultAssetLoader
+
+    system_prompt, _ = DefaultAssetLoader().download_prompt("skills/skills-system-prompt")
+    if not system_prompt:
+        raise RuntimeError(
+            "skills-system-prompt could not be loaded; aborting to prevent prompt injection"
+        )
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ]
+    )
+
+    if use_rhoai_mcp:
+        try:
+            from langchain_mcp_adapters.client import MultiServerMCPClient
+
+            async with MultiServerMCPClient(
+                {
+                    "rhoai-mcp": {
+                        "url": os.environ["RHOAI_MCP_BASE_URL"] + "/sse",
+                        "transport": "sse",
+                    }
+                }
+            ) as client:
+                all_tools = tools + client.get_tools()
+                agent = create_tool_calling_agent(llm, all_tools, prompt)
+                await AgentExecutor(
+                    agent=agent, tools=all_tools, verbose=True, max_iterations=50
+                ).ainvoke({"input": instructions})
+                return
+        except Exception as exc:
+            logging.warning(
+                "RHOAI MCP requested but unavailable — skill ran WITHOUT MCP tools: %s",
+                exc,
+            )
+
+    agent = create_tool_calling_agent(llm, tools, prompt)
+    await AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=50).ainvoke(
+        {"input": instructions}
+    )
 
 
 def fetch_skills(name: str) -> list[SkillConfig]:
@@ -28,7 +95,7 @@ def fetch_skills(name: str) -> list[SkillConfig]:
     return [
         SkillConfig(
             name=entry["name"],
-            repo=entry["repo"],
+            repo=entry.get("repo"),
             enabled=entry.get("enabled", True),
             target_dir=entry.get("target_dir"),
             repo_branch=entry.get("repo_branch"),
@@ -37,7 +104,7 @@ def fetch_skills(name: str) -> list[SkillConfig]:
     ]
 
 
-def load_skill_instructions(name: str, repo: str, repo_branch: str | None = None) -> str:
+def load_external_skill_instructions(name: str, repo: str, repo_branch: str | None = None) -> str:
     """Clone a skills repo and return the SKILL.md body for the named skill."""
     with tempfile.TemporaryDirectory(prefix=f"skill-{name}-") as skills_dir:
         clone_cmd = ["git", "clone", "--depth", "1"]
@@ -59,73 +126,64 @@ def load_skill_instructions(name: str, repo: str, repo_branch: str | None = None
     return match.group(1).strip() if match else content.strip()
 
 
-async def _run_as_agent(
+def load_skill_instructions(
+    name: str, repo: str | None = None, repo_branch: str | None = None
+) -> str:
+    """Return the body of the named skill.
+
+    When repo is None the skill is loaded from the asset loader.
+    When repo is provided the skill repo is cloned and SKILL.md is read.
+    """
+    if repo is None:
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        body, _ = DefaultAssetLoader().load_skill(name)
+        return body
+
+    return load_external_skill_instructions(name, repo, repo_branch)
+
+
+def run_local_skill(
+    skill_name: str,
     repo_dir: str,
-    instructions: str,
+    git_slug: str,
     use_rhoai_mcp: bool = False,
-    extra_tools: list | None = None,
-) -> None:
-    from langchain.agents import AgentExecutor, create_tool_calling_agent
-    from langchain_community.agent_toolkits import FileManagementToolkit
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_openai import ChatOpenAI
+) -> str | None:
+    """
+    Run a local skill by name against repo_dir.
 
-    llm = ChatOpenAI(
-        model=os.environ["CODE_LLM_ID"],
-        base_url=os.environ["CODE_LLM_API_BASE"],
-        api_key=os.environ["CODE_LLM_TOKEN"],
-    )
-    tools = FileManagementToolkit(
-        root_dir=repo_dir,
-        selected_tools=["read_file", "write_file", "list_directory"],
-    ).get_tools()
-    if extra_tools:
-        tools = tools + extra_tools
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful assistant."),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ]
-    )
-
-    if use_rhoai_mcp:
-        try:
-            from langchain_mcp_adapters.client import MultiServerMCPClient
-
-            async with MultiServerMCPClient(
-                {
-                    "rhoai-mcp": {
-                        "url": os.environ["RHOAI_MCP_BASE_URL"] + "/sse",
-                        "transport": "sse",
-                    }
-                }
-            ) as client:
-                all_tools = tools + client.get_tools()
-                agent = create_tool_calling_agent(llm, all_tools, prompt)
-                await AgentExecutor(agent=agent, tools=all_tools, verbose=True).ainvoke(
-                    {"input": instructions}
-                )
-                return
-        except Exception as exc:
-            logging.warning("Could not load rhoai-mcp tools: %s", exc)
-
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    await AgentExecutor(agent=agent, tools=tools, verbose=True).ainvoke({"input": instructions})
+    Constructs a SkillConfig from skill_name (loading instructions from the asset loader)
+    and delegates to run_skill.
+    Returns the path to the generated report file, or None if no report was written.
+    """
+    return run_skill(SkillConfig(name=skill_name), repo_dir, git_slug, use_rhoai_mcp)
 
 
 def run_skill(
     skill: SkillConfig,
     repo_dir: str,
+    git_slug: str,
     use_rhoai_mcp: bool = False,
 ) -> str | None:
     """
     Run a single skill against repo_dir.
-
-    Returns the path to the generated report file, or None if no report was written.
     """
+    logging.info("Running skill: %s", skill.name)
+
     instructions = load_skill_instructions(skill.name, skill.repo, skill.repo_branch)
-    coro = _run_as_agent(repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp)
+    from utils.tool_utils import get_read_asset_tool, get_register_enrichments_tool
+
+    extra_tools = (
+        [
+            get_read_asset_tool(repo_dir, git_slug),
+            get_register_enrichments_tool(repo_dir, git_slug),
+        ]
+        if skill.repo is None
+        else None
+    )
+    coro = _run_as_agent(
+        repo_dir, instructions, use_rhoai_mcp=use_rhoai_mcp, extra_tools=extra_tools
+    )
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -152,6 +210,7 @@ def run_skill(
 def run_composite_skill(
     repo_dir: str,
     composite_skill: str,
+    git_slug: str,
     use_rhoai_mcp: bool = False,
 ) -> None:
     """
@@ -162,6 +221,7 @@ def run_composite_skill(
     """
     from loaders.default_asset_loader import DefaultAssetLoader
     from tools.skill.skill_tool import get_run_skill_tool
+    from utils.tool_utils import get_register_enrichments_tool
 
     logging.info("Running composite skill: %s", composite_skill)
 
@@ -174,12 +234,13 @@ def run_composite_skill(
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
 
-    skill_tool = get_run_skill_tool(repo_dir, use_rhoai_mcp)
+    skill_tool = get_run_skill_tool(repo_dir, git_slug, use_rhoai_mcp)
+    register_enrichments_tool = get_register_enrichments_tool(repo_dir, git_slug)
     coro = _run_as_agent(
         repo_dir,
         instructions,
         use_rhoai_mcp=use_rhoai_mcp,
-        extra_tools=[skill_tool],
+        extra_tools=[skill_tool, register_enrichments_tool],
     )
     try:
         loop = asyncio.get_running_loop()

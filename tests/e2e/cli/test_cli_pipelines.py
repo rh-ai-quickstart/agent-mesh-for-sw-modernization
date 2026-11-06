@@ -14,8 +14,9 @@ from pathlib import Path
 import pytest
 from kfp_server_api import ApiException
 from urllib3.exceptions import HTTPError
-
-from ui.catalog import git_slug
+from workflows.examples.code_understanding.utils.code_utils import (
+    generate_slug_from_repo as git_slug,
+)
 
 REPO = "https://github.com/agapebondservant/tic-tac-toe-sample"
 BRANCH = "main"
@@ -71,7 +72,15 @@ def _wait_for_run(client, run_id, timeout):
             )
         except (HTTPError, ApiException) as exc:
             status = getattr(exc, "status", None)
-            if isinstance(exc, ApiException) and status not in (0, 408, 429, 500, 502, 503, 504):
+            if isinstance(exc, ApiException) and status not in (
+                0,
+                408,
+                429,
+                500,
+                502,
+                503,
+                504,
+            ):
                 pytest.fail(
                     f"Could not monitor KFP run {run_id}: API returned HTTP {status}. "
                     "Check route access and oc authentication; the pipeline may still be running."
@@ -150,7 +159,12 @@ def _assert_analysis_report(client, namespace, run_id, tmp_path, *, multi_repo=F
 
 def _assert_index(client, namespace, run_id, tmp_path, *, multi_repo=False):
     index_run_id = _artifact_run(
-        client, namespace, "result-directories", "indexing", run_id, multi_repo=multi_repo
+        client,
+        namespace,
+        "result-directories",
+        "indexing",
+        run_id,
+        multi_repo=multi_repo,
     )
     index_path = (
         "results/datasets/repos/multi-repo" if multi_repo else f"results/datasets/repos/{GIT_SLUG}"
@@ -162,7 +176,13 @@ def _assert_index(client, namespace, run_id, tmp_path, *, multi_repo=False):
     }
     import pyarrow.parquet as parquet
 
-    for table in ("entities", "relationships", "text_units", "communities", "community_reports"):
+    for table in (
+        "entities",
+        "relationships",
+        "text_units",
+        "communities",
+        "community_reports",
+    ):
         path = f"{index_path}/{table}.parquet"
         assert path in index_files, f"KFP run {run_id} produced no index table: {path}"
         local_path = client.download_artifacts(index_run_id, path, str(tmp_path))
@@ -201,7 +221,10 @@ def test_analysis_only_pipeline_returns_report(
     run_cli, deployed_kfp_client, deployed_mlflow_client, deployed_namespace, tmp_path
 ):
     run_id = _submit_and_wait(
-        run_cli, deployed_kfp_client, deployed_namespace, "--single-repo --analysis-only"
+        run_cli,
+        deployed_kfp_client,
+        deployed_namespace,
+        "--single-repo --analysis-only",
     )
     _assert_analysis_report(deployed_mlflow_client, deployed_namespace, run_id, tmp_path)
 
@@ -222,7 +245,11 @@ def test_multi_repo_pipeline_creates_report_and_index(
     run_cli, deployed_kfp_client, deployed_mlflow_client, deployed_namespace, tmp_path
 ):
     run_id = _submit_and_wait(
-        run_cli, deployed_kfp_client, deployed_namespace, "--multi-repo", repo_list=REPO_LIST
+        run_cli,
+        deployed_kfp_client,
+        deployed_namespace,
+        "--multi-repo",
+        repo_list=REPO_LIST,
     )
     _assert_analysis_report(
         deployed_mlflow_client, deployed_namespace, run_id, tmp_path, multi_repo=True

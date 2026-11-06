@@ -1,7 +1,129 @@
+import json
 import logging
 import os
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
+
+
+def merge_json_enrichment(base, override, treat_lists_as_singletons: bool = False):
+    """Recursively merges override into base. Delegates to json_utils.merge_json."""
+    from utils.json_utils import merge_json
+
+    return merge_json(base, override, treat_lists_as_singletons)
+
+
+def is_global_scoped_enrichment(path: str) -> bool:
+    """Returns True if the path is global-scoped — i.e., at or under .enrichments/.assets."""
+    parts = os.path.normpath(path).split(os.sep)
+    return any(
+        parts[i] == ".enrichments" and parts[i + 1] == ".assets" for i in range(len(parts) - 1)
+    )
+
+
+def get_global_scoped_enrichment_dir(base_dir: str | None) -> str | None:
+    """Returns the global-scoped enrichments assets directory for base_dir.
+
+    Returns None if base_dir is None.  If base_dir is already the enrichments
+    assets directory (.enrichments/.assets), it is returned unchanged.
+    Otherwise {base_dir}/.enrichments/.assets is returned.
+    """
+    if not base_dir:
+        return None
+    if is_global_scoped_enrichment(base_dir):
+        return base_dir
+    return os.path.join(base_dir, ".enrichments", ".assets")
+
+
+def is_global_scoped_enrichment_tagset(tags: dict) -> bool:
+    """Returns True if tags represent a global-scoped enrichment run
+    (category=enrichments with git_slug explicitly None)."""
+    return (
+        bool(tags)
+        and tags.get("category") == "enrichments"
+        and "git_slug" in tags
+        and tags["git_slug"] is None
+    )
+
+
+def normalize_asset_path(asset_path: str) -> str:
+    """Strip any prefix up to and including assets/ from asset_path if present."""
+
+    _, sep, remainder = asset_path.partition("assets/")
+
+    return remainder if sep else asset_path
+
+
+def load_local_enrichments(download_dir: str, asset_path: str, *, is_dir: bool = False):
+    """Tier 1: check the global-scoped enrichments assets directory on the local filesystem.
+
+    ``download_dir`` is passed to ``get_global_scoped_enrichment_dir`` so callers
+    may pass either the repository root or the assets directory itself.
+
+    Returns resolved content (file) or True (directory) on hit, None on miss.
+    """
+    if not download_dir:
+        return None
+
+    local_path = os.path.join(get_global_scoped_enrichment_dir(download_dir), asset_path)
+
+    if is_dir and os.path.isdir(local_path):
+        logging.debug("Resolved asset dir from local enrichments: %s", local_path)
+        return True
+
+    if not is_dir and os.path.isfile(local_path):
+        logging.debug("Resolved asset from local enrichments: %s", local_path)
+        with open(local_path, "r") as f:
+            content = json.load(f) if local_path.endswith(".json") else f.read()
+        return content
+
+    return None
+
+
+def sync_enrichments(loader, assets_dir: str) -> None:
+    """Downloads global enrichment assets from the store and merges them into assets_dir.
+
+    For each file present in the remote global enrichment store:
+    - Not present locally: copied in, preserving content (e.g. graphrag/, mappings/)
+      across archival cycles.
+    - Present locally and JSON: merged with local as override, remote as base.
+    - Present locally and not JSON: left unchanged.
+
+    Call this before registering global (git_slug=None) enrichments so that
+    previously stored content is not discarded when a new anchor run archives
+    the previous global enrichment run.
+    """
+    import json
+    import shutil
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as seed_dir:
+        seed_assets = get_global_scoped_enrichment_dir(seed_dir)
+        loader.load_results(
+            download_dir=seed_assets,
+            artifact_path=f"{loader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
+        )
+        if not os.path.exists(seed_assets):
+            return
+
+        os.makedirs(assets_dir, exist_ok=True)
+
+        for seed_path in Path(seed_assets).rglob("*"):
+            if not seed_path.is_file():
+                continue
+            rel = seed_path.relative_to(seed_assets)
+            dst = Path(assets_dir) / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+
+            if not dst.exists():
+                shutil.copy2(seed_path, dst)
+            elif seed_path.suffix == ".json":
+                try:
+                    remote = json.loads(seed_path.read_text())
+                    local = json.loads(dst.read_text())
+                    dst.write_text(json.dumps(merge_json_enrichment(remote, local), indent=2))
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
 
 def download_result_directory(
@@ -14,8 +136,8 @@ def download_result_directory(
 ):
     """Downloads a single repo's assets from the backing store to download_dir."""
 
+    from loaders.asset_loader import AssetLoader
     from loaders.default_asset_loader import DefaultAssetLoader
-    from loaders.mlflow_asset_loader import MlFlowAssetLoader
 
     DefaultAssetLoader(namespace=namespace).download_dir(
         asset_dir_path=DefaultAssetLoader.get_log_results_artifact_path(
@@ -24,9 +146,47 @@ def download_result_directory(
             multi_repo=multi_repo,
         ),
         download_dir=download_dir,
-        experiment_name=MlFlowAssetLoader.RESULT_DIRECTORY_ASSET_EXPERIMENT,
+        experiment_name=AssetLoader.RESULT_DIRECTORY_ASSET_EXPERIMENT,
         asset_tags=asset_tags,
     )
+
+
+def download_graphrag_output_directory(
+    graphrag_source_path: str,
+    pipeline_run_id: str,
+    git_repo: str = "",
+    git_branch: str = "",
+    multi_repo: bool = False,
+):
+    """Downloads a previous run's GraphRAG index into graphrag_source_path/output/.
+
+    Fetches the indexing artifact tagged with pipeline_run_id from the backing store
+    and moves it into the expected output/ subdirectory so that downstream analysis
+    can read it as if it had just been generated.
+    """
+    import shutil
+
+    from loaders.default_asset_loader import DefaultAssetLoader
+    from pipelines.base.data_generation import generate_git_slug
+    from utils.graphrag_utils import DependencyAnalyzer
+
+    git_slug = generate_git_slug(git_repo, git_branch) if git_repo else None
+    artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
+        DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+        git_slug=git_slug,
+        multi_repo=multi_repo,
+    )
+    download_dir = os.path.join(graphrag_source_path, os.path.basename(artifact_path))
+    download_result_directory(
+        git_slug=git_slug,
+        download_dir=download_dir,
+        results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+        multi_repo=multi_repo,
+        asset_tags={"pipeline_run_id": pipeline_run_id, "category": "indexing"},
+    )
+    output_dir = os.path.join(graphrag_source_path, "output")
+    shutil.move(download_dir, output_dir)
+    DependencyAnalyzer.prepare_settings(template_dir=output_dir, output_dir=graphrag_source_path)
 
 
 def download_code_metadata_directories(git_repos: list, parent_target_path: str):

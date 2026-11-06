@@ -63,7 +63,9 @@ def test_analysis_offers_the_same_indexed_repositories_as_chat(page: Page) -> No
         expect(page.locator("#run-analysis")).to_be_disabled()
 
 
-def test_analysis_and_chat_keep_independent_selections_after_refresh(page: Page) -> None:
+def test_analysis_and_chat_keep_independent_selections_after_refresh(
+    page: Page,
+) -> None:
     page.locator('.cu-tabs button[data-tab="analysis"]').click()
     expect(page.locator("#analysis-loading")).to_be_hidden()
     options = page.locator("#analysis-repo option")
