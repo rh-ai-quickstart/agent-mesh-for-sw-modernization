@@ -193,7 +193,10 @@ def _extract_bundle(bundle: Path, directory: Path, max_bytes: int) -> None:
                 target.mkdir(parents=True, exist_ok=True)
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with archive.extractfile(member) as source, target.open("xb") as destination:
+                with (
+                    archive.extractfile(member) as source,
+                    target.open("xb") as destination,
+                ):
                     shutil.copyfileobj(source, destination)
 
 
@@ -383,7 +386,9 @@ class IndexTransfer:
             with tarfile.open(archive_path, "w:gz") as archive:
                 for path in sorted(directory.rglob("*")):
                     archive.add(
-                        path, arcname=path.relative_to(directory).as_posix(), recursive=False
+                        path,
+                        arcname=path.relative_to(directory).as_posix(),
+                        recursive=False,
                     )
             if archive_path.stat().st_size > self.max_bytes:
                 raise IndexTransferError("Compressed bundle exceeds the 5 GiB transfer limit")
@@ -493,4 +498,8 @@ class IndexTransfer:
             except Exception:
                 self.client.set_terminated(destination_id, "FAILED")
                 raise
-            return {**result, "outcome": "imported", "destination_run_id": destination_id}
+            return {
+                **result,
+                "outcome": "imported",
+                "destination_run_id": destination_id,
+            }

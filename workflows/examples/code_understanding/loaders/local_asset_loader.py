@@ -46,7 +46,7 @@ class LocalAssetLoader(AssetLoader):
 
                 with open(dest_file, "w") as f:
 
-                    json.dump(content, f) if asset_uri.endswith(".json") else f.write(content)
+                    (json.dump(content, f) if asset_uri.endswith(".json") else f.write(content))
 
             return content
 
@@ -72,13 +72,21 @@ class LocalAssetLoader(AssetLoader):
 
             shutil.copytree(source_dir, download_dir, dirs_exist_ok=True)
 
+            return True
+
         except Exception as e:
 
             logging.error(f"Error downloading asset directory {asset_dir_path}: {e}")
 
             raise e
 
-    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+    def load_results(
+        self,
+        download_dir: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        git_slug: str | None = None,
+    ):
         """No-op. Local results are already on disk and require no download step."""
         pass
 
@@ -94,8 +102,12 @@ class LocalAssetLoader(AssetLoader):
             with open(results_path, "w") as f:
                 f.write(content)
 
-    def log_static_asset(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    def register_static_asset(
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
         """Delegates to log_results; no experiment distinction for local storage."""
         self.log_results(results_path, artifact_path, tags, content)
@@ -133,6 +145,38 @@ class LocalAssetLoader(AssetLoader):
 
         body, meta = self._get_prompt_body_and_metadata(raw)
         return Template(body).render(**kwargs), meta
+
+    def register_enrichments(
+        self,
+        repo_dir: str | None = None,
+        git_slug: str | None = None,
+        enrichment_files: dict | None = None,
+    ) -> str:
+        """Ensures the enrichments directory exists. No remote upload for local storage."""
+        if repo_dir is None:
+            return "Logged enrichments (local no-op)"
+        enrichments_dir = os.path.join(repo_dir, ".enrichments")
+        os.makedirs(enrichments_dir, exist_ok=True)
+        return f"Logged enrichments from {enrichments_dir}"
+
+    def log_repos(self, run_repos: list) -> None:
+        """No-op. Local mode has no backing store; register_enrichments is in-memory only."""
+        pass
+
+    def load_run_repos(self, run_id: str | None = None) -> list:
+        """Returns the repo list from GIT_REPO_LIST_CONTENTS (local mode has no backing store)."""
+        import json
+
+        return json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]")
+
+    def load_catalog_repos(self) -> list:
+        """Returns the repo catalog from the local asset store, falling back to
+        GIT_REPO_LIST_CONTENTS."""
+        import json
+
+        return self.download("repos/repo_list.json") or json.loads(
+            os.getenv("GIT_REPO_LIST_CONTENTS", "[]") or "[]"
+        )
 
     def num_prompts(self, prompt_prefix: str) -> int:
         """Returns the number of .txt files directly under the prefixed prompts directory."""

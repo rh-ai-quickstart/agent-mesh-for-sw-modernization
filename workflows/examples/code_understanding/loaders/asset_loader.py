@@ -9,13 +9,20 @@ class AssetLoader(ABC):
     _ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
     _PROMPTS_DIR = os.path.join(_ASSETS_DIR, "prompts")
 
+    ENRICHMENTS_DIR = ".enrichments"
+
     RESULTS_PATH_PREFIX_EVAL = "results/evaluations"
     RESULTS_PATH_PREFIX_PIPELINES = "results/pipelines"
     RESULTS_PATH_PREFIX_ADHOC_QUERIES = "results/adhoc_queries"
     RESULTS_PATH_PREFIX_METADATA = "results/metadata"
-    RESULTS_PATH_PREFIX_ENRICHMENTS = "results/enrichments"
+    RESULTS_PATH_PREFIX_ENRICHMENTS = f"results/{ENRICHMENTS_DIR}"
     RESULTS_PATH_PREFIX_VISUALIZATIONS = "results/visualizations"
     RESULTS_PATH_PREFIX_REPO_DATASETS = "results/datasets/repos"
+
+    _MLFLOW_NS = os.environ.get("MLFLOW_NAMESPACE", os.environ.get("KFP_NAMESPACE", "demo"))
+    STATIC_ASSET_EXPERIMENT = f"{_MLFLOW_NS}/code-refactoring/assets/static"
+    RESULT_DIRECTORY_ASSET_EXPERIMENT = f"{_MLFLOW_NS}/code-refactoring/assets/result-directories"
+    RESULT_ASSET_EXPERIMENT = f"{_MLFLOW_NS}/code-refactoring/assets/results"
 
     @abstractmethod
     def load_skill(self, name: str) -> tuple[str, dict]:
@@ -78,13 +85,20 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+    def load_results(
+        self,
+        download_dir: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        git_slug: str | None = None,
+    ):
         """Downloads previously logged results to download_dir.
 
         Args:
             download_dir: Local directory path to download results into.
             artifact_path: Subdirectory within the run's artifact store to download from.
             tags: Optional key-value tags to filter which run to download from.
+            git_slug: Optional repository slug passed to the underlying download_dir call.
         """
 
     @abstractmethod
@@ -106,8 +120,12 @@ class AssetLoader(ABC):
         """
 
     @abstractmethod
-    def log_static_asset(
-        self, results_path: str, artifact_path: str = None, tags: dict = None, content: str = None
+    def register_static_asset(
+        self,
+        results_path: str,
+        artifact_path: str = None,
+        tags: dict = None,
+        content: str = None,
     ):
         """Logs an artifact to the static asset store (same experiment as ``download``).
 
@@ -149,6 +167,65 @@ class AssetLoader(ABC):
 
         Returns:
             Tuple of (rendered prompt string, frontmatter metadata dict).
+        """
+
+    @abstractmethod
+    def register_enrichments(
+        self,
+        repo_dir: str | None = None,
+        git_slug: str | None = None,
+        enrichment_files: dict | None = None,
+    ) -> str:
+        """Persists the enrichments directory to the pipeline asset store.
+
+        Args:
+            repo_dir: Root of the cloned repository; .enrichments/ is derived from this path.
+                When None, a temporary directory is created internally.
+            git_slug: Optional repository slug used to namespace the artifact path and tags.
+            enrichment_files: Optional mapping of relative paths to content to write into
+                .enrichments/.assets/ before registering (e.g. {"repos/repo_list.json": [...]}).
+
+        Returns:
+            A message describing what was logged.
+        """
+
+    @abstractmethod
+    def log_repos(self, run_repos: list) -> None:
+        """Persists the repository list to the asset store.
+
+        Implementations must first invoke ``register_enrichments`` to write
+        ``repos/repo_list.json`` into the enrichments store, then apply any
+        backend-specific logic (e.g. writing under category: repositories).
+
+        Args:
+            run_repos: Repositories associated with the current pipeline run (each dict
+                has git_repo and git_branch keys).
+        """
+
+    @abstractmethod
+    def load_run_repos(self, run_id: str | None = None) -> list:
+        """Loads the repository list from the asset store, falling back to GIT_REPO_LIST_CONTENTS.
+
+        Args:
+            run_id: Optional pipeline run identifier to scope the lookup. In KFP
+                this is the ``ARGO_WORKFLOW_UID`` of the run. When omitted,
+                ``get_pipeline_run_id()`` is used.
+
+        Returns:
+            List of repository dicts.
+        """
+
+    @abstractmethod
+    def load_catalog_repos(self) -> list:
+        """Downloads the full repo catalog, trying enrichments first and falling back to
+        static assets.
+
+        Resolution order:
+        1. Enrichments (``RESULT_DIRECTORY_ASSET_EXPERIMENT``) — written by ``log_repos``.
+        2. Static asset (``STATIC_ASSET_EXPERIMENT``) — fallback.
+
+        Returns:
+            List of repository dicts, or an empty list if neither source is available.
         """
 
     @abstractmethod

@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 
@@ -14,8 +13,12 @@ def generate_graphrag_index(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Generates a GraphRAG index from the provided codebase."""
+    if pipeline_run_id:
+        return
+
     import json
     import logging
     import os
@@ -27,7 +30,7 @@ def generate_graphrag_index(
     from loaders.default_asset_loader import DefaultAssetLoader
     from pipelines.base.data_generation import generate_git_slug
     from pipelines.graphrag import run_graphrag
-    from utils.graphrag_utils import DependencyAnalyzer
+    from utils.graphrag_utils import DependencyAnalyzer, is_empty_dir
 
     tracemalloc.start()
 
@@ -40,6 +43,12 @@ def generate_graphrag_index(
     status = "fail"
 
     try:
+
+        if is_empty_dir(codebase_path):
+            raise ValueError(
+                f"Codebase directory '{codebase_path}' is empty — data generation likely failed "
+                "(check generate-code-and-meta-op pod logs)."
+            )
 
         logging.info("Starting process...")
 
@@ -77,7 +86,11 @@ def generate_graphrag_index(
         DefaultAssetLoader().log_results(
             f"{graphrag_source_path}/output",
             artifact_path=artifact_path,
-            tags={"git_slug": git_slug, "category": "indexing", "multi_repo": multi_repo},
+            tags={
+                "git_slug": git_slug,
+                "category": "indexing",
+                "multi_repo": multi_repo,
+            },
         )
 
         status = "success"
@@ -111,15 +124,26 @@ def generate_graphrag_index(
                 multi_repo=multi_repo,
             ),
             content=json.dumps(result),
-            tags={"git_slug": git_slug, "category": "indexing", "multi_repo": multi_repo},
+            tags={
+                "git_slug": git_slug,
+                "category": "indexing",
+                "multi_repo": multi_repo,
+            },
         )
 
 
 @enable_telemetry
 def evaluate_graphrag_index(
-    graphrag_source_path: str, git_repo: str, git_branch: str, multi_repo: bool = False
+    graphrag_source_path: str,
+    git_repo: str,
+    git_branch: str,
+    multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Evaluates a GraphRAG index using DefaultCustomEvaluator.evaluate_with_dataset."""
+    if pipeline_run_id:
+        return None
+
     import logging
     import os
 
@@ -141,7 +165,7 @@ def evaluate_graphrag_index(
 
     except Exception as e:
 
-        logging.warning(f"GraphRAG index evaluation failed: {e}")
+        logging.warning(f"GraphRAG index evaluation failed: {e}", exc_info=True)
 
 
 ##############################################################################
@@ -210,7 +234,7 @@ class IndexingPipeline:
 
             except Exception as e:
 
-                logging.warning(f"GraphRAG index evaluation failed: {e}")
+                logging.warning(f"GraphRAG index evaluation failed: {e}", exc_info=True)
 
         return {
             "codebase_path": codebase_path,
@@ -219,11 +243,20 @@ class IndexingPipeline:
             "fail_message": "",
         }
 
-    def run_multi_repo(self, parent_target_path: str, graphrag_source_path: str = None):
+    def run_multi_repo(
+        self,
+        parent_target_path: str,
+        graphrag_source_path: str = None,
+        pipeline_run_id: str = "",
+    ):
         """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
+        if pipeline_run_id:
+            return
+
         import logging
         import os
 
+        from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_code_metadata_directories
 
         logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -233,14 +266,7 @@ class IndexingPipeline:
                 "KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source"
             )
 
-        if kfp_run_id := os.getenv("KFP_RUN_ID"):
-            from services.get_repo_list import get_multi_repo_list
-
-            # Use the same per-run selection as data generation. The environment
-            # list is a local-run default and may name entirely different repos.
-            git_repos = get_multi_repo_list(kfp_run_id)
-        else:
-            git_repos = json.loads(os.getenv("GIT_REPO_LIST_CONTENTS")) or []
+        git_repos = DefaultAssetLoader().load_run_repos()
 
         download_code_metadata_directories(git_repos, parent_target_path)
 

@@ -31,6 +31,8 @@ unexport CLUSTER_DOMAIN GATEWAY_HOST
 PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
+PIPELINE_RUN_ID     	?=
+OBJECT_STORE_BACKEND   ?= s4
 DEPLOY_EMBEDDING_MODEL ?= false
 DEPLOY_OTEL            ?= false
 # When false, install assumes the project namespace already exists and is
@@ -112,6 +114,7 @@ SECRET_ENV_VARS := \
 	GIT_USERNAME GIT_TOKEN GIT_REPO GIT_BRANCH GIT_REPO_LIST \
 	GRAPHRAG_LLM_TOKEN GRAPHRAG_LLM_ID GRAPHRAG_LLM_API_BASE \
 	GRAPHRAG_LLM_PROVIDER GRAPHRAG_LLM_PROVIDER_SETTINGS_XML \
+	GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY \
 	EMBED_LLM_TOKEN EMBED_LLM_API_BASE EMBED_LLM_ID \
 	EMBED_LLM_PROVIDER EMBED_LLM_PROVIDER_SETTINGS_XML \
 	GROUND_TRUTH_LLM_TOKEN GROUND_TRUTH_LLM_ID GROUND_TRUTH_LLM_API_BASE \
@@ -127,7 +130,9 @@ SECRET_ENV_VARS := \
 	KFP_DATA_GENERATION_BASE_IMAGE_TAG KFP_INDEXING_BASE_IMAGE_TAG \
 	KFP_ANALYSIS_BASE_IMAGE_TAG KFP_PIPELINE_TOOLS_IMAGE_TAG CONSOLE_IMAGE_TAG \
 	MLFLOW_TRACKING_URI MLFLOW_TRACKING_INSECURE_TLS MLFLOW_TRACKING_AUTH \
+	RHOAI_MLFLOW_COST_MONITORING_ENABLED \
 	ASSET_LOADER INSTALL_PREBUILT_INDEX CUSTOM_EVALUATOR LOGLEVEL \
+	ALLOW_DYNAMIC_LANGUAGE_SUPPORT \
 	OTEL_SERVICE_NAME OTEL_NAMESPACE OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER \
 	MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT OTEL_SEMCONV_STABILITY_OPT_IN
 
@@ -173,7 +178,8 @@ CONSOLE_PLUGIN_IMAGE = $(BUILD_REGISTRY)/$(CONSOLE_PLUGIN_IMAGE_NAME):$(or $(VER
 
 HELM_REPO_ARGS = \
 	--set "repoUrl=$(GIT_REPO_URL)" \
-	--set "repoRef=$(GIT_REPO_BRANCH)"
+	--set "repoRef=$(GIT_REPO_BRANCH)" \
+	--set "objectStoreBackend=$(OBJECT_STORE_BACKEND)"
 HELM_WORKFLOW_IMAGE_ARGS = \
 	--set "dataGeneration.image.registry=$(KFP_IMAGE_REGISTRY)" \
 	--set "dataGeneration.image.name=$(KFP_DATA_GENERATION_BASE_IMAGE_NAME)" \
@@ -317,7 +323,8 @@ help-all:
 	@echo "Testing:"
 	@echo "  test-all                    Run API, UI unit, Playwright, workflow, index transfer, and release tests"
 	@echo "  test-api                    Run API route and service tests"
-	@echo "  test-ui-unit                Run console API and unit tests"
+	@echo "  test-ui-unit                Run UI unit tests"
+	@echo "  test-ui-downloads           Run UI download/upload tests"
 	@echo "  test-playwright             Test UI submissions with mocked APIs (no cluster)"
 	@echo "  test-workflows              Run workflow pipeline tests"
 	@echo "  test-release                Check release version reading and bumps"
@@ -389,9 +396,11 @@ help-all:
 	@echo "  DEPLOY_EMBEDDING_MODEL      Deploy e5-mistral during install (default: false)"
 	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  MANAGE_NAMESPACE           Create namespace and apply metadata (default: true; false for pre-provisioned namespaces)"
+	@echo "  OBJECT_STORE_BACKEND        Object store backend: s4 (default) or minio"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
+	@echo "  PIPELINE_RUN_ID             KFP run ID of a previous run (required for --analysis-only)"
 	@echo "  ARGS                        Arguments passed to run-pipelines"
 	@echo "  KFP_NAMESPACE               Namespace used for this project"
 	@echo "  INDEX_GIT_SLUG              Export the latest completed single-repository index"
@@ -470,7 +479,9 @@ install: _install-preflight
 		--set "mlflowGatewayHost=$(GATEWAY_HOST)" \
 		--set imageStreams.enabled=false \
 		--set deployNotebooks=true \
-		--set otel.enabled=false; \
+		--set otel.enabled=false \
+		--set rhoaiMcp.enabled=$${RHOAI_MCP_ENABLED:-false} \
+		--set rhoaiMcp.image="$${RHOAI_MCP_IMAGE:-}"; \
 	if [ "$(DEPLOY_OTEL)" = "true" ] && \
 	   [ -n "$(OTEL_NAMESPACE)" ] && [ -n "$(OTEL_SERVICE_NAME)" ] && \
 	   oc get crd opentelemetrycollectors.opentelemetry.io >/dev/null 2>&1 && \
@@ -650,15 +661,11 @@ apply-secrets:
 			-p "{\"stringData\":{\"MLFLOW_TRACKING_URI\":\"https://$(GATEWAY_HOST)/mlflow\"}}"; \
 	fi && \
 	if [ "$${RHOAI_MCP_ENABLED:-false}" = "true" ]; then \
-		echo "==> Patching RHOAI_MCP_BASE_URL from rhoai-mcp Route..." && \
-		RHOAI_MCP_HOST=$$(oc get route rhoai-mcp -n $$KFP_NAMESPACE -o jsonpath='{.spec.host}' 2>/dev/null) && \
-		if [ -n "$$RHOAI_MCP_HOST" ]; then \
-			oc patch secret code-understanding-env -n $$KFP_NAMESPACE \
-				--type=merge \
-				-p "{\"stringData\":{\"RHOAI_MCP_BASE_URL\":\"https://$$RHOAI_MCP_HOST\"}}"; \
-		else \
-			echo "WARNING: rhoai-mcp route not found or has no host, skipping RHOAI_MCP_BASE_URL patch"; \
-		fi; \
+		RHOAI_MCP_HOST="rhoai-mcp-$(KFP_NAMESPACE).$(CLUSTER_DOMAIN)" && \
+		echo "==> Patching RHOAI_MCP_BASE_URL with auto-generated hostname: $$RHOAI_MCP_HOST" && \
+		oc patch secret code-understanding-env -n $(KFP_NAMESPACE) \
+			--type=merge \
+			-p "{\"stringData\":{\"RHOAI_MCP_BASE_URL\":\"https://$$RHOAI_MCP_HOST\"}}"; \
 	fi
 
 # ============================================================================
@@ -753,8 +760,12 @@ test-api:
 	uv run --project . --group test --frozen pytest tests/unit/api
 
 test-ui-unit:
-	@echo "==> Running UI tests..."
+	@echo "==> Running UI unit tests..."
 	uv run --project . --group test --frozen pytest tests/unit/ui
+
+test-ui-downloads:
+	@echo "==> Running UI download/upload tests..."
+	PYTHONPATH=ui uv run --project . --group test --frozen pytest ui/tests
 
 test-workflows:
 	@echo "==> Running workflow pipeline tests..."
@@ -765,7 +776,7 @@ test-release:
 	@echo "==> Running release tests..."
 	uv run --project . --group test --frozen pytest tests/unit/release
 
-test-all: test-api test-ui-unit test-playwright test-workflows test-index-transfer test-release
+test-all: test-api test-ui-unit test-ui-downloads test-playwright test-workflows test-index-transfer test-release
 
 test-ui-install:
 	@echo "==> Installing Playwright and Chromium for UI smoke tests..."
@@ -811,18 +822,18 @@ test-index-transfer:
 
 format:
 	@echo "==> Sorting Python imports with isort..."
-	uv run --project . --group lint --frozen isort --skip-glob '*/.venv/*' .
+	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' .
 	@echo "==> Formatting Python code with Black..."
-	uv run --project . --group lint --frozen black --extend-exclude '/\.venv/' .
+	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' .
 	@echo "==> Formatting completed successfully."
 
 lint:
 	@echo "==> Running Flake8..."
-	uv run --project . --group lint --frozen flake8 --extend-exclude=.venv --max-line-length=99 --extend-ignore=E203,W503 .
+	uv run --project . --group lint --frozen flake8 --extend-exclude=.venv,temp --max-line-length=99 --extend-ignore=E203,W503 .
 	@echo "==> Checking Python formatting with Black..."
-	uv run --project . --group lint --frozen black --extend-exclude '/\.venv/' --check --diff .
+	uv run --project . --group lint --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/|/temp/' --check --diff .
 	@echo "==> Checking Python import sorting with isort..."
-	uv run --project . --group lint --frozen isort --skip-glob '*/.venv/*' --check-only --diff .
+	uv run --project . --group lint --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' --skip-glob '*/temp/*' --check-only --diff .
 	@echo "==> Lint checks completed successfully."
 
 # ============================================================================
@@ -1139,6 +1150,16 @@ run-pipelines:
 	if [ -n "$(PIPELINE_GIT_BRANCH)" ]; then \
 		oc patch secret code-understanding-env -n $(KFP_NAMESPACE) \
 			--type=merge -p '{"stringData":{"GIT_BRANCH":"$(PIPELINE_GIT_BRANCH)"}}'; \
+	fi; \
+	if [ -n "$(PIPELINE_RUN_ID)" ]; then \
+		oc patch secret code-understanding-env -n $(KFP_NAMESPACE) \
+			--type=merge -p '{"stringData":{"PIPELINE_RUN_ID":"$(PIPELINE_RUN_ID)"}}'; \
+	fi; \
+	if [ -n "$(PIPELINE_GIT_REPO_LIST)" ]; then \
+		[ -f "$(PIPELINE_GIT_REPO_LIST)" ] || { echo "Error: PIPELINE_GIT_REPO_LIST file not found: $(PIPELINE_GIT_REPO_LIST)" >&2; exit 1; }; \
+		echo "==> Injecting repo list from $(PIPELINE_GIT_REPO_LIST) into secret..."; \
+		oc set data secret/code-understanding-env -n $(KFP_NAMESPACE) \
+			--from-file=GIT_REPO_LIST_CONTENTS="$(PIPELINE_GIT_REPO_LIST)"; \
 	fi; \
 	echo "==> Submitting run-pipelines job..."; \
 	oc delete job run-pipelines -n $(KFP_NAMESPACE) --ignore-not-found=true \

@@ -13,7 +13,11 @@ def test_log_results_tags_kfp_run(monkeypatch, tmp_path):
     observed = {}
 
     monkeypatch.setenv("KFP_RUN_ID", "selected-kfp")
-    monkeypatch.setattr(mlflow_asset_loader, "MlflowClient", lambda: object())
+    monkeypatch.delenv("_AGENTMESH_PIPELINE_RUN_ID", raising=False)
+    from utils import pipeline_utils
+
+    monkeypatch.setattr(pipeline_utils, "get_pipeline_run_id", lambda: "")
+    monkeypatch.setattr(mlflow_asset_loader.mlflow.tracking, "MlflowClient", lambda: object())
     monkeypatch.setattr(
         mlflow_asset_loader.MlFlowAssetLoader,
         "get_or_create_experiment_by_name",

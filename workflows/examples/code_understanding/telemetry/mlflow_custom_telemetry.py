@@ -30,7 +30,10 @@ class MlFlowCustomTelemetry(CustomTelemetry):
     def track(self):
         import litellm
 
-        from .telemetry_litellm.mlflow_token_logger import MlflowTokenLogger
+        from .telemetry_litellm.mlflow_token_logger import (
+            MlflowTokenLogger,
+            get_mlflow_callback,
+        )
 
         tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 
@@ -41,19 +44,13 @@ class MlFlowCustomTelemetry(CustomTelemetry):
 
         mlflow.set_experiment(self._DEFAULT_EXPERIMENT_NAME)
 
-        try:
-            mlflow.openai.autolog()
-            logging.info("Mlflow tracking registered successfully")
-        except Exception as e:
-            logging.error(f"mlflow.openai.autolog() failed: {e}")
-
         counter = MlflowTokenLogger(self._DEFAULT_EXPERIMENT_NAME)
-        litellm.callbacks = ["mlflow", counter]
+        litellm.callbacks = [counter, get_mlflow_callback()]
 
         atexit.register(counter.finalize)
 
     @staticmethod
-    def get_token_usage(kfp_run_id: str) -> dict:
+    def get_token_usage(pipeline_run_id: str) -> dict:
         from mlflow.tracking import MlflowClient
 
         try:
@@ -64,7 +61,7 @@ class MlFlowCustomTelemetry(CustomTelemetry):
                 return {}
             runs = client.search_runs(
                 experiment_ids=[experiment.experiment_id],
-                filter_string=f"tags.kfp_run_id = '{kfp_run_id}'",
+                filter_string=f"tags.pipeline_run_id = '{pipeline_run_id}'",
             )
             totals: dict[str, int] = {}
             for run in runs:
@@ -72,6 +69,9 @@ class MlFlowCustomTelemetry(CustomTelemetry):
                     val = run.data.metrics.get(key)
                     if val is not None:
                         totals[key] = totals.get(key, 0) + int(val)
+                cost = run.data.metrics.get("cost_usd")
+                if cost is not None:
+                    totals["cost_usd"] = totals.get("cost_usd", 0.0) + cost
             return totals
         except Exception:
             return {}

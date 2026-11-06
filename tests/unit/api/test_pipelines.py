@@ -1,5 +1,6 @@
 """Console pipeline routing without submitting cluster runs."""
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -21,23 +22,23 @@ def client():
 
 
 @pytest.mark.parametrize(
-    "body, pipeline_name, expected_repo_list, analysis_only",
+    "body, pipeline_name, pipeline_run_id",
     [
-        ({"repos": [REPO]}, "single_repo", None, False),
-        ({"repos": [REPO, SECOND_REPO]}, "multi_repo", [REPO, SECOND_REPO], False),
-        ({"repos": [REPO], "analysis_only": True}, "single_repo", None, True),
-        ({"analysis_only": True, "multi_repo": True}, "multi_repo", None, True),
+        ({"repos": [REPO]}, "single_repo", ""),
+        ({"repos": [REPO, SECOND_REPO]}, "multi_repo", ""),
+        ({"repos": [REPO], "pipeline_run_id": "prev-run"}, "single_repo", "prev-run"),
+        ({"repos": [REPO, SECOND_REPO], "pipeline_run_id": "prev-run"}, "multi_repo", "prev-run"),
     ],
 )
 def test_pipeline_requests_route_to_existing_pipelines(
-    client, monkeypatch, body, pipeline_name, expected_repo_list, analysis_only
+    client, monkeypatch, body, pipeline_name, pipeline_run_id
 ):
     calls = []
     monkeypatch.setenv("PARENT_SOURCE_PATH", "sources")
     monkeypatch.setenv("PARENT_TARGET_PATH", "targets")
 
-    def trigger(name, run_name, params, *, repos, namespace):
-        calls.append((name, run_name, params, repos, namespace))
+    def trigger(name, run_name, params, *, namespace, enable_caching):
+        calls.append((name, run_name, params, namespace, enable_caching))
         return SimpleNamespace(run_id="new-run")
 
     monkeypatch.setattr(pipeline_service, "_trigger_run", trigger)
@@ -45,20 +46,22 @@ def test_pipeline_requests_route_to_existing_pipelines(
     response = client.post("/api/v2/pipelines", json=body)
 
     assert response.status_code == 200
-    name, run_name, params, repo_list, namespace = calls[0]
+    name, run_name, params, namespace, enable_caching = calls[0]
     assert name == pipeline_name
-    assert repo_list == expected_repo_list
     assert namespace == "selected-namespace"
-    expected_params = {"parent_source_path": "sources", "parent_target_path": "targets"}
+    assert enable_caching == bool(pipeline_run_id)
+    assert run_name.startswith(f"{pipeline_name}_")
+
+    expected_params = {
+        "pipeline_run_id": pipeline_run_id,
+        "parent_source_path": "sources",
+        "parent_target_path": "targets",
+    }
     if pipeline_name == "single_repo":
         expected_params.update(REPO)
-    if analysis_only:
-        expected_params["analysis_only"] = True
-        assert params["analysis_only"] is True
-        assert run_name.startswith(f"{pipeline_name}_analysis_")
     else:
-        assert run_name.startswith(f"{pipeline_name}_")
-        assert "_analysis_" not in run_name
+        expected_params["repos"] = json.dumps(body["repos"])
+
     assert params == expected_params
     assert response.json() == {
         "job_id": "new-run",
@@ -71,12 +74,8 @@ def test_pipeline_requests_route_to_existing_pipelines(
     "body",
     [
         {},
-        {"multi_repo": True, "repos": [REPO, SECOND_REPO]},
-        {"analysis_only": True},
-        {"analysis_only": True, "repos": [REPO, SECOND_REPO]},
-        {"analysis_only": True, "repos": [{"git_repo": ""}]},
-        {"analysis_only": True, "repos": [{"git_repo": "   "}]},
-        {"analysis_only": True, "multi_repo": True, "repos": [REPO]},
+        {"repos": []},
+        {"pipeline_run_id": "some-run"},
     ],
 )
 def test_invalid_pipeline_requests_are_rejected_before_submission(client, monkeypatch, body):
@@ -91,13 +90,13 @@ def test_invalid_pipeline_requests_are_rejected_before_submission(client, monkey
     assert response.json()["detail"]
 
 
-def test_analysis_submission_failure_returns_error(client, monkeypatch):
+def test_pipeline_submission_failure_returns_error(client, monkeypatch):
     def unavailable(*args, **kwargs):
         raise RuntimeError("Pipeline service unavailable")
 
     monkeypatch.setattr(pipeline_service, "_trigger_run", unavailable)
 
-    response = client.post("/api/v2/pipelines", json={"repos": [REPO], "analysis_only": True})
+    response = client.post("/api/v2/pipelines", json={"repos": [REPO]})
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Pipeline service unavailable"
@@ -118,7 +117,7 @@ def test_pipeline_status_passes_selected_run_id_to_report_lookup(monkeypatch):
     monkeypatch.setattr(
         pipeline_service,
         "_fetch_reports",
-        lambda git_slug, multi_repo, kfp_run_id: seen.append(kfp_run_id) or (None, "report"),
+        lambda job_id, git_slug, multi_repo: seen.append(job_id) or (None, "report"),
     )
 
     status = pipeline_service.get_run_status("selected-kfp")

@@ -63,7 +63,13 @@ def test_prebuilt_bundle_has_portable_metadata_and_anonymous_tar_headers(tmp_pat
     transfer._require_index(files, index_path)
     with tarfile.open(PREBUILT_BUNDLE, "r:gz") as archive:
         for member in archive:
-            assert (member.uid, member.gid, member.uname, member.gname, member.mtime) == (
+            assert (
+                member.uid,
+                member.gid,
+                member.uname,
+                member.gname,
+                member.mtime,
+            ) == (
                 0,
                 0,
                 "",
@@ -140,7 +146,11 @@ def write_bundle(path, metadata=None, entries=None):
         member.size = len(content)
         archive.addfile(member, io.BytesIO(content))
         for name, body, kind in entries or [
-            ("artifacts/results/datasets/repos/owner-repo-main/entities.parquet", b"data", None)
+            (
+                "artifacts/results/datasets/repos/owner-repo-main/entities.parquet",
+                b"data",
+                None,
+            )
         ]:
             member = tarfile.TarInfo(name)
             member.size = len(body)
@@ -165,7 +175,12 @@ def test_latest_selection_order_and_combined_run_id():
     client = fake_client([combined, *runs])
     wrapper = transfer.IndexTransfer(client, "source")
     indexes = wrapper.list_indexes()["indexes"]
-    assert [item["run_id"] for item in indexes] == ["combined", "a-tie", "z-tie", "older"]
+    assert [item["run_id"] for item in indexes] == [
+        "combined",
+        "a-tie",
+        "z-tie",
+        "older",
+    ]
     assert [item["latest"] for item in indexes] == [True, True, False, False]
     assert wrapper._select("owner-repo-main", None)["run_id"] == "a-tie"
     client.get_run.return_value = combined
@@ -272,7 +287,9 @@ def test_missing_artifacts_and_source_export_failure(tmp_path, monkeypatch):
     with pytest.raises(transfer.IndexTransferError, match="Missing or empty"):
         wrapper.export_index(run_id="source-id", bundle=bundle)
     monkeypatch.setattr(
-        wrapper, "_remote_files", lambda _: {f"{transfer.INDEX_ROOT}/owner-repo-main/file": 4}
+        wrapper,
+        "_remote_files",
+        lambda _: {f"{transfer.INDEX_ROOT}/owner-repo-main/file": 4},
     )
     exporter = MagicMock(return_value=None)
     package_stub(monkeypatch, exporter=exporter)
@@ -290,7 +307,9 @@ def test_missing_artifacts_and_source_export_failure(tmp_path, monkeypatch):
 def test_existing_export_is_not_overwritten(tmp_path, monkeypatch):
     wrapper = transfer.IndexTransfer(fake_client(), "source")
     monkeypatch.setattr(
-        wrapper, "_remote_files", lambda _: {f"{transfer.INDEX_ROOT}/owner-repo-main/file": 4}
+        wrapper,
+        "_remote_files",
+        lambda _: {f"{transfer.INDEX_ROOT}/owner-repo-main/file": 4},
     )
     bundle = tmp_path / "existing.tar.gz"
     bundle.write_bytes(b"original")
@@ -445,7 +464,8 @@ def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
         source_id = source.info.run_id
         client.log_param(source_id, "embedding_model", "test-model")
         client.log_batch(
-            source_id, metrics=[Metric("count", 1.5, 1100, 0), Metric("count", 2.5, 1200, 1)]
+            source_id,
+            metrics=[Metric("count", 1.5, 1100, 0), Metric("count", 2.5, 1200, 1)],
         )
         client.log_artifacts(source_id, str(source_tree))
         client.set_terminated(source_id, "FINISHED", end_time=2000)

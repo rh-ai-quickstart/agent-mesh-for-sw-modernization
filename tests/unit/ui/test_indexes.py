@@ -62,6 +62,8 @@ def test_discovery_keeps_newest_run_for_slug(discovered_runs):
             "run_id": "new",
             "git_slug": "acme-widget-main",
             "multi_repo": False,
+            "uploaded": True,
+            "kfp_run_id": "",
             "indexed_at": "2023-11-14T22:13:21+00:00",
         }
     ]
@@ -79,7 +81,10 @@ def test_discovery_skips_invalid_single_repository_slugs(discovered_runs, slug):
 
 def test_discovered_indexes_remain_available_to_analysis_and_chat(discovered_runs):
     discovered_runs.extend(
-        [make_run(uploaded="true"), make_run("combined", git_slug="", multi_repo="true")]
+        [
+            make_run(uploaded="true"),
+            make_run("combined", git_slug="", multi_repo="true"),
+        ]
     )
     repo = {"git_repo": "https://github.com/acme/widget", "git_branch": "main"}
     unindexed_repo = {"git_repo": "https://github.com/acme/other", "git_branch": "main"}
@@ -89,12 +94,19 @@ def test_discovered_indexes_remain_available_to_analysis_and_chat(discovered_run
 
     assert [item["run_id"] for item in data["indexes"]] == ["run-1", "combined"]
     assert options == [
-        {**repo, "label": "widget @ main", "key": f"{repo['git_repo']}|main", "use_global": False},
+        {
+            **repo,
+            "label": "widget @ main",
+            "key": f"{repo['git_repo']}|main",
+            "use_global": False,
+            "kfp_run_id": "",
+        },
         {
             "git_repo": "",
             "git_branch": "main",
             "label": "Combined multi-repo index",
             "key": "__multi_repo__",
             "use_global": True,
+            "kfp_run_id": "",
         },
     ]

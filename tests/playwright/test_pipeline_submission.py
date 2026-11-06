@@ -22,8 +22,9 @@ QUERYABLE = [
         "key": f"{repo['git_repo']}|{repo['git_branch']}",
         "label": f"{repo['git_repo'].rsplit('/', 1)[-1]} @ {repo['git_branch']}",
         "use_global": False,
+        "kfp_run_id": f"kfp-run-{i}",
     }
-    for repo in REPOS
+    for i, repo in enumerate(REPOS)
 ] + [
     {
         "git_repo": "",
@@ -31,6 +32,7 @@ QUERYABLE = [
         "key": "__multi_repo__",
         "label": "Combined multi-repo index",
         "use_global": True,
+        "kfp_run_id": "kfp-run-combined",
     }
 ]
 
@@ -45,7 +47,7 @@ def mock_console(page: Page):
     def open_console(*, indexed=True):
         responses = {
             "/api/status": {"ok": True, "namespace": "test"},
-            "/api/catalog": {"repos": REPOS, "default_key": None},
+            "/api/v2/repositories/catalog-repos": {"repos": REPOS, "default_key": None},
             "/api/indexes": {
                 "ok": True,
                 "indexes": [],
@@ -104,14 +106,13 @@ def test_indexing_submits_selected_repositories(page: Page, mock_console, repo_c
     assert submissions == [{"repos": REPOS[:repo_count]}]
 
 
-@pytest.mark.parametrize("combined", [False, True], ids=["single-repo", "multi-repo"])
-def test_analysis_submits_selected_index(page: Page, mock_console, combined):
+@pytest.mark.parametrize("repo_idx", [0, 1], ids=["first-repo", "second-repo"])
+def test_analysis_submits_selected_index(page: Page, mock_console, repo_idx):
     submissions = mock_console()
-    # Make the catalog selection differ from the analysis selection so accidental
-    # use of the indexing checkboxes is caught for both analysis modes.
+    # Select all repos in the indexing tab to confirm analysis uses its own selection.
     page.get_by_role("button", name="Select all", exact=True).click()
     page.locator('.cu-tabs button[data-tab="analysis"]').click()
-    key = "__multi_repo__" if combined else QUERYABLE[1]["key"]
+    key = QUERYABLE[repo_idx]["key"]
     page.locator("#analysis-repo").select_option(key)
 
     with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
@@ -119,9 +120,8 @@ def test_analysis_submits_selected_index(page: Page, mock_console, combined):
     page.wait_for_load_state("networkidle")
     assert submissions == [
         {
-            "repos": [] if combined else [REPOS[1]],
-            "analysis_only": True,
-            "multi_repo": combined,
+            "repos": [REPOS[repo_idx]],
+            "pipeline_run_id": QUERYABLE[repo_idx]["kfp_run_id"],
         }
     ]
 
@@ -145,5 +145,5 @@ def test_analysis_without_available_indexes_does_not_submit(page: Page, mock_con
 
     expect(page.locator("#analysis-empty")).to_be_visible()
     expect(page.locator("#analysis-repo option")).to_have_count(0)
-    expect(page.get_by_role("button", name="Run Analysis", exact=True)).to_be_disabled()
+    expect(page.locator("#run-analysis")).to_be_hidden()
     assert submissions == []

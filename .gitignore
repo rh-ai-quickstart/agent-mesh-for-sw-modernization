@@ -32,6 +32,7 @@ console-plugin/package-lock.json
 .pytest_cache/
 tests/e2e/ui/test-results/
 .idea
+*.db
 /artifacts/indexes/
 /resources/helm/charts/*.tgz
 mlflow.db

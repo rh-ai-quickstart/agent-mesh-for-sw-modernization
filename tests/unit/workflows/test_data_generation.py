@@ -14,8 +14,13 @@ def test_data_generation_runs_code_and_config_passes(monkeypatch):
         lambda repo, branch: "example-repo-main",
     )
     monkeypatch.setattr(data_generation, "prepare_environment", lambda **kwargs: None)
-    monkeypatch.setattr(data_generation, "detect_languages", lambda path: ["python"])
-    monkeypatch.setattr(data_generation, "load_external_metadata", lambda **kwargs: None)
+    monkeypatch.setattr(
+        data_generation,
+        "run_preflight",
+        lambda source, slug: data_generation.PreflightResult(
+            languages=["python"], external_metadata=[]
+        ),
+    )
     monkeypatch.setattr(
         data_generation,
         "generate_code_and_meta",
@@ -34,7 +39,8 @@ def test_data_generation_runs_code_and_config_passes(monkeypatch):
         "status": "complete",
         "fail_message": "",
     }
-    assert [call["config"] for call in calls] == [False, True]
+    assert len(calls) == 1
+    assert calls[0]["languages"] == ["python"]
 
 
 def test_data_generation_cleans_up_after_failure(monkeypatch):
