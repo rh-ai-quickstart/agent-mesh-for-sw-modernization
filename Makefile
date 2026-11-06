@@ -647,18 +647,8 @@ apply-secrets:
 		--from-literal=GIT_TOKEN="$(GIT_TOKEN)" \
 		-n $(KFP_NAMESPACE) --dry-run=client -o yaml | oc apply -f - && \
 	\
-	echo "==> Recreating secret code-understanding-env..." && \
-	SECRET_ENV_FILE=$$(mktemp) && \
-	trap 'rm -f "$$SECRET_ENV_FILE"' 0 && \
-	for key in $(SECRET_ENV_VARS); do \
-		if printenv "$$key" >/dev/null 2>&1; then \
-			printf '%s=' "$$key" >> "$$SECRET_ENV_FILE"; \
-			printenv "$$key" >> "$$SECRET_ENV_FILE"; \
-		fi; \
-	done && \
-	oc delete secret code-understanding-env -n $(KFP_NAMESPACE) --ignore-not-found=true \
-		--wait=true --timeout="$(WAIT_TIMEOUT)" && \
-	oc create secret generic code-understanding-env --from-env-file "$$SECRET_ENV_FILE" -n $(KFP_NAMESPACE) && \
+	echo "==> Updating secret code-understanding-env..." && \
+	sh resources/scripts/update_application_secret.sh $(SECRET_ENV_VARS) && \
 	\
 	REPO_LIST="$(GIT_REPO_LIST)" && \
 	if [ -n "$(PIPELINE_GIT_REPO_LIST)" ] && [ -f "$(PIPELINE_GIT_REPO_LIST)" ]; then \
