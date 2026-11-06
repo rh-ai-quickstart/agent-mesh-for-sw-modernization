@@ -523,6 +523,8 @@ uninstall:
 	echo "==> Removing Helm releases..."; \
 	helm uninstall e5-mistral -n "$(KFP_NAMESPACE)" \
 		--ignore-not-found --cascade foreground --wait --timeout "$(WAIT_TIMEOUT)"; \
+	helm uninstall agent-model -n "$(KFP_NAMESPACE)" \
+		--ignore-not-found --cascade foreground --wait --timeout "$(WAIT_TIMEOUT)"; \
 	helm uninstall agent-mesh-for-sw -n "$(KFP_NAMESPACE)" \
 		--ignore-not-found --cascade foreground --wait --timeout "$(WAIT_TIMEOUT)"; \
 	echo "==> Removing non-Helm resources..."; \

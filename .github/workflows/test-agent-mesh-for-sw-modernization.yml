@@ -49,7 +49,7 @@ jobs:
           repo_url: https://github.com/${{ github.repository }}
           ref: ${{ inputs.branch }}
           namespace: agent-mesh-ci-project-1
-          deploy_command: "make install MANAGE_NAMESPACE=false DEPLOY_EMBEDDING_MODEL=true WAIT_TIMEOUT=10m CUSTOM_EVALUATOR=basic"
+          deploy_command: "make install MANAGE_NAMESPACE=false DEPLOY_EMBEDDING_MODEL=true AGENT_MODEL=qwen WAIT_TIMEOUT=10m CUSTOM_EVALUATOR=basic"
         env:
           PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
           PROD_SERVER: ${{ secrets.PROD_SERVER }}
