@@ -566,8 +566,8 @@
               Select <strong>1</strong> repository
               for focused analysis, or <strong>multiple</strong> for cross-repository comparative analysis.<br/>
             </p>
-        <div class="cu-actions">
-          <div class="cu-note hidden" id="selection-note">0 selected</div>
+        <div class="cu-pipeline-row">
+          <div class="cu-note hidden" id="selection-note"></div>
           <button type="button" class="cu-btn cu-btn-secondary" id="select-all">Select all</button>
           <button type="button" class="cu-btn cu-btn-link" id="clear">Clear</button>
           <!--<button type="button" class="cu-btn cu-btn-link" id="refresh">Refresh indexes</button>-->
@@ -1382,10 +1382,11 @@
         banner("");
         delete $("banner").dataset.reason;
       }
-      $("selection-note").textContent = `${n} selected`;
-      $("pipeline-selection").innerHTML = n
+      const repoSummary = n
         ? `<strong>Repositories:<br/></strong> ${selectedRepos().map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}`
         : "<strong>Repositories:<br/></strong> <i>None selected</i>";
+      $("selection-note").innerHTML = repoSummary;
+      $("pipeline-selection").innerHTML = repoSummary;
     }
     function renderChatSelect() {
       $("chat-repo").innerHTML = state.queryable.map((o) =>
