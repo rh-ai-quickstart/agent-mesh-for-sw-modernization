@@ -1710,8 +1710,7 @@
       try {
         const body = {
           repos: option.use_global ? [] : [{ git_repo: option.git_repo, git_branch: option.git_branch }],
-          analysis_only: true,
-          multi_repo: !!option.use_global,
+          pipeline_run_id: option.kfp_run_id,
         };
         const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify(body) });
         setThinking({ kind: "pipeline", label: "Running analysis pipeline", status: `KFP run ${result.job_id} started` });
