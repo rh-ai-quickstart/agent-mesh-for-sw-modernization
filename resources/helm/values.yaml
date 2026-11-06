@@ -4,6 +4,8 @@ kfpHost: ""
 clusterDomain: ""
 mlflowGatewayHost: ""
 deployNotebooks: false
+# Object-store backend: "s4" (default) or "minio"
+objectStoreBackend: s4
 
 imageStreams:
   enabled: false
@@ -129,6 +131,27 @@ rhoaiMcp:
       cpu: 500m
       memory: 512Mi
 
+skillAgent:
+  networkPolicy:
+    enabled: true
+    # Namespace where cluster DNS pods run.
+    # OpenShift default: openshift-dns  |  vanilla Kubernetes default: kube-system
+    dnsNamespace: openshift-dns
+    # Egress ports permitted from skill-agent pods.
+    # Adjust if using non-default ports.
+    egressPorts:
+      # Backend port of the CoreDNS pods (post-DNAT)
+      dns: 5353
+      # Kubernetes API server backend port (post-DNAT)
+      kubeapi: 6443
+      https: 443    # External LLM API endpoint
+      mlflow: 8443  # MLflow tracking server (OpenShift AI default)
+      mlmd: 8080    # KFP ML Metadata gRPC service (required by KFP executor)
+      minio: 9000   # In-namespace MinIO object store
+      s3: 7480      # In-namespace S4 (S3-compatible) object store HTTP API port
+      rhoaiMcp: 8000  # RHOAI MCP server (required when rhoaiMcp.enabled=true)
+      otelHttp: 4318  # OpenTelemetry collector HTTP OTLP endpoint
+      otelGrpc: 4317  # OpenTelemetry collector gRPC OTLP endpoint
 
 console:
   enabled: false

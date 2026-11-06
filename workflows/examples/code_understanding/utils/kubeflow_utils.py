@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from contextlib import contextmanager
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
@@ -72,12 +73,14 @@ def get_pip_installable_git_url(
 ##############################################################################
 
 
-def inject_secret_as_env(secret_name: str):
-    """Decorator factory that injects ALL keys from a K8s secret as env vars.
+def inject_secret_as_env(secret_name: str, keys: list[str] | None = None):
+    """Decorator factory that injects keys from a K8s secret as env vars.
 
     Args:
         secret_name: Name of the Kubernetes Secret whose keys should be
                      exposed as environment variables of the same name.
+        keys: Explicit list of keys to inject.
+        If not present, injects the full secret.
     """
     import functools
 
@@ -113,13 +116,13 @@ def inject_secret_as_env(secret_name: str):
             try:
                 from kfp import kubernetes
 
-                keys = read_secret_keys()
+                inject_keys = keys if keys is not None else read_secret_keys()
 
-                if keys:
+                if inject_keys:
                     kubernetes.use_secret_as_env(
                         task,
                         secret_name=secret_name,
-                        secret_key_to_env={k: k for k in keys},
+                        secret_key_to_env={k: k for k in inject_keys},
                     )
 
             except ImportError:
@@ -130,6 +133,91 @@ def inject_secret_as_env(secret_name: str):
         return wrapper
 
     return decorator
+
+
+##############################################################################
+# Skill-component hardening
+##############################################################################
+
+
+def sigterm_handler(signum, frame):
+    logging.error(
+        "SIGTERM received — Kubernetes is terminating this pod "
+        "(node eviction, pod preemption, or manual deletion). "
+        "Exiting with code 143."
+    )
+    sys.exit(143)
+
+
+def harden_skill_component(
+    component_fn=None,
+    *,
+    cpu_limit: str = "2",
+    memory_limit: str = "8G",
+    timeout_seconds: int | None = None,
+):
+    """
+    Decorator that hardens a KFP component for isolated skill execution.
+
+    Args:
+        cpu_limit:       CPU limit for the component pod (default: "2").
+        memory_limit:    Memory limit for the component pod (default: "8G").
+        timeout_seconds: KFP task timeout in seconds. Pass an integer to enforce a
+                         deadline (e.g. 1800 for 30 min). Defaults to None (no timeout).
+    """
+    import functools
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            task = fn(*args, **kwargs)
+            task.set_cpu_limit(cpu_limit).set_memory_limit(memory_limit)
+            try:
+                from kfp import kubernetes
+
+                kubernetes.add_pod_label(task, "skill-agent", "true")
+                if timeout_seconds is not None:
+                    kubernetes.set_timeout(task, timeout_seconds)
+            except ImportError:
+                pass
+            return task
+
+        return wrapper
+
+    # Support both @harden_skill_component and @harden_skill_component(...)
+    return decorator(component_fn) if component_fn is not None else decorator
+
+
+##############################################################################
+# Pipeline run ID helpers
+##############################################################################
+
+
+def get_kfp_run_id() -> str | None:
+    """Return the KFP run ID for the current pod by reading the ``pipeline/runid`` label.
+
+    Uses ``KFP_POD_NAME`` if set (e.g. injected via downward API), otherwise falls
+    back to ``HOSTNAME`` (Kubernetes sets the container hostname to the pod name by
+    default). Returns ``None`` if the label is absent or the API call fails.
+    """
+    try:
+        from kubernetes import client as k8s_client
+        from kubernetes import config as k8s_config
+
+        k8s_config.load_incluster_config()
+
+        pod_name = (os.environ.get("KFP_POD_NAME") or os.environ.get("HOSTNAME", "")).strip()
+        ns = (os.environ.get("KFP_NAMESPACE") or os.environ.get("MLFLOW_NAMESPACE", "")).strip()
+
+        if pod_name and ns:
+            pod = k8s_client.CoreV1Api().read_namespaced_pod(pod_name, ns)
+            kfp_run_id = (pod.metadata.labels or {}).get("pipeline/runid", "").strip()
+            return kfp_run_id or None
+
+    except Exception:
+        pass
+
+    return None
 
 
 ##############################################################################
@@ -166,22 +254,15 @@ def compile_all_and_exit(pipelines: dict):
 @contextmanager
 def read_from_input_artifact(artifact):
     """Extract a KFP Input[Dataset] tar.gz archive to a temp dir."""
-    import shutil
     import tarfile
     import tempfile
 
-    tmp = tempfile.mkdtemp()
-
-    try:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
         with tarfile.open(artifact.path, "r:gz") as tar:
             tar.extractall(tmp)
 
         yield tmp
-
-    finally:
-
-        shutil.rmtree(tmp, ignore_errors=True)
 
 
 @contextmanager
@@ -195,13 +276,10 @@ def write_to_output_artifact(artifact, compresslevel=1):
                        data (e.g. parquet + embeddings) that compresses poorly.
     """
     import os
-    import shutil
     import tarfile
     import tempfile
 
-    tmp = tempfile.mkdtemp()
-
-    try:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
         yield tmp
 
@@ -210,23 +288,12 @@ def write_to_output_artifact(artifact, compresslevel=1):
         with tarfile.open(artifact.path, "w:gz", compresslevel=compresslevel) as tar:
             tar.add(tmp, arcname=".")
 
-    finally:
-
-        shutil.rmtree(tmp, ignore_errors=True)
-
 
 @contextmanager
 def use_ephemeral_space():
     """Yield a temporary directory and remove it on exit."""
-    import shutil
     import tempfile
 
-    tmp = tempfile.mkdtemp()
-
-    try:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
         yield tmp
-
-    finally:
-
-        shutil.rmtree(tmp, ignore_errors=True)

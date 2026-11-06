@@ -189,7 +189,13 @@ def test_multi_repo_submission_applies_readme_list_before_submitting(monkeypatch
         f"PIPELINE_GIT_REPO_LIST={helpers['REPO_LIST']}",
     ]
     assert commands[1] == ["make", "run-pipelines", "ARGS=--multi-repo"]
-    assert commands[2] == ["oc", "logs", "job/run-pipelines", "--namespace", "namespace"]
+    assert commands[2] == [
+        "oc",
+        "logs",
+        "job/run-pipelines",
+        "--namespace",
+        "namespace",
+    ]
     waiter.assert_called_once()
     assert waiter.call_args.args[:2] == (client, "selected-run")
 

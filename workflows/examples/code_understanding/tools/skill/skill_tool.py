@@ -4,11 +4,13 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
-def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
+def get_run_skill_tool(repo_dir: str, git_slug: str, use_rhoai_mcp: bool = False):
     """Return a LangChain tool that runs a single skill against the repository.
 
     Args:
         repo_dir:       Absolute path to the cloned repository.
+        git_slug:       Repository slug forwarded to local sub-skill agents so their
+                        register_enrichments tool can tag artifacts correctly.
         use_rhoai_mcp:  Whether to include rhoai-mcp tools in the skill agent.
 
     Returns:
@@ -18,10 +20,23 @@ def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
 
     @tool
     def run_skill(
-        skill_name: str, repo: str, target_dir: str | None = None, repo_branch: str | None = None
+        skill_name: str,
+        repo: str,
+        target_dir: str | None = None,
+        repo_branch: str | None = None,
     ) -> str:
-        """Run a skill against the repository. Skips if a report already exists in target_dir.
-        Optionally specify repo_branch to clone a non-default branch of the skills repo."""
+        """Fetch a skill by name from a remote skills repository URL and run it.
+
+        Args:
+            skill_name:  Name of the skill to run.
+            repo:        URL of the remote Git repository that hosts the skill (e.g.
+                         https://github.com/org/skills-repo). Must be a remote URL, not a
+                         local path.
+            target_dir:  Optional subdirectory within the repository to write the report to.
+            repo_branch: Optional branch to clone from the skills repo. Defaults to the
+                         repo's default branch when omitted.
+        Skips execution if a report already exists in target_dir.
+        """
         from tools.skill.skill_util import SkillConfig
         from tools.skill.skill_util import run_skill as _run_skill
 
@@ -45,7 +60,9 @@ def get_run_skill_tool(repo_dir: str, use_rhoai_mcp: bool = False):
             skill = SkillConfig(
                 name=skill_name, repo=repo, target_dir=target_dir, repo_branch=repo_branch
             )
-            skill_output_path = _run_skill(skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp)
+            skill_output_path = _run_skill(
+                skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp, git_slug=git_slug
+            )
             msg = f"[{skill_name}] completed. report={skill_output_path or '(none)'}"
             logging.info(msg)
             return msg

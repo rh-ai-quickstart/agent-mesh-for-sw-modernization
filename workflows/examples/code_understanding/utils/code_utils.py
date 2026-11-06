@@ -9,12 +9,14 @@ from pygments.util import ClassNotFound
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from loaders.asset_loader import AssetLoader  # noqa: E402
 from loaders.default_asset_loader import DefaultAssetLoader  # noqa: E402
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 CODE_METADATA_DIR = ".code_metadata"
-ENRICHMENTS_DIR = ".enrichments"
+ENRICHMENTS_DIR = AssetLoader.ENRICHMENTS_DIR
+LANGUAGE_MAPPINGS_ASSET_PATH = f"{ENRICHMENTS_DIR}/.assets/mappings/language_mappings.json"
 
 
 def _load_mappings():
@@ -43,7 +45,26 @@ def _extract_git_owner_and_repo(git_url: str):
     return tuple(parts[-2:])
 
 
-_MAPPINGS = _load_mappings()
+def cache_mappings():
+    """Loads and caches language mappings from the asset store."""
+    global _MAPPINGS
+    _MAPPINGS = _load_mappings()
+
+
+cache_mappings()
+
+
+def merge_language_mappings(new_mappings: dict):
+    """Merges new_mappings into the cached language mappings."""
+    from utils.json_utils import merge_json
+
+    global _MAPPINGS
+    _MAPPINGS = merge_json(_MAPPINGS or {}, new_mappings)
+
+
+def get_mapped_languages() -> list:
+    """Returns the list of languages present in the current language mappings."""
+    return list(_MAPPINGS.get("file_extensions", {}).keys())
 
 
 def get_file_extensions_for_language(language):

@@ -24,8 +24,7 @@ class Repo(BaseModel):
 
 class RunPipelinesRequest(BaseModel):
     repos: list[Repo] = Field(default_factory=list)
-    analysis_only: bool = False
-    multi_repo: bool = False
+    pipeline_run_id: str = ""
 
 
 @router.post("/pipelines")
@@ -39,8 +38,7 @@ async def post_pipeline_service(
             pipeline_service.submit_pipeline_run,
             repos,
             cu_namespace,
-            analysis_only=body.analysis_only,
-            multi_repo=body.multi_repo,
+            body.pipeline_run_id,
         )
     except ValueError as exc:
         logging.error(traceback.format_exc())
@@ -51,7 +49,9 @@ async def post_pipeline_service(
 
 
 @router.get("/pipelines/runs")
-async def list_pipeline_runs(cu_namespace: str | None = Cookie(default=None)) -> dict[str, Any]:
+async def list_pipeline_runs(
+    cu_namespace: str | None = Cookie(default=None),
+) -> dict[str, Any]:
     return {"runs": await asyncio.to_thread(pipeline_service.list_pipeline_runs, cu_namespace)}
 
 

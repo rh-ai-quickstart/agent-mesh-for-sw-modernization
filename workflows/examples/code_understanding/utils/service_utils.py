@@ -50,7 +50,11 @@ def find_pipeline_id(client: Any, pipeline_name: str) -> str:
         filter=json.dumps(
             {
                 "predicates": [
-                    {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+                    {
+                        "key": "display_name",
+                        "operation": "EQUALS",
+                        "stringValue": pipeline_name,
+                    }
                 ]
             }
         )

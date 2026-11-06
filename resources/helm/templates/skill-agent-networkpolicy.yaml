@@ -1,0 +1,81 @@
+{{- if .Values.skillAgent.networkPolicy.enabled }}
+---
+# Egress NetworkPolicy for KFP pods labelled skill-agent: "true".
+# All other egress is denied.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: skill-agent-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      skill-agent: "true"
+  policyTypes:
+    - Egress
+  egress:
+    # DNS — target the CoreDNS pods by namespace.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.skillAgent.networkPolicy.dnsNamespace }}
+      ports:
+        - protocol: UDP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.dns }}
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.dns }}
+    # Kubernetes API server — required by KFP executor to read secrets
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.kubeapi }}
+    # External HTTPS — LLM API endpoint
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.https }}
+    # MLflow tracking server
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.mlflow }}
+    # KFP ML Metadata gRPC service — in-namespace only (required by KFP executor)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.mlmd }}
+    # MinIO object store — in-namespace only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.minio }}
+    # S4 (S3-compatible) object store — in-namespace only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.s3 }}
+    # RHOAI MCP server — in-namespace only (required when rhoaiMcp.enabled=true)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.rhoaiMcp }}
+    # OpenTelemetry collector — in-namespace only (HTTP and gRPC OTLP)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.otelHttp }}
+        - protocol: TCP
+          port: {{ .Values.skillAgent.networkPolicy.egressPorts.otelGrpc }}
+{{- end }}

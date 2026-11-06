@@ -17,9 +17,7 @@ from urllib.parse import urlparse
 # Run directly from a checkout without installing the workflow's dependencies.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from code_understanding.utils.index_transfer import (  # noqa: E402
-    IndexTransfer,
-)
+from code_understanding.utils.index_transfer import IndexTransfer  # noqa: E402
 
 
 def print_indexes(result: dict) -> None:
@@ -28,7 +26,14 @@ def print_indexes(result: dict) -> None:
     if not indexes:
         print(f"No completed indexes found in {result['namespace']}.")
         return
-    headers = ("Repository / Index", "Type", "Uploaded", "Latest", "Started (UTC)", "Run ID")
+    headers = (
+        "Repository / Index",
+        "Type",
+        "Uploaded",
+        "Latest",
+        "Started (UTC)",
+        "Run ID",
+    )
     rows = []
     for index in indexes:
         started = index["start_time"]

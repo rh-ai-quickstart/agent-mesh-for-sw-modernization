@@ -5,11 +5,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 
 from kfp import dsl  # noqa: E402
 from kfp.dsl import Dataset, Input, Metrics, Output  # noqa: E402
+
+# fmt: off
+from utils.kubeflow_utils import INDEXING_BASE_IMAGE  # noqa: E402
 from utils.kubeflow_utils import (  # noqa: E402
-    INDEXING_BASE_IMAGE,
     get_pip_installable_git_url,
     inject_secret_as_env,
 )
+
+# fmt: on
 
 _AGENTMESH_INSTALLABLE_URL = get_pip_installable_git_url(
     git_username=os.getenv("GIT_USERNAME"),
@@ -35,13 +39,8 @@ def graphrag_indexing_op(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
-    kfp_run_id: str = "",
+    pipeline_run_id: str = "",
 ):
-
-    import os
-
-    if kfp_run_id:
-        os.environ["KFP_RUN_ID"] = kfp_run_id
 
     from pipelines.base.indexing import generate_graphrag_index
     from utils.kubeflow_utils import (
@@ -63,6 +62,7 @@ def graphrag_indexing_op(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         result.log_metric("success", 1)
@@ -77,13 +77,8 @@ def graphrag_evaluation_op(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
-    kfp_run_id: str = "",
+    pipeline_run_id: str = "",
 ):
-
-    import os
-
-    if kfp_run_id:
-        os.environ["KFP_RUN_ID"] = kfp_run_id
 
     import logging
 
@@ -93,7 +88,7 @@ def graphrag_evaluation_op(
     setup_logging()
 
     if not git_repo or multi_repo:
-        logging.info("Skipping evaluation: git_repo not provided or multi_repo=True.")
+        logging.info("Skipping evaluation.")
         pd.DataFrame().to_csv(eval_results.path, index=False)
         return
 
@@ -106,6 +101,7 @@ def graphrag_evaluation_op(
             git_repo=git_repo,
             git_branch=git_branch,
             multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
     df = results if isinstance(results, pd.DataFrame) else pd.DataFrame(results or [])
@@ -119,14 +115,9 @@ def run_indexing_multi_repo_op(
     parent_target_path: str,
     graphrag_dir: Output[Dataset],
     eval_results: Output[Dataset],
-    kfp_run_id: str = "",
+    pipeline_run_id: str = "",
 ):
     """Runs GraphRAG indexing and evaluation across the combined multi-repo codebase."""
-
-    import os
-
-    if kfp_run_id:
-        os.environ["KFP_RUN_ID"] = kfp_run_id
 
     import pandas as pd
     from pipelines.base.indexing import IndexingPipeline
@@ -135,7 +126,11 @@ def run_indexing_multi_repo_op(
     setup_logging()
 
     with write_to_output_artifact(graphrag_dir) as tmp_graphrag:
-        IndexingPipeline().run_multi_repo(parent_target_path, graphrag_source_path=tmp_graphrag)
+        IndexingPipeline().run_multi_repo(
+            parent_target_path,
+            graphrag_source_path=tmp_graphrag,
+            pipeline_run_id=pipeline_run_id,
+        )
 
     pd.DataFrame().to_csv(eval_results.path, index=False)
 
@@ -151,6 +146,7 @@ def _run_pipeline(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ) -> Dataset:
 
     task = graphrag_indexing_op(
@@ -158,7 +154,7 @@ def _run_pipeline(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
-        kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER,
+        pipeline_run_id=pipeline_run_id,
     )
 
     graphrag_evaluation_op(
@@ -166,18 +162,20 @@ def _run_pipeline(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
-        kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER,
+        pipeline_run_id=pipeline_run_id,
     )
 
     return task.outputs["graphrag_dir"]
 
 
 @dsl.pipeline(name="graphrag-indexing-multi-repo-pipeline")
-def _run_indexing_multi_repo_pipeline(parent_target_path: str) -> Dataset:
+def _run_indexing_multi_repo_pipeline(
+    parent_target_path: str, pipeline_run_id: str = ""
+) -> Dataset:
 
     task = run_indexing_multi_repo_op(
         parent_target_path=parent_target_path,
-        kfp_run_id=dsl.PIPELINE_JOB_ID_PLACEHOLDER,
+        pipeline_run_id=pipeline_run_id,
     )
     return task.outputs["graphrag_dir"]
 
