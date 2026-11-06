@@ -151,7 +151,7 @@ spec:
           imagePullPolicy: {{ .Values.rhoaiMcp.imagePullPolicy | default "IfNotPresent" }}
           args:
             - "--transport"
-            - "sse"
+            - "streamable-http"
             - "--host"
             - "0.0.0.0"
             - "--port"

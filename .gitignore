@@ -35,3 +35,4 @@ tests/e2e/ui/test-results/
 *.db
 /artifacts/indexes/
 /resources/helm/charts/*.tgz
+mlflow.db

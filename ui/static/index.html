@@ -168,6 +168,7 @@
     .cu-job-dot.Cancelled { background: var(--cu-red); }
     .cu-job-kind { font-size: 0.78rem; font-weight: 600; }
     .cu-job-name { font-size: 0.7rem; color: var(--cu-gray); word-break: break-all; }
+
     .cu-help { position: relative; display: inline-flex; align-items: center; vertical-align: middle; margin-left: 0.3rem; }
     .cu-help-btn { background: none; border: none; cursor: pointer; color: var(--cu-gray); padding: 0; line-height: 1; display: inline-flex; }
     .cu-help-btn:hover { color: var(--cu-text); }
@@ -902,7 +903,6 @@
         bar.classList.add("hidden");
         $("send").disabled = false;
         $("run-pipeline").disabled = false;
-        updateAnalysisControls();
         return;
       }
       bar.classList.remove("hidden");
@@ -1693,11 +1693,6 @@
       $("report-viewer-content").innerHTML = "";
       setThinking({ kind: "pipeline", label: "Running pipeline", status: "Submitting indexing job…" });
       try {
-        /*
-        const result = await api("/api/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos() }) }); // v1
-        setThinking({ kind: "pipeline", label: "Running pipeline", status: `Job ${result.job_name} started` });
-        poll(result.job_name, "pipeline");
-         */
         const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify({ repos: selectedRepos()}) });
         setThinking({ kind: "pipeline", label: "Running pipeline", status: `KFP run ${result.job_id} started` });
         pollV2(result.job_id);
@@ -1707,22 +1702,19 @@
       }
     };
     $("run-analysis").onclick = async () => {
-      if (state.thinking) return;
-      const selectedKey = $("analysis-repo").value;
-      const option = state.queryable.find(o => o.key === selectedKey);
-      if (!option || !option.kfp_run_id) return;
+      if ($("run-analysis").disabled) return;
+      const option = state.queryable.find((o) => o.key === $("analysis-repo").value);
+      if (!option) return;
       $("report-viewer").classList.add("hidden");
-      $("report-viewer-title").textContent = "";
-      $("report-viewer-subtitle").textContent = "";
-      $("report-viewer-content").innerHTML = "";
-      setThinking({ kind: "pipeline", label: "Running analysis", status: "Submitting analysis job…" });
+      setThinking({ kind: "pipeline", label: "Running analysis pipeline", status: "Submitting analysis job…" });
       try {
-        const repos = [{ git_repo: option.git_repo, git_branch: option.git_branch }];
-        const result = await api("/api/v2/pipelines", {
-          method: "POST",
-          body: JSON.stringify({ repos, pipeline_run_id: option.kfp_run_id }),
-        });
-        setThinking({ kind: "pipeline", label: "Running analysis", status: `KFP run ${result.job_id} started` });
+        const body = {
+          repos: option.use_global ? [] : [{ git_repo: option.git_repo, git_branch: option.git_branch }],
+          analysis_only: true,
+          multi_repo: !!option.use_global,
+        };
+        const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify(body) });
+        setThinking({ kind: "pipeline", label: "Running analysis pipeline", status: `KFP run ${result.job_id} started` });
         pollV2(result.job_id);
       } catch (e) {
         setThinking(null);

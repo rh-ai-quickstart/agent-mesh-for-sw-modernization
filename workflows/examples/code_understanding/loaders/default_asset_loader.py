@@ -78,6 +78,10 @@ class DefaultAssetLoader(AssetLoader):
 
         return self._loader.load_results(download_dir, artifact_path, tags, git_slug)
 
+    def load_results(self, download_dir: str, artifact_path: str = None, tags: dict = None):
+
+        return self._loader.load_results(download_dir, artifact_path, tags)
+
     def log_results(
         self,
         results_path: str,

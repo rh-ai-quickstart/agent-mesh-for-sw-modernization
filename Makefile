@@ -658,11 +658,15 @@ apply-secrets:
 			-p "{\"stringData\":{\"MLFLOW_TRACKING_URI\":\"https://$(GATEWAY_HOST)/mlflow\"}}"; \
 	fi && \
 	if [ "$${RHOAI_MCP_ENABLED:-false}" = "true" ]; then \
-		RHOAI_MCP_HOST="rhoai-mcp-$(KFP_NAMESPACE).$(CLUSTER_DOMAIN)" && \
-		echo "==> Patching RHOAI_MCP_BASE_URL with auto-generated hostname: $$RHOAI_MCP_HOST" && \
-		oc patch secret code-understanding-env -n $(KFP_NAMESPACE) \
-			--type=merge \
-			-p "{\"stringData\":{\"RHOAI_MCP_BASE_URL\":\"https://$$RHOAI_MCP_HOST\"}}"; \
+		echo "==> Patching RHOAI_MCP_BASE_URL from rhoai-mcp Route..." && \
+		RHOAI_MCP_HOST=$$(oc get route rhoai-mcp -n $$KFP_NAMESPACE -o jsonpath='{.spec.host}' 2>/dev/null) && \
+		if [ -n "$$RHOAI_MCP_HOST" ]; then \
+			oc patch secret code-understanding-env -n $$KFP_NAMESPACE \
+				--type=merge \
+				-p "{\"stringData\":{\"RHOAI_MCP_BASE_URL\":\"https://$$RHOAI_MCP_HOST\"}}"; \
+		else \
+			echo "WARNING: rhoai-mcp route not found or has no host, skipping RHOAI_MCP_BASE_URL patch"; \
+		fi; \
 	fi
 
 # ============================================================================

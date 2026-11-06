@@ -115,8 +115,8 @@ otel:
     storageSize: 10Gi
 
 rhoaiMcp:
-  enabled: true
-  image: "quay.io/oawofolurh/rhoai-mcp:v1"
+  enabled: false
+  image: ""
   imagePullPolicy: IfNotPresent
   authMode: auto
   logLevel: INFO
