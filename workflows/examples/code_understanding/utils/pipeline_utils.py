@@ -16,16 +16,18 @@ def _running_in_kubernetes_pod() -> bool:
 
 
 def uses_kfp():
-    """Returns True if KFP is installed, the process is running inside a Kubernetes pod,
-    and the process is not running in a Jupyter notebook."""
+    """Returns True when KFP pipeline graph construction should be used.
+    """
+    import os
+
     try:
         if uses_jupyter_runtime():
             return False
-        if not _running_in_kubernetes_pod():
-            return False
         import kfp  # noqa: F401
 
-        return True
+        if _running_in_kubernetes_pod() or os.getenv("PIPELINE_COMPILE_ONLY"):
+            return True
+        return False
     except ImportError:
         return False
 
