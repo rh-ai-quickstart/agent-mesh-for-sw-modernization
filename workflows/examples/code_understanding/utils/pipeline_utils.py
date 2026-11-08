@@ -59,7 +59,7 @@ def get_pipeline_run_id() -> str:
 
     # In a KFP run every stage must share the same ID; a random fallback would
     # cause stages to store and look up results under different keys.
-    if uses_kfp():
+    if uses_kfp() and _running_in_kubernetes_pod():
         raise RuntimeError(
             "Running in KFP but could not read the pipeline/runid pod label. "
             "Ensure KFP_POD_NAME and KFP_NAMESPACE are set via the downward API."
