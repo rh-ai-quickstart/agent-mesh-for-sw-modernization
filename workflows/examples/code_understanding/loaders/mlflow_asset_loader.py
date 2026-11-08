@@ -70,6 +70,16 @@ class MlFlowAssetLoader(AssetLoader):
         for stale_run in stale:
             client.set_tag(stale_run.info.run_id, "archived", "true")
 
+    def _get_artifact_base_uri(self, client, experiment, filter_string: str) -> str:
+        """Return the artifact URI of the latest matching run in *experiment*."""
+        latest_runs = client.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            filter_string=filter_string,
+            order_by=["attributes.start_time DESC"],
+            max_results=1,
+        )
+        return latest_runs[0].info.artifact_uri if latest_runs else experiment.artifact_location
+
     def _get_absolute_artifact_uris(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
     ) -> list[str]:
@@ -96,28 +106,28 @@ class MlFlowAssetLoader(AssetLoader):
             )
             if not runs:
                 return [os.path.join(enrichment_experiment.artifact_location, asset_file_path)]
-            return [os.path.join(run.info.artifact_uri, asset_file_path) for run in runs]
+            # Prepend the static base so enrichment deltas merge on top of
+            # the full original content
+            static_experiment = self.get_or_create_experiment_by_name(
+                client, self.STATIC_ASSET_EXPERIMENT
+            )
+            static_base_uri = self._get_artifact_base_uri(
+                client, static_experiment, "tags.latest = 'true'"
+            )
+            enrichment_uris = [
+                os.path.join(run.info.artifact_uri, asset_file_path) for run in runs
+            ]
+            return [os.path.join(static_base_uri, asset_file_path)] + enrichment_uris
 
-        if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags:
-
-            filter_string = "tags.latest = 'true'"
-
-        else:
-
-            filter_string = " AND ".join(tag_filter_parts)
+        filter_string = (
+            "tags.latest = 'true'"
+            if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags
+            else " AND ".join(tag_filter_parts)
+        )
 
         logging.debug(f"Filter string: {filter_string}")
 
-        latest_runs = client.search_runs(
-            experiment_ids=[experiment.experiment_id],
-            filter_string=filter_string,
-            order_by=["attributes.start_time DESC"],
-            max_results=1,
-        )
-
-        asset_base_uri = (
-            latest_runs[0].info.artifact_uri if latest_runs else experiment.artifact_location
-        )
+        asset_base_uri = self._get_artifact_base_uri(client, experiment, filter_string)
 
         logging.info(f"Base absolute storage URI: {asset_base_uri}")
 
