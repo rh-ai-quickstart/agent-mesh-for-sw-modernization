@@ -107,6 +107,7 @@ enable_caching = os.environ.get("KFP_TRIGGER_ENABLE_CACHING", "false").lower() =
 run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], params,
                   enable_caching=enable_caching)
 print(f"  Submitted run id: {run.run_id}")
+print(f"==> Pipeline run ID: {run.run_id}")
 PYEOF
     echo "  OK: $run_name submitted."
 }
@@ -126,6 +127,13 @@ done
 if [[ "$ANALYSIS_ONLY" == "true" && -z "$PIPELINE_RUN_ID" ]]; then
     echo "Error: PIPELINE_RUN_ID must be set and non-empty for --analysis-only." >&2
     exit 1
+fi
+
+# Only forward pipeline_run_id for analysis-only runs.  Passing a non-empty
+# value on a full run causes data-gen and indexing components to return early
+# and silently skip their work (they guard on `if pipeline_run_id: return`).
+if [[ "$ANALYSIS_ONLY" != "true" ]]; then
+    PIPELINE_RUN_ID=""
 fi
 
 if [[ "$MODE" == "single" ]]; then

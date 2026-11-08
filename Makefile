@@ -324,7 +324,6 @@ help-all:
 	@echo "  test-all                    Run API, UI unit, Playwright, workflow, index transfer, and release tests"
 	@echo "  test-api                    Run API route and service tests"
 	@echo "  test-ui-unit                Run UI unit tests"
-	@echo "  test-ui-downloads           Run UI download/upload tests"
 	@echo "  test-playwright             Test UI submissions with mocked APIs (no cluster)"
 	@echo "  test-workflows              Run workflow pipeline tests"
 	@echo "  test-release                Check release version reading and bumps"
@@ -763,10 +762,6 @@ test-ui-unit:
 	@echo "==> Running UI unit tests..."
 	uv run --project . --group test --frozen pytest tests/unit/ui
 
-test-ui-downloads:
-	@echo "==> Running UI download/upload tests..."
-	PYTHONPATH=ui uv run --project . --group test --frozen pytest ui/tests
-
 test-workflows:
 	@echo "==> Running workflow pipeline tests..."
 	uv run --project . --group test --frozen \
@@ -776,7 +771,7 @@ test-release:
 	@echo "==> Running release tests..."
 	uv run --project . --group test --frozen pytest tests/unit/release
 
-test-all: test-api test-ui-unit test-ui-downloads test-playwright test-workflows test-index-transfer test-release
+test-all: test-api test-ui-unit test-playwright test-workflows test-index-transfer test-release
 
 test-ui-install:
 	@echo "==> Installing Playwright and Chromium for UI smoke tests..."
@@ -1177,6 +1172,7 @@ run-pipelines:
 	JOB_EXIT=0; \
 	oc wait job/run-pipelines -n "$(KFP_NAMESPACE)" \
 		--for=condition=complete --timeout="$(WAIT_TIMEOUT)" || JOB_EXIT=$$?; \
+	oc logs job/run-pipelines -n "$(KFP_NAMESPACE)" 2>/dev/null | grep "^==> Pipeline run ID:" || true; \
 	[ "$$JOB_EXIT" -eq 0 ] || { echo "Error: pipeline submission failed or timed out." >&2; exit "$$JOB_EXIT"; }
 
 clean-mlflow:

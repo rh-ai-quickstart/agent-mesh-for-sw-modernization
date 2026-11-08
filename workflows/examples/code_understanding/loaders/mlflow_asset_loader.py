@@ -637,19 +637,16 @@ class MlFlowAssetLoader(AssetLoader):
             catalog_repos = merge_json_enrichment(base, run_repos)
             self.register_enrichments(enrichment_files={"repos/repo_list.json": catalog_repos})
         except Exception:
-            logging.warning("Failed to log repo list as enrichment", exc_info=True)
+            logging.warning("Failed to update repo catalog enrichment", exc_info=True)
 
-        try:
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
-                tmp_path = os.path.join(tmp_dir, "repo_list.json")
-                self.log_results(
-                    tmp_path,
-                    artifact_path="repos",
-                    tags={"category": "repositories"},
-                    content=json.dumps(run_repos),
-                )
-        except Exception:
-            logging.warning("Failed to log repo list to asset store", exc_info=True)
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, "repo_list.json")
+            self.log_results(
+                tmp_path,
+                artifact_path="repos",
+                tags={"category": "repositories"},
+                content=json.dumps(run_repos),
+            )
 
     def load_run_repos(self, run_id: str | None = None) -> list:
         """Loads the repo list from MLflow, scoped by run_id if set,
