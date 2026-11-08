@@ -16,8 +16,7 @@ def _running_in_kubernetes_pod() -> bool:
 
 
 def uses_kfp():
-    """Returns True when KFP pipeline graph construction should be used.
-    """
+    """Returns True when KFP pipeline graph construction should be used."""
     import os
 
     try:

@@ -1172,6 +1172,8 @@ run-pipelines:
 	JOB_EXIT=0; \
 	oc wait job/run-pipelines -n "$(KFP_NAMESPACE)" \
 		--for=condition=complete --timeout="$(WAIT_TIMEOUT)" || JOB_EXIT=$$?; \
+	echo ""; \
+	echo "✅ Submitted: SUCCESS"; \
 	oc logs job/run-pipelines -n "$(KFP_NAMESPACE)" 2>/dev/null | grep "^==> Pipeline run ID:" || true; \
 	[ "$$JOB_EXIT" -eq 0 ] || { echo "Error: pipeline submission failed or timed out." >&2; exit "$$JOB_EXIT"; }
 
