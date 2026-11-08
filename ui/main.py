@@ -103,18 +103,22 @@ def set_namespace(body: NamespaceRequest, response: Response) -> dict[str, str]:
 
 
 @app.get("/api/catalog")
-def get_catalog() -> dict[str, Any]:
+def get_catalog(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None),
+) -> dict[str, Any]:
     from api import repositories_service
 
-    return {"repos": repositories_service.get_catalog_repos()}
+    return {"repos": repositories_service.get_catalog_repos(cu_namespace)}
 
 
 @app.get("/api/indexes")
-def get_indexes() -> dict[str, Any]:
+def get_indexes(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None),
+) -> dict[str, Any]:
     from api import repositories_service
 
     data = indexes.list_indexed_repos()
-    catalog_entries = repositories_service.get_catalog_repos()
+    catalog_entries = repositories_service.get_catalog_repos(cu_namespace)
     options = indexes.queryable_repos(data.get("indexes") or [], catalog_entries)
     return {**data, "queryable": options}
 
