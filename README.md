@@ -527,8 +527,8 @@ indexes you want to keep before deleting the deployment.
 The commands use the project configured by `KFP_NAMESPACE` in `.env`. To use
 a different project, add `KFP_NAMESPACE=<project-name>` to the command.
 
-First, list the available indexes and copy the run ID of the index you want
-to export:
+First, list the available indexes and copy the pipeline run ID of the index
+you want to export:
 
 ```sh
 make list-indexes
@@ -539,17 +539,17 @@ Example output:
 ```text
 Indexes in agent-mesh-demo (1)
 
-Repository / Index                        Type      Uploaded  Latest  Started (UTC)        Run ID
+Repository / Index                        Type      Uploaded  Latest  Started (UTC)        Pipeline Run ID
 ----------------------------------------  --------  --------  ------  -------------------  --------------------------------
-agapebondservant-tic-tac-toe-sample-main  Single    yes       yes     2026-10-12 19:39:52  21ffb6906aff4646b76dc430f2a2a43b
+agapebondservant-tic-tac-toe-sample-main  Single    yes       yes     2026-10-12 19:39:52  c7e47028-2df8-4a57-a045-9ed3605bcf17
 ```
 
-Export the selected index to a local archive. Replace `<run-id>` with the ID
+Export the selected index to a local archive. Replace `<pipeline-id>` with the ID
 from the list. `INDEX_BUNDLE` is the local `.tar.gz` file path: export writes
 the archive there, and import reads it from that path:
 
 ```sh
-make export-indexes INDEX_RUN_ID=<run-id> \
+make export-indexes PIPELINE_RUN_ID=<pipeline-id> \
   INDEX_BUNDLE=artifacts/indexes/my-index.tar.gz
 ```
 
@@ -566,11 +566,20 @@ Example output:
 ```text
 Index:     agapebondservant-tic-tac-toe-sample-main
 Type:      Single repository
-Run ID:    21ffb6906aff4646b76dc430f2a2a43b
+Pipeline Run ID: c7e47028-2df8-4a57-a045-9ed3605bcf17
 Namespace: agent-mesh-demo
 
-Index saved to "artifacts/indexes/agapebondservant-tic-tac-toe-sample-main-21ffb6906aff4646b76dc430f2a2a43b.tar.gz"
+Index saved to "artifacts/indexes/agapebondservant-tic-tac-toe-sample-main-c7e47028-2df8-4a57-a045-9ed3605bcf17.tar.gz"
 ```
+
+Pipeline IDs are resolved within the selected project's index experiment. If
+multiple active, completed indexes share a pipeline ID, export selects the newest
+by start time and prints a notice with the number of matches. Equal start times
+use a stable internal ordering.
+
+Older indexes appear with an `unavailable` pipeline ID. They cannot be selected
+by `PIPELINE_RUN_ID`. To transfer one, use `INDEX_GIT_SLUG` and an explicit
+`INDEX_BUNDLE` path; no pipeline ID is generated for it.
 
 Finally, import the archive into the destination project's MLflow instance:
 
@@ -579,7 +588,22 @@ make import-indexes KFP_NAMESPACE=destination-project \
   INDEX_BUNDLE=artifacts/indexes/my-index.tar.gz
 ```
 
+Import preserves the source pipeline ID and creates a new internal MLflow run.
+The import result reports the pipeline ID; older bundles report it as `null` with
+an explanation. Reimporting the identical bundle reuses its existing imported
+index unless `INDEX_FORCE=true` is supplied.
 
+Use the listed pipeline ID to run analysis against the index in that project:
+
+```sh
+make run-pipelines ARGS="--single-repo --analysis-only" \
+  PIPELINE_GIT_REPO=<repository-url> \
+  PIPELINE_GIT_BRANCH=<branch> \
+  PIPELINE_RUN_ID=<pipeline-id>
+```
+
+The direct transfer CLI accepts `export --pipeline-run-id <pipeline-id>` as well.
+MLflow run IDs remain internal to retrieval and the unchanged bundle format.
 
 ### 13. Explore traces with MLflow (Optional)
 
