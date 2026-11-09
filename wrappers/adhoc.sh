@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # Shortcut for: make run-adhoc-query QUESTION="..."
-# Usage: ./wrappers/adhoc.sh <question> [--git-repo URL] [--git-branch BRANCH]
+# Usage: ./wrappers/adhoc.sh <question> [--git-repo URL] [--git-branch BRANCH] [--pipeline-run-id ID]
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 GIT_REPO=""
 GIT_BRANCH=""
+PIPELINE_RUN_ID=""
 QUESTION_PARTS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --git-repo)   GIT_REPO="$2";   shift 2 ;;
-        --git-branch) GIT_BRANCH="$2"; shift 2 ;;
-        *)            QUESTION_PARTS+=("$1"); shift ;;
+        --git-repo)          GIT_REPO="$2";          shift 2 ;;
+        --git-branch)        GIT_BRANCH="$2";        shift 2 ;;
+        --pipeline-run-id)   PIPELINE_RUN_ID="$2";   shift 2 ;;
+        *)                   QUESTION_PARTS+=("$1"); shift ;;
     esac
 done
 
-[ ${#QUESTION_PARTS[@]} -eq 0 ] && { echo "Usage: $0 <question> [--git-repo URL] [--git-branch BRANCH]" >&2; exit 1; }
+[ ${#QUESTION_PARTS[@]} -eq 0 ] && { echo "Usage: $0 <question> [--git-repo URL] [--git-branch BRANCH] [--pipeline-run-id ID]" >&2; exit 1; }
 
 _spin() {
     local pid=$1
@@ -40,6 +42,7 @@ make -s -C "$REPO_DIR" run-adhoc-query \
     QUESTION_FILE="$QUESTION_FILE" \
     GIT_REPO="$GIT_REPO" \
     GIT_BRANCH="$GIT_BRANCH" \
+    PIPELINE_RUN_ID="$PIPELINE_RUN_ID" \
     >"$TMPFILE" 2>&1 &
 MAKE_PID=$!
 

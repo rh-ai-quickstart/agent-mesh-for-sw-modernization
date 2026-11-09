@@ -195,7 +195,7 @@ def generate_code_and_meta_op(
     base_image=DATA_GENERATION_BASE_IMAGE,
     packages_to_install=[_AGENTMESH_INSTALLABLE_URL],
 )
-def get_repo_list_op(repos: str = "[]") -> list:
+def get_repo_list_op(runnable_repos: str = "[]") -> list:
     """Returns the repo list for this pipeline run and logs it to the asset store."""
     import json
 
@@ -205,7 +205,7 @@ def get_repo_list_op(repos: str = "[]") -> list:
 
     setup_logging()
 
-    repo_list = get_run_repos(json.loads(repos))
+    repo_list = get_run_repos(json.loads(runnable_repos))
     DefaultAssetLoader().log_repos(repo_list)
     return repo_list
 
@@ -252,12 +252,12 @@ def _run_pipeline(
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
 def _run_pipeline_multi_repo(  # noqa: B006 — mutable default is safe here: KFP
-    repos: list = [], pipeline_run_id: str = ""
+    runnable_repos: list = [], pipeline_run_id: str = ""
 ):
     """Generates code metadata for all repositories in the repo list."""
 
     with dsl.ParallelFor(
-        items=repos, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
+        items=runnable_repos, parallelism=int(os.getenv("GRAPHRAG_PARALLEL_REPOS", "2"))
     ) as repo:
 
         _run_pipeline(
@@ -273,11 +273,11 @@ def _run_pipeline_multi_repo(  # noqa: B006 — mutable default is safe here: KF
 ##############################################################################
 
 
-def _get_repo_list(repos):
+def _get_repo_list(runnable_repos):
     # Resolve the repo list at the top-level pipeline so the list param is passed
     # directly to a component (not through an intermediate sub-pipeline - recommended
     # for KFP v2).
-    task = get_repo_list_op(repos=repos)
+    task = get_repo_list_op(runnable_repos=runnable_repos)
     return task
 
 

@@ -76,11 +76,14 @@ def test_data_generation_cleans_up_after_failure(monkeypatch):
 
 
 def test_multi_repo_uses_isolated_paths_and_preserves_results(monkeypatch):
+    from loaders.default_asset_loader import DefaultAssetLoader
+
     calls = []
     code_utils = ModuleType("utils.code_utils")
     code_utils.generate_slug_from_repo = lambda repo, branch: f"{repo.rsplit('/', 1)[-1]}-{branch}"
     monkeypatch.setitem(sys.modules, "utils.code_utils", code_utils)
     monkeypatch.setattr(utils, "code_utils", code_utils, raising=False)
+    monkeypatch.setattr(DefaultAssetLoader, "log_repos", lambda self, repos: None)
     monkeypatch.setenv("PARENT_SOURCE_PATH", "sources")
     monkeypatch.setenv("PARENT_TARGET_PATH", "targets")
 

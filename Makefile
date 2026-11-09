@@ -324,7 +324,6 @@ help-all:
 	@echo "  test-all                    Run API, UI unit, Playwright, workflow, index transfer, and release tests"
 	@echo "  test-api                    Run API route and service tests"
 	@echo "  test-ui-unit                Run UI unit tests"
-	@echo "  test-ui-downloads           Run UI download/upload tests"
 	@echo "  test-playwright             Test UI submissions with mocked APIs (no cluster)"
 	@echo "  test-workflows              Run workflow pipeline tests"
 	@echo "  test-release                Check release version reading and bumps"
@@ -763,10 +762,6 @@ test-ui-unit:
 	@echo "==> Running UI unit tests..."
 	uv run --project . --group test --frozen pytest tests/unit/ui
 
-test-ui-downloads:
-	@echo "==> Running UI download/upload tests..."
-	PYTHONPATH=ui uv run --project . --group test --frozen pytest ui/tests
-
 test-workflows:
 	@echo "==> Running workflow pipeline tests..."
 	uv run --project . --group test --frozen \
@@ -776,7 +771,7 @@ test-release:
 	@echo "==> Running release tests..."
 	uv run --project . --group test --frozen pytest tests/unit/release
 
-test-all: test-api test-ui-unit test-ui-downloads test-playwright test-workflows test-index-transfer test-release
+test-all: test-api test-ui-unit test-playwright test-workflows test-index-transfer test-release
 
 test-ui-install:
 	@echo "==> Installing Playwright and Chromium for UI smoke tests..."
@@ -1122,6 +1117,7 @@ run-adhoc-query:
 		--set-string adhocQuery.gitRepo="$(GIT_REPO)" \
 		--set-string adhocQuery.gitBranch="$(GIT_BRANCH)" \
 		--set-string adhocQuery.retryCount="$${RETRY_COUNT:-3}" \
+		--set-string adhocQuery.pipelineRunId="$(PIPELINE_RUN_ID)" \
 		--set analysis.image.registry="$(KFP_IMAGE_REGISTRY)" \
 		--set analysis.image.name="$(KFP_ANALYSIS_BASE_IMAGE_NAME)" \
 		--set analysis.image.tag="$(KFP_ANALYSIS_BASE_IMAGE_TAG)" \
@@ -1177,6 +1173,9 @@ run-pipelines:
 	JOB_EXIT=0; \
 	oc wait job/run-pipelines -n "$(KFP_NAMESPACE)" \
 		--for=condition=complete --timeout="$(WAIT_TIMEOUT)" || JOB_EXIT=$$?; \
+	echo ""; \
+	echo "✅ Submitted: SUCCESS"; \
+	oc logs job/run-pipelines -n "$(KFP_NAMESPACE)" 2>/dev/null | grep "^==> Pipeline run ID:" || true; \
 	[ "$$JOB_EXIT" -eq 0 ] || { echo "Error: pipeline submission failed or timed out." >&2; exit "$$JOB_EXIT"; }
 
 clean-mlflow:

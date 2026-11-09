@@ -102,11 +102,12 @@ if repos_json:
         log_repos(json.loads(repos_json))
     except Exception:
         logging.warning("log_repos failed; continuing with pipeline submission.", exc_info=True)
-    params["repos"] = repos_json
+    params["runnable_repos"] = repos_json
 enable_caching = os.environ.get("KFP_TRIGGER_ENABLE_CACHING", "false").lower() == "true"
 run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], params,
                   enable_caching=enable_caching)
 print(f"  Submitted run id: {run.run_id}")
+print(f"==> Pipeline run ID: {run.run_id}")
 PYEOF
     echo "  OK: $run_name submitted."
 }
@@ -128,6 +129,13 @@ if [[ "$ANALYSIS_ONLY" == "true" && -z "$PIPELINE_RUN_ID" ]]; then
     exit 1
 fi
 
+# Only forward pipeline_run_id for analysis-only runs.  Passing a non-empty
+# value on a full run causes data-gen and indexing components to return early
+# and silently skip their work (they guard on `if pipeline_run_id: return`).
+if [[ "$ANALYSIS_ONLY" != "true" ]]; then
+    PIPELINE_RUN_ID=""
+fi
+
 if [[ "$MODE" == "single" ]]; then
     if [[ -z "$GIT_REPO" ]]; then
         echo "Error: GIT_REPO must be set and non-empty for --single-repo." >&2
@@ -135,12 +143,12 @@ if [[ "$MODE" == "single" ]]; then
     fi
     trigger_pipeline "single_repo" "single_repo_${TIMESTAMP}" \
         "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\"}" \
-        "" \
+        "[{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\"}]" \
         "$ANALYSIS_ONLY"
 else
     trigger_pipeline "multi_repo" "multi_repo_${TIMESTAMP}" \
         "{\"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\"}" \
-        "" \
+        "${GIT_REPO_LIST_CONTENTS:-}" \
         "$ANALYSIS_ONLY"
 fi
 

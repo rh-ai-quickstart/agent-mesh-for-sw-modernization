@@ -70,6 +70,24 @@ class MlFlowAssetLoader(AssetLoader):
         for stale_run in stale:
             client.set_tag(stale_run.info.run_id, "archived", "true")
 
+    @staticmethod
+    def _has_prior_enrichment_checkpoint(runs: list) -> bool:
+        """Return True if any run in the list is a checkpoint (tagged latest=true)."""
+        return any(
+            (getattr(getattr(r, "data", None), "tags", None) or {}).get("latest") == "true"
+            for r in runs
+        )
+
+    def _get_artifact_base_uri(self, client, experiment, filter_string: str) -> str:
+        """Return the artifact URI of the latest matching run in *experiment*."""
+        latest_runs = client.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            filter_string=filter_string,
+            order_by=["attributes.start_time DESC"],
+            max_results=1,
+        )
+        return latest_runs[0].info.artifact_uri if latest_runs else experiment.artifact_location
+
     def _get_absolute_artifact_uris(
         self, asset_file_path: str, experiment_name: str, tags: dict = None
     ) -> list[str]:
@@ -96,28 +114,30 @@ class MlFlowAssetLoader(AssetLoader):
             )
             if not runs:
                 return [os.path.join(enrichment_experiment.artifact_location, asset_file_path)]
-            return [os.path.join(run.info.artifact_uri, asset_file_path) for run in runs]
+            enrichment_uris = [
+                os.path.join(run.info.artifact_uri, asset_file_path) for run in runs
+            ]
+            # When no checkpoint exists yet, prepend the static base so
+            # enrichment deltas merge on top of the full original content.
+            if not self._has_prior_enrichment_checkpoint(runs):
+                static_experiment = self.get_or_create_experiment_by_name(
+                    client, self.STATIC_ASSET_EXPERIMENT
+                )
+                static_base_uri = self._get_artifact_base_uri(
+                    client, static_experiment, "tags.latest = 'true'"
+                )
+                enrichment_uris.insert(0, os.path.join(static_base_uri, asset_file_path))
+            return enrichment_uris
 
-        if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags:
-
-            filter_string = "tags.latest = 'true'"
-
-        else:
-
-            filter_string = " AND ".join(tag_filter_parts)
+        filter_string = (
+            "tags.latest = 'true'"
+            if experiment_name == self.STATIC_ASSET_EXPERIMENT and not tags
+            else " AND ".join(tag_filter_parts)
+        )
 
         logging.debug(f"Filter string: {filter_string}")
 
-        latest_runs = client.search_runs(
-            experiment_ids=[experiment.experiment_id],
-            filter_string=filter_string,
-            order_by=["attributes.start_time DESC"],
-            max_results=1,
-        )
-
-        asset_base_uri = (
-            latest_runs[0].info.artifact_uri if latest_runs else experiment.artifact_location
-        )
+        asset_base_uri = self._get_artifact_base_uri(client, experiment, filter_string)
 
         logging.info(f"Base absolute storage URI: {asset_base_uri}")
 
@@ -365,11 +385,12 @@ class MlFlowAssetLoader(AssetLoader):
         try:
             is_dir = os.path.isdir(results_path)
 
-            from utils.pipeline_utils import get_pipeline_run_id
+            if "pipeline_run_id" not in (tags or {}):
+                from utils.pipeline_utils import get_pipeline_run_id
 
-            pipeline_run_id = get_pipeline_run_id()
-            if pipeline_run_id:
-                tags = {**(tags or {}), "pipeline_run_id": pipeline_run_id}
+                pipeline_run_id = get_pipeline_run_id()
+                if pipeline_run_id:
+                    tags = {**(tags or {}), "pipeline_run_id": pipeline_run_id}
 
             if os.path.dirname(results_path):
 
@@ -637,19 +658,16 @@ class MlFlowAssetLoader(AssetLoader):
             catalog_repos = merge_json_enrichment(base, run_repos)
             self.register_enrichments(enrichment_files={"repos/repo_list.json": catalog_repos})
         except Exception:
-            logging.warning("Failed to log repo list as enrichment", exc_info=True)
+            logging.warning("Failed to update repo catalog enrichment", exc_info=True)
 
-        try:
-            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
-                tmp_path = os.path.join(tmp_dir, "repo_list.json")
-                self.log_results(
-                    tmp_path,
-                    artifact_path="repos",
-                    tags={"category": "repositories"},
-                    content=json.dumps(run_repos),
-                )
-        except Exception:
-            logging.warning("Failed to log repo list to asset store", exc_info=True)
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, "repo_list.json")
+            self.log_results(
+                tmp_path,
+                artifact_path="repos",
+                tags={"category": "repositories"},
+                content=json.dumps(run_repos),
+            )
 
     def load_run_repos(self, run_id: str | None = None) -> list:
         """Loads the repo list from MLflow, scoped by run_id if set,

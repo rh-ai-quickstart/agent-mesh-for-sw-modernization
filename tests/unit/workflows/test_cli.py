@@ -66,6 +66,9 @@ def capture_submission(tmp_path):
         "    return SimpleNamespace(run_id='mock-run-123')\n"
         "service.trigger_run = trigger_run\n"
         "sys.modules['services.trigger_run'] = service\n"
+        "repo_service = ModuleType('services.update_repos')\n"
+        "repo_service.log_repos = lambda repos, **kw: None\n"
+        "sys.modules['services.update_repos'] = repo_service\n"
     )
     return capture, {
         "PYTHONPATH": str(tmp_path),
@@ -104,6 +107,9 @@ def test_successful_invocation_passes_parameters_and_repos(
     }
     if mode == "single":
         expected_params.update(git_repo=env["GIT_REPO"], git_branch="develop")
+        expected_params["runnable_repos"] = json.dumps(
+            [{"git_repo": env["GIT_REPO"], "git_branch": "develop"}]
+        )
     assert submission["params"] == expected_params
     assert submission["enable_caching"] is analysis_only
 

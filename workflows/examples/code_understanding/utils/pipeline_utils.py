@@ -8,14 +8,25 @@ def uses_jupyter_runtime():
         return False
 
 
+def _running_in_kubernetes_pod() -> bool:
+    """Returns True if the process is running inside a Kubernetes pod."""
+    import os
+
+    return os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/token")
+
+
 def uses_kfp():
-    """Returns True if KFP is installed and the process is not running in a Jupyter notebook."""
+    """Returns True when KFP pipeline graph construction should be used."""
+    import os
+
     try:
         if uses_jupyter_runtime():
             return False
         import kfp  # noqa: F401
 
-        return True
+        if _running_in_kubernetes_pod() or os.getenv("PIPELINE_COMPILE_ONLY"):
+            return True
+        return False
     except ImportError:
         return False
 
@@ -44,6 +55,17 @@ def get_pipeline_run_id() -> str:
 
     except Exception:
         pass
+
+    # In a KFP run every stage must share the same ID; a random fallback would
+    # cause stages to store and look up results under different keys.
+    # Only raise when KFP_POD_NAME is set — that env var is injected by the
+    # downward API exclusively in KFP pipeline pods, not in other pods (like
+    # the console) that happen to have kfp installed.
+    if os.getenv("KFP_POD_NAME") and uses_kfp() and _running_in_kubernetes_pod():
+        raise RuntimeError(
+            "Running in KFP but could not read the pipeline/runid pod label. "
+            "Ensure KFP_POD_NAME and KFP_NAMESPACE are set via the downward API."
+        )
 
     import uuid
 

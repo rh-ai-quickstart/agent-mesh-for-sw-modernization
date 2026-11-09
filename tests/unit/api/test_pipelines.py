@@ -56,11 +56,10 @@ def test_pipeline_requests_route_to_existing_pipelines(
         "pipeline_run_id": pipeline_run_id,
         "parent_source_path": "sources",
         "parent_target_path": "targets",
+        "runnable_repos": json.dumps(body["repos"]),
     }
     if pipeline_name == "single_repo":
         expected_params.update(REPO)
-    else:
-        expected_params["repos"] = json.dumps(body["repos"])
 
     assert params == expected_params
     assert response.json() == {
