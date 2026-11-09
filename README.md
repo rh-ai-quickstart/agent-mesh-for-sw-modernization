@@ -232,6 +232,13 @@ embedding model during installation, use this command instead:
 make install DEPLOY_EMBEDDING_MODEL=true
 ```
 
+To deploy an agent model and use it for the supported agentic tasks, set `AGENT_MODEL` to
+`qwen` or `muse-glimmer` during installation.
+
+```sh
+make install AGENT_MODEL=qwen
+```
+
 
 
 ### 5. Ask a question using the prebuilt index

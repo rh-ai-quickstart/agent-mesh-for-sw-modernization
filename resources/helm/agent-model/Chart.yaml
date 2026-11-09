@@ -1,0 +1,5 @@
+apiVersion: v2
+name: agent-model
+description: KServe vLLM endpoint for Qwen3.5 9B FP8 Dynamic or Muse Glimmer 30B FP8
+type: application
+version: 0.1.0
