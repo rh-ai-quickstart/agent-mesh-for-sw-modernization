@@ -442,6 +442,7 @@ class DependencyAnalyzer:
         multi_repo: bool,
         git_repo: str = "",
         namespace: str | None = None,
+        pipeline_run_id: str = "",
     ):
         """Downloads GraphRAG index artifacts and prepares settings.
 
@@ -487,6 +488,7 @@ class DependencyAnalyzer:
                     "git_slug": git_slug,
                     "multi_repo": multi_repo,
                     "category": "indexing",
+                    **({"pipeline_run_id": pipeline_run_id} if pipeline_run_id else {}),
                 },
                 namespace=namespace,
             )

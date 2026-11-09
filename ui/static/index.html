@@ -1106,7 +1106,7 @@
         return;
       }
       $("analysis-loading").classList.add("hidden");
-      const opts = state.queryable.filter(o => o.key !== "__multi_repo__");
+      const opts = state.queryable;
       if (!opts.length) {
         $("analysis-empty").textContent = state.indexesError
           ? "Failed to load indexed repositories. Check the status panel."
@@ -1130,7 +1130,7 @@
     }
 
     function renderIndexedSelect() {
-      const opts = state.queryable.filter(o => o.key !== "__multi_repo__");
+      const opts = state.queryable;
       const prevKey = $("analysis-repo").value;
       $("analysis-repo").innerHTML = opts.map(o =>
         `<option value="${esc(o.key)}">${esc(o.label)}</option>`
