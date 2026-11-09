@@ -152,6 +152,7 @@ def sigterm_handler(signum, frame):
 def harden_skill_component(
     component_fn=None,
     *,
+    cpu_request: str = "250m",
     cpu_limit: str = "2",
     memory_limit: str = "8G",
     timeout_seconds: int | None = None,
@@ -160,6 +161,8 @@ def harden_skill_component(
     Decorator that hardens a KFP component for isolated skill execution.
 
     Args:
+        cpu_request:     CPU reserved for scheduling (default: "250m"). Set explicitly
+                         so Kubernetes does not reserve the full CPU limit.
         cpu_limit:       CPU limit for the component pod (default: "2").
         memory_limit:    Memory limit for the component pod (default: "8G").
         timeout_seconds: KFP task timeout in seconds. Pass an integer to enforce a
@@ -171,7 +174,7 @@ def harden_skill_component(
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             task = fn(*args, **kwargs)
-            task.set_cpu_limit(cpu_limit).set_memory_limit(memory_limit)
+            task.set_cpu_request(cpu_request).set_cpu_limit(cpu_limit).set_memory_limit(memory_limit)
             try:
                 from kfp import kubernetes
 
