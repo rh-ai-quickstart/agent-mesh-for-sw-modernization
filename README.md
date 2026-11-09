@@ -294,12 +294,11 @@ It can also be found in the OpenShift AI console under **Develop & train >
 Pipelines > Runs** — open the completed full run and copy the value shown in
 the **pipeline_run_id** input parameter.
 
-For the prebuilt index, install first to upload the sample index (step 4), then
-locate its run ID in the Pipelines view and pass it here:
+For the prebuilt index, you can use the following pipeline run ID:
 
 ```sh
 make run-pipelines ARGS="--single-repo --analysis-only" \
-  PIPELINE_RUN_ID=<run-id-of-full-pipeline-run> \
+  PIPELINE_RUN_ID=8e71296d-5458-4433-a7b5-48aea9caf346 \
   PIPELINE_GIT_REPO=https://github.com/agapebondservant/tic-tac-toe-sample \
   PIPELINE_GIT_BRANCH=main
 ```
