@@ -44,22 +44,19 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.skillAgent.networkPolicy.egressPorts.mlmd }}
-    # MinIO object store — in-namespace only
+    # S3-compatible object store — in-namespace only
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: {{ .Values.namespace }}
       ports:
         - protocol: TCP
-          port: {{ .Values.skillAgent.networkPolicy.egressPorts.minio }}
-    # S4 (S3-compatible) object store — in-namespace only
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.namespace }}
-      ports:
-        - protocol: TCP
-          port: {{ .Values.skillAgent.networkPolicy.egressPorts.s3 }}
+          {{- if (index .Values "aws-compatible-storage").enabled }}
+          # The bundled S4 Service forwards to this pod port, even if s3Port changes.
+          port: s3-api
+          {{- else }}
+          port: {{ include "agent-mesh.awsCompatibleStorage.apiPort" . }}
+          {{- end }}
     # RHOAI MCP server — in-namespace only (required when rhoaiMcp.enabled=true)
     - to:
         - namespaceSelector:

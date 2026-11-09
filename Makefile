@@ -32,7 +32,6 @@ PIPELINE_GIT_REPO   	?=
 PIPELINE_GIT_BRANCH 	?=
 PIPELINE_GIT_REPO_LIST	?=
 PIPELINE_RUN_ID     	?=
-OBJECT_STORE_BACKEND   ?= s4
 DEPLOY_EMBEDDING_MODEL ?= false
 AGENT_MODEL            ?=
 DEPLOY_OTEL            ?= false
@@ -179,8 +178,7 @@ CONSOLE_PLUGIN_IMAGE = $(BUILD_REGISTRY)/$(CONSOLE_PLUGIN_IMAGE_NAME):$(or $(VER
 
 HELM_REPO_ARGS = \
 	--set "repoUrl=$(GIT_REPO_URL)" \
-	--set "repoRef=$(GIT_REPO_BRANCH)" \
-	--set "objectStoreBackend=$(OBJECT_STORE_BACKEND)"
+	--set "repoRef=$(GIT_REPO_BRANCH)"
 HELM_WORKFLOW_IMAGE_ARGS = \
 	--set "dataGeneration.image.registry=$(KFP_IMAGE_REGISTRY)" \
 	--set "dataGeneration.image.name=$(KFP_DATA_GENERATION_BASE_IMAGE_NAME)" \
@@ -399,7 +397,6 @@ help-all:
 	@echo "  AGENT_MODEL                 Deploy qwen or muse-glimmer during install or deploy-agent-model"
 	@echo "  DEPLOY_OTEL                 Deploy OpenTelemetry and Tempo during install (default: false)"
 	@echo "  MANAGE_NAMESPACE           Create namespace and apply metadata (default: true; false for pre-provisioned namespaces)"
-	@echo "  OBJECT_STORE_BACKEND        Object store backend: s4 (default) or minio"
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
