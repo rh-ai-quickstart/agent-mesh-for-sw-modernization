@@ -117,6 +117,7 @@ class AnalysisPipeline:
                 multi_repo=use_multi_repo,
                 git_repo=git_repo,
                 namespace=namespace,
+                pipeline_run_id=pipeline_run_id,
             )
         except Exception:
             msg = (

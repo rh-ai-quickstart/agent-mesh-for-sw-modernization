@@ -16,11 +16,3 @@ dependencies = [
     "pydantic>=2.0.0",
     "python-multipart>=0.0.9",
 ]
-
-[tool.isort]
-profile = "black"
-line_length = 99
-
-[tool.black]
-line-length = 99
-target-version = ["py311"]
