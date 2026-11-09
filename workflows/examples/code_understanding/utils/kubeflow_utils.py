@@ -174,7 +174,9 @@ def harden_skill_component(
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             task = fn(*args, **kwargs)
-            task.set_cpu_request(cpu_request).set_cpu_limit(cpu_limit).set_memory_limit(memory_limit)
+            task.set_cpu_request(cpu_request).set_cpu_limit(cpu_limit).set_memory_limit(
+                memory_limit
+            )
             try:
                 from kfp import kubernetes
 
