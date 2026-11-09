@@ -546,6 +546,11 @@
       0% { transform: translateX(-120%); }
       100% { transform: translateX(320%); }
     }
+    @keyframes cu-fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .cu-animate-in { animation: cu-fade-in 0.8s ease-in-out; }
 
     .cu-chat {
       min-height: 16rem;
@@ -1271,6 +1276,12 @@
       ["repos", "runs", "analysis"].forEach((tab) => {
         $("tab-" + tab).classList.toggle("hidden", tab !== name);
       });
+      if (name === "analysis") {
+        const el = $("tab-analysis");
+        el.classList.remove("cu-animate-in");
+        void el.offsetWidth;
+        el.classList.add("cu-animate-in");
+      }
     }
 
     async function openReport(runId, runName, gitRepo, gitBranch) {
