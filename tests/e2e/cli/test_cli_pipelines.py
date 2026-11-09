@@ -4,6 +4,7 @@ These tests require an existing deployment and oc login. Pipeline tests also
 require --run-pipelines (or make test-cli-e2e RUN_PIPELINES=true). The query test
 uses the existing index. CLI_E2E_PIPELINE_TIMEOUT_SECONDS defaults to two hours;
 CLI_E2E_COMMAND_TIMEOUT_SECONDS defaults to 30 minutes.
+The analysis-only test requires the bundled prebuilt index to be installed.
 """
 
 import os
@@ -22,13 +23,17 @@ REPO = "https://github.com/agapebondservant/tic-tac-toe-sample"
 BRANCH = "main"
 QUESTION = "Which components should we investigate first, and why?"
 GIT_SLUG = git_slug(REPO, BRANCH)
+# Matches the bundled prebuilt index and the README analysis-only example.
+PREBUILT_PIPELINE_RUN_ID = "8e71296d-5458-4433-a7b5-48aea9caf346"
 REPO_LIST = (
     Path(__file__).resolve().parents[3]
     / "workflows/examples/code_understanding/assets/repos/repo_list.json"
 )
 
 
-def _artifact_run(client, namespace, experiment_suffix, category, kfp_run_id, *, multi_repo=False):
+def _artifact_run(
+    client, namespace, experiment_suffix, category, pipeline_run_id, *, multi_repo=False
+):
     experiment_name = f"{namespace}/code-refactoring/assets/{experiment_suffix}"
     experiment = client.get_experiment_by_name(experiment_name)
     assert experiment is not None, f"Missing MLflow experiment: {experiment_name}"
@@ -39,7 +44,7 @@ def _artifact_run(client, namespace, experiment_suffix, category, kfp_run_id, *,
             "attributes.status = 'FINISHED'"
             f" AND tags.category = '{category}'"
             f"{scope}"
-            f" AND tags.kfp_run_id = '{kfp_run_id}'"
+            f" AND tags.pipeline_run_id = '{pipeline_run_id}'"
         ),
         order_by=["attributes.start_time DESC"],
         max_results=100,
@@ -55,7 +60,7 @@ def _artifact_run(client, namespace, experiment_suffix, category, kfp_run_id, *,
     )
     assert (
         run is not None
-    ), f"No completed {category} artifacts for KFP run {kfp_run_id} in {experiment_name}."
+    ), f"No completed {category} artifacts for KFP run {pipeline_run_id} in {experiment_name}."
     return run.info.run_id
 
 
@@ -112,11 +117,13 @@ def _wait_for_run(client, run_id, timeout):
     )
 
 
-def _submit_and_wait(run_cli, client, namespace, args, *, repo_list=None):
+def _submit_and_wait(run_cli, client, namespace, args, *, repo_list=None, pipeline_run_id=""):
     command_timeout = int(os.environ.get("CLI_E2E_COMMAND_TIMEOUT_SECONDS", "1800"))
     pipeline_timeout = int(os.environ.get("CLI_E2E_PIPELINE_TIMEOUT_SECONDS", "7200"))
 
     command = ["make", "run-pipelines", f"ARGS={args}"]
+    if pipeline_run_id:
+        command.append(f"PIPELINE_RUN_ID={pipeline_run_id}")
     if repo_list is not None:
         run_cli(
             ["make", "apply-secrets", f"PIPELINE_GIT_REPO_LIST={repo_list}"],
@@ -225,8 +232,19 @@ def test_analysis_only_pipeline_returns_report(
         deployed_kfp_client,
         deployed_namespace,
         "--single-repo --analysis-only",
+        pipeline_run_id=PREBUILT_PIPELINE_RUN_ID,
     )
     _assert_analysis_report(deployed_mlflow_client, deployed_namespace, run_id, tmp_path)
+
+    experiment_name = f"{deployed_namespace}/code-refactoring/assets/result-directories"
+    experiment = deployed_mlflow_client.get_experiment_by_name(experiment_name)
+    assert experiment is not None, f"Missing MLflow experiment: {experiment_name}"
+    indexes = deployed_mlflow_client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"tags.category = 'indexing' AND tags.pipeline_run_id = '{run_id}'",
+        max_results=1,
+    )
+    assert not indexes, f"Analysis-only KFP run {run_id} created a new index."
 
 
 @pytest.mark.pipeline

@@ -26,6 +26,7 @@ PREBUILT_BUNDLE = (
     / "workflows/examples/code_understanding/assets/prebuilt-indexes"
     / "agapebondservant-tic-tac-toe-sample-main-index.tar.gz"
 )
+PREBUILT_PIPELINE_RUN_ID = "8e71296d-5458-4433-a7b5-48aea9caf346"
 
 
 def test_prebuilt_bundle_has_portable_metadata_and_anonymous_tar_headers(tmp_path):
@@ -52,7 +53,7 @@ def test_prebuilt_bundle_has_portable_metadata_and_anonymous_tar_headers(tmp_pat
         "category": "indexing",
         "git_slug": "agapebondservant-tic-tac-toe-sample-main",
         "multi_repo": "False",
-        "pipeline_run_id": "8e71296d-5458-4433-a7b5-48aea9caf346",
+        "pipeline_run_id": PREBUILT_PIPELINE_RUN_ID,
         "mlflow.runName": "tic-tac-toe-prebuilt-index",
     }
     assert metadata["mlflow"]["params"] == {
@@ -668,10 +669,10 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
     mlflow.set_tracking_uri(mlflow_server)
     client = MlflowClient(tracking_uri=mlflow_server)
     with WorkspaceContext("destination"):
-        assert imported["pipeline_run_id"] is None
+        assert imported["pipeline_run_id"] == PREBUILT_PIPELINE_RUN_ID
         assert "source_run_id" not in imported
         assert "destination_run_id" not in imported
-        assert "cannot be selected by PIPELINE_RUN_ID" in imported["message"]
+        assert "message" not in imported
         runs = client.search_runs(
             experiment_ids=[
                 client.get_experiment_by_name(
@@ -688,7 +689,7 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
             "destination" + transfer.EXPERIMENT_SUFFIX
         )
         assert run.data.tags["uploaded"] == "true"
-        assert run.data.tags["pipeline_run_id"] == "8e71296d-5458-4433-a7b5-48aea9caf346"
+        assert run.data.tags["pipeline_run_id"] == PREBUILT_PIPELINE_RUN_ID
         assert run.data.tags["bundle_sha256"] == transfer.bundle_sha256(PREBUILT_BUNDLE)
         assert run.data.params["embedding_model"] == "intfloat/e5-mistral-7b-instruct"
         downloaded = Path(client.download_artifacts(run_id, "", str(tmp_path)))
@@ -701,17 +702,18 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
                     )
         existing = run_import()
         assert existing["outcome"] == "existing"
-        assert existing["pipeline_run_id"] is None
+        assert existing["pipeline_run_id"] == PREBUILT_PIPELINE_RUN_ID
         assert "destination_run_id" not in existing
         listing = run_cli("list")
-        assert "unavailable" in listing
-        assert "cannot be selected by PIPELINE_RUN_ID" in listing
+        assert PREBUILT_PIPELINE_RUN_ID in listing
+        assert "unavailable" not in listing
+        assert "cannot be selected by PIPELINE_RUN_ID" not in listing
         exported = run_cli(
             "export",
-            "--git-slug",
-            "agapebondservant-tic-tac-toe-sample-main",
+            "--pipeline-run-id",
+            PREBUILT_PIPELINE_RUN_ID,
             "--bundle",
-            str(tmp_path / "legacy-export.tar.gz"),
+            str(tmp_path / "prebuilt-export.tar.gz"),
         )
-        assert "Pipeline Run ID: unavailable" in exported
+        assert f"Pipeline Run ID: {PREBUILT_PIPELINE_RUN_ID}" in exported
         assert all(run_id not in output for output in outputs)
