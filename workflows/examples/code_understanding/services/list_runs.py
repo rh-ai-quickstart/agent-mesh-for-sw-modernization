@@ -54,6 +54,21 @@ def get_run_git_metadata(run_id: str, namespace: str | None = None) -> tuple[str
     return git_slug, multi_repo
 
 
+def _parse_runnable_repos(raw: Any) -> list[dict[str, str]] | None:
+    """Parse the ``runnable_repos`` JSON parameter into a list of repo dicts."""
+    if not raw:
+        return None
+    try:
+        import json
+
+        repos = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(repos, list) and repos:
+            return repos
+    except Exception:
+        pass
+    return None
+
+
 def list_kfp_runs(page_size: int = 50, namespace: str | None = None) -> list[dict[str, Any]]:
     """Return KFP runs newest-first as a list of {run_id, name, status, start_time} dicts."""
     client = create_client(namespace=namespace)
@@ -64,6 +79,7 @@ def list_kfp_runs(page_size: int = 50, namespace: str | None = None) -> list[dic
         params = getattr(getattr(r, "runtime_config", None), "parameters", None) or {}
         git_repo = params.get("git_repo") or ""
         git_branch = params.get("git_branch") or ""
+        runnable_repos = _parse_runnable_repos(params.get("runnable_repos"))
         out.append(
             {
                 "run_id": getattr(r, "run_id", None) or getattr(r, "id", ""),
@@ -73,6 +89,7 @@ def list_kfp_runs(page_size: int = 50, namespace: str | None = None) -> list[dic
                 "git_slug": _get_git_slug(r),
                 "git_repo": git_repo or None,
                 "git_branch": git_branch or None,
+                **({"repos": runnable_repos} if runnable_repos else {}),
             }
         )
     return out

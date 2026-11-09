@@ -166,11 +166,12 @@
     .cu-job-dot.Running, .cu-job-dot.Pending { background: var(--cu-gold); animation: cu-blink 1.2s ease-in-out infinite; }
     .cu-job-dot.Skipped { background: var(--cu-green); }
     .cu-job-dot.Cancelled { background: var(--cu-red); }
-    .cu-run-table .cu-job-dot { width: 1.1rem; height: 1.1rem; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #9ea3a9; }
-    .cu-run-table .cu-job-dot.Succeeded, .cu-run-table .cu-job-dot.Skipped   { border-color: #6ab04c; }
-    .cu-run-table .cu-job-dot.Failed,    .cu-run-table .cu-job-dot.Cancelled { border-color: #ff6b6b; }
-    .cu-run-table .cu-job-dot.Running,   .cu-run-table .cu-job-dot.Pending   { border-color: #ffd060; }
-    .cu-run-table .cu-job-dot::after { content: none; }
+    .cu-run-table .cu-job-dot { width: 1rem; height: 1rem; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: 0; animation: none; }
+    .cu-run-table .cu-job-dot::after { display: inline-block; font-size: 0.85rem; line-height: 1; }
+    .cu-run-table .cu-job-dot.Succeeded::after, .cu-run-table .cu-job-dot.Skipped::after { content: "✓"; color: var(--cu-green); font-weight: 700; }
+    .cu-run-table .cu-job-dot.Failed::after,    .cu-run-table .cu-job-dot.Cancelled::after { content: "✕"; color: var(--cu-red); font-weight: 700; }
+    .cu-run-table .cu-job-dot.Running, .cu-run-table .cu-job-dot.Pending { width: 0.85rem; height: 0.85rem; border: 2px solid #d2d2d2; border-top-color: var(--cu-gold); border-radius: 50%; animation: cu-spin 0.7s linear infinite; }
+    .cu-run-table .cu-job-dot.Running::after, .cu-run-table .cu-job-dot.Pending::after { content: none; }
     .cu-job-kind { font-size: 0.78rem; font-weight: 600; }
     .cu-job-name { font-size: 0.7rem; color: var(--cu-gray); word-break: break-all; }
 
@@ -300,7 +301,7 @@
     }
     textarea { min-height: 4.5rem; resize: vertical; }
 
-    .cu-repo-list { border: 1px solid var(--cu-border); background: #fff; max-height: 18rem; overflow-y: auto; border-radius: 0.5rem; }
+    .cu-repo-list { border: 1px solid var(--cu-border); background: #fff; max-height: 21rem; overflow-y: auto; border-radius: 0.5rem; }
     .cu-repo {
       display: grid;
       grid-template-columns: 1.25rem minmax(0, 1fr) auto;
@@ -334,6 +335,14 @@
       background-repeat: no-repeat;
       background-position: center;
     }
+    .cu-check.cu-radio { border-radius: 50%; }
+    .cu-check.cu-radio:checked {
+      background: #fff;
+      border-color: #8a8d90;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='4' fill='%238a8d90'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+    }
     .cu-radio {
       appearance: none;
       width: 1rem;
@@ -354,7 +363,7 @@
     .cu-repo-title {
       display: block;
       font-weight: 600;
-      font-size: 0.95rem;
+      font-size: 0.88rem;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -407,7 +416,7 @@
       margin-top: 1rem;
       font-size: 0.9rem;
     }
-    #selection-note {
+    #selection-note, #run-selection-note {
       background: none;
       border-left-color: var(--cu-red);
       margin-top: 0;
@@ -417,13 +426,13 @@
       cursor: pointer;
       position: relative;
     }
-    #selection-note .cu-note-detail { color: #888; }
-    #selection-note.cu-note-expanded {
+    #selection-note .cu-note-detail, #run-selection-note .cu-note-detail { color: #888; }
+    #selection-note.cu-note-expanded, #run-selection-note.cu-note-expanded {
       white-space: normal;
       overflow: visible;
       text-overflow: clip;
     }
-    #selection-note::after {
+    #selection-note::after, #run-selection-note::after {
       content: "Click to expand";
       display: none;
       position: absolute;
@@ -437,9 +446,9 @@
       border-radius: 3px;
       pointer-events: none;
     }
-    #selection-note.cu-note-expanded::after { content: "Click to collapse"; }
-    #selection-note.cu-note-overflowing:hover::after,
-    #selection-note.cu-note-expanded:hover::after { display: inline-block; }
+    #selection-note.cu-note-expanded::after, #run-selection-note.cu-note-expanded::after { content: "Click to collapse"; }
+    #selection-note.cu-note-overflowing:hover::after, #run-selection-note.cu-note-overflowing:hover::after,
+    #selection-note.cu-note-expanded:hover::after, #run-selection-note.cu-note-expanded:hover::after { display: inline-block; }
     .cu-alert-warning {
       display: flex;
       align-items: flex-start;
@@ -727,6 +736,9 @@
         <h2>Runs</h2>
         <div class="cu-pipeline-row">
           <p class="cu-muted" style="margin:0;flex:1">View, download, query and re-run analysis reports generated from your repository knowledge graphs.</p>
+        </div>
+        <div class="cu-pipeline-row">
+          <div class="cu-note hidden" id="run-selection-note"></div>
           <button type="button" class="cu-btn cu-btn-secondary cu-run-action" id="run-view-report" disabled>View Report</button>
           <button type="button" class="cu-btn cu-btn-secondary cu-run-action" id="run-download-report" disabled>Download Report</button>
         </div>
@@ -889,7 +901,6 @@
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], thinking: null,
       animateLatest: false, indexesLoading: true, indexesError: "",
-      runRepos: JSON.parse(localStorage.getItem("cu_run_repos") || "{}"),
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1382,7 +1393,7 @@
         ? "Combined repos"
         : run.git_repo ? shortName(run.git_repo).replace(/\.git$/, "") : (run.git_slug || run.name);
       const started = run.start_time ? esc(prettyRelativeDate(run.start_time)) : "—";
-      const storedRepos = state.runRepos[run.run_id];
+      const storedRepos = run.repos || null;
       const repoSummary = storedRepos && storedRepos.length
         ? `<strong>Repositories:<br/></strong> ${storedRepos.map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}`
         : isMulti
@@ -1417,7 +1428,7 @@
       return `<tr>
         <td>
           <div style="display:flex;align-items:center;gap:0.75rem">
-            <input type="checkbox" class="cu-check cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-succeeded="${succeeded}"/>
+            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-succeeded="${succeeded}"/>
             <div>
               <span class="cu-index-title">${esc(title)}</span>
               <div class="cu-index-owner" style="font-size:0.8rem">${esc(run.name || "")}</div>
@@ -1428,6 +1439,21 @@
         <td><span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span></td>
         <td><span class="cu-muted" style="font-size:0.8rem">${started}</span></td>
       </tr>`;
+    }
+
+    function updateRunSelectionNote(cb) {
+      const note = $("run-selection-note");
+      if (cb) {
+        const owner = cb.dataset.runName || "";
+        const title = cb.dataset.title || "";
+        const label = owner ? `${esc(owner)} @ ${esc(title)}` : esc(title);
+        note.innerHTML = `<strong>Selected Run:</strong> &nbsp;&nbsp;<span class="cu-note-detail">${label}</span>`;
+        note.classList.remove("hidden");
+      } else {
+        note.innerHTML = `<strong>Selected Run:</strong> &nbsp;&nbsp;<span class="cu-note-detail"><i>None selected</i></span>`;
+      }
+      note.classList.remove("cu-note-expanded");
+      note.classList.toggle("cu-note-overflowing", note.scrollWidth > note.clientWidth);
     }
 
     function bindRunCards(container) {
@@ -1447,6 +1473,7 @@
           $("run-view-report").dataset.gitBranch = selected ? cb.dataset.gitBranch : "";
           $("run-download-report").dataset.runId = selected ? cb.dataset.runId : "";
           $("run-download-report").dataset.runName = selected ? cb.dataset.runName : "";
+          updateRunSelectionNote(selected ? cb : null);
         });
       });
       root.querySelectorAll(".cu-repo-toggle").forEach((link) => {
@@ -1740,7 +1767,6 @@
 
         state.repos = catalog.repos || [];
         state.defaultKey = catalog.default_key;
-        state.repos.forEach((r) => state.selected.add(repoKey(r)));
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
         state.indexesLoading = false;
@@ -1775,6 +1801,7 @@
             if (page < totalPages - 1) $("run-next").onclick = () => renderRunPage(page + 1);
           }
           bindRunCards($("run-list"));
+          updateRunSelectionNote(null);
         };
         const renderRuns = (expanded) => {
           const shown = expanded ? allRuns : allRuns.slice(0, 3);
@@ -1836,6 +1863,8 @@
         };
         $("selection-note").classList.remove("hidden");
         $("selection-note").onclick = () => $("selection-note").classList.toggle("cu-note-expanded");
+        $("run-selection-note").classList.remove("hidden");
+        $("run-selection-note").onclick = () => $("run-selection-note").classList.toggle("cu-note-expanded");
         $("chat-loading").classList.add("hidden");
         $("chat-repo-row").classList.remove("hidden");
         renderRepos();
@@ -2069,8 +2098,6 @@
       try {
         const submittedRepos = selectedRepos();
         const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify({ repos: submittedRepos }) });
-        state.runRepos[result.job_id] = submittedRepos;
-        localStorage.setItem("cu_run_repos", JSON.stringify(state.runRepos));
         setThinking({ kind: "pipeline", label: "Running pipeline", status: `KFP run ${result.job_id} started` });
         pollV2(result.job_id);
       } catch (e) {
