@@ -170,10 +170,7 @@
     .cu-run-table .cu-job-dot.Succeeded, .cu-run-table .cu-job-dot.Skipped   { border-color: #6ab04c; }
     .cu-run-table .cu-job-dot.Failed,    .cu-run-table .cu-job-dot.Cancelled { border-color: #ff6b6b; }
     .cu-run-table .cu-job-dot.Running,   .cu-run-table .cu-job-dot.Pending   { border-color: #ffd060; }
-    .cu-run-table .cu-job-dot::after { color: #fff; font-size: 0.55rem; font-weight: 900; line-height: 1; }
-    .cu-run-table .cu-job-dot.Succeeded::after, .cu-run-table .cu-job-dot.Skipped::after   { content: "✓"; }
-    .cu-run-table .cu-job-dot.Running::after,   .cu-run-table .cu-job-dot.Pending::after   { content: "!"; }
-    .cu-run-table .cu-job-dot.Failed::after,    .cu-run-table .cu-job-dot.Cancelled::after { content: "✕"; }
+    .cu-run-table .cu-job-dot::after { content: none; }
     .cu-job-kind { font-size: 0.78rem; font-weight: 600; }
     .cu-job-name { font-size: 0.7rem; color: var(--cu-gray); word-break: break-all; }
 
@@ -266,7 +263,7 @@
       justify-content: center;
       min-height: 2.25rem;
       padding: 0 1rem;
-      border-radius: 3px;
+      border-radius: 999px;
       font-weight: 500;
       font-size: 0.95rem;
       border: 1px solid transparent;
@@ -318,15 +315,40 @@
     .cu-repo:last-child { border-bottom: 0; }
     .cu-repo:hover { background: #f5f5f5; }
     .cu-check {
-      appearance: auto;
+      appearance: none;
       width: 1rem;
       height: 1rem;
       min-width: 1rem;
       margin: 0;
       padding: 0;
-      border: 1px solid #8a8d90;
-      accent-color: var(--cu-red);
+      border: 1px solid #6a6e73;
+      border-radius: 2px;
+      background: #fff;
       justify-self: center;
+      cursor: pointer;
+    }
+    .cu-check:checked {
+      background: #8a8d90;
+      border-color: #8a8d90;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+    .cu-radio {
+      appearance: none;
+      width: 1rem;
+      height: 1rem;
+      min-width: 1rem;
+      margin: 0;
+      padding: 0;
+      border: 1px solid #6a6e73;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+    .cu-radio:checked {
+      border-color: #8a8d90;
+      background: radial-gradient(circle, #8a8d90 40%, #fff 45%);
     }
     .cu-repo-body { min-width: 0; }
     .cu-repo-title {
@@ -389,7 +411,35 @@
       background: none;
       border-left-color: var(--cu-red);
       margin-top: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      position: relative;
     }
+    #selection-note .cu-note-detail { color: #888; }
+    #selection-note.cu-note-expanded {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
+    #selection-note::after {
+      content: "Click to expand";
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 0;
+      background: #333;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: normal;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+    #selection-note.cu-note-expanded::after { content: "Click to collapse"; }
+    #selection-note.cu-note-overflowing:hover::after,
+    #selection-note.cu-note-expanded:hover::after { display: inline-block; }
     .cu-alert-warning {
       display: flex;
       align-items: flex-start;
@@ -533,8 +583,8 @@
     .gridjs-td { vertical-align: top; }
     .cu-row-fail td.gridjs-td { background-color: #fff0f0 !important; }
     .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
-    .cu-pipeline-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
-    .cu-pipeline-row .cu-note { margin: 0; flex: 1; }
+    .cu-pipeline-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; margin-bottom: 0.75rem; }
+    .cu-pipeline-row .cu-note { margin: 0; flex: 1; min-width: 0; }
     .cu-pipeline-row .cu-btn { flex-shrink: 0; }
     .hidden { display: none !important; }
     .cu-modal-overlay {
@@ -666,7 +716,7 @@
         <div class="cu-pipeline-row">
           <div class="cu-note hidden" id="selection-note"></div>
           <button type="button" class="cu-btn cu-btn-secondary" id="open-analyze" disabled>Analyze</button>
-          <button type="button" class="cu-btn cu-btn-secondary" id="open-add-repo">Add repository</button>
+          <button type="button" class="cu-btn cu-btn-secondary" id="open-add-repo">Add new repository</button>
           <button type="button" class="cu-btn cu-btn-secondary" id="select-all">Select all</button>
           <button type="button" class="cu-btn cu-btn-link" id="clear">Clear</button>
           <!--<button type="button" class="cu-btn cu-btn-link" id="refresh">Refresh indexes</button>-->
@@ -675,18 +725,13 @@
       </section>
       <section id="tab-runs" class="cu-card hidden">
         <h2>Runs</h2>
+        <div class="cu-pipeline-row">
+          <p class="cu-muted" style="margin:0;flex:1">View, download, query and re-run analysis reports generated from your repository knowledge graphs.</p>
+          <button type="button" class="cu-btn cu-btn-secondary cu-run-action" id="run-view-report" disabled>View Report</button>
+          <button type="button" class="cu-btn cu-btn-secondary cu-run-action" id="run-download-report" disabled>Download Report</button>
+        </div>
         <div class="cu-repo-list" style="max-height:none;overflow:hidden">
           <table class="cu-run-table">
-            <thead>
-              <tr>
-                <th style="width:2rem"></th>
-                <th>Run Title</th>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Started</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
             <tbody id="run-list"></tbody>
           </table>
         </div>
@@ -1354,23 +1399,66 @@
             <button type="button" class="cu-run-download" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" title="Download analysis report">${iconDownload}</button>
           </div>`
         : "";
+      const repoList = storedRepos && storedRepos.length
+        ? storedRepos.map((r) => esc(r.git_repo))
+        : isMulti
+          ? []
+          : run.git_repo
+            ? [esc(run.git_repo)]
+            : [];
+      const visibleRepos = repoList.slice(0, 2).join("<br/>");
+      const hiddenRepos = repoList.length > 2
+        ? `<span class="cu-repo-overflow" style="display:none">${repoList.slice(2).map((r) => "<br/>" + r).join("")}</span>`
+          + `<br/><a href="#" class="cu-repo-toggle" style="font-size:0.8rem">More (${repoList.length - 2})</a>`
+        : "";
+      const repoCell = repoList.length
+        ? visibleRepos + hiddenRepos
+        : isMulti ? "<i>Combined repos</i>" : "";
       return `<tr>
-        <td style="text-align:center"><span class="cu-job-dot ${esc(run.status)}"></span></td>
         <td>
-          <div style="display:flex;align-items:center;gap:0.4rem">
-            <span class="cu-index-title">${esc(title)}</span>
-            ${helpIcon}
+          <div style="display:flex;align-items:center;gap:0.75rem">
+            <input type="checkbox" class="cu-check cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-succeeded="${succeeded}"/>
+            <div>
+              <span class="cu-index-title">${esc(title)}</span>
+              <div class="cu-index-owner" style="font-size:0.8rem">${esc(run.name || "")}</div>
+            </div>
           </div>
         </td>
-        <td><span class="cu-index-owner">${esc(run.name || "")}</span></td>
+        <td><div style="display:flex;align-items:center;gap:0.4rem"><span class="cu-job-dot ${esc(run.status)}"></span><span class="cu-muted" style="font-size:0.85rem">${repoCell}</span></div></td>
         <td><span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span></td>
         <td><span class="cu-muted" style="font-size:0.8rem">${started}</span></td>
-        <td>${actions}</td>
       </tr>`;
     }
 
     function bindRunCards(container) {
       const root = container || document;
+      root.querySelectorAll(".cu-run-select").forEach((cb) => {
+        cb.addEventListener("change", () => {
+          document.querySelectorAll(".cu-run-select").forEach((other) => {
+            if (other !== cb) other.checked = false;
+          });
+          const selected = cb.checked;
+          const succeeded = cb.dataset.succeeded === "true";
+          $("run-view-report").disabled = !(selected && succeeded);
+          $("run-download-report").disabled = !(selected && succeeded);
+          $("run-view-report").dataset.runId = selected ? cb.dataset.runId : "";
+          $("run-view-report").dataset.runName = selected ? cb.dataset.runName : "";
+          $("run-view-report").dataset.gitRepo = selected ? cb.dataset.gitRepo : "";
+          $("run-view-report").dataset.gitBranch = selected ? cb.dataset.gitBranch : "";
+          $("run-download-report").dataset.runId = selected ? cb.dataset.runId : "";
+          $("run-download-report").dataset.runName = selected ? cb.dataset.runName : "";
+        });
+      });
+      root.querySelectorAll(".cu-repo-toggle").forEach((link) => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          const overflow = link.parentElement.querySelector(".cu-repo-overflow");
+          const visible = overflow.style.display !== "none";
+          overflow.style.display = visible ? "none" : "inline";
+          const count = overflow.querySelectorAll("br").length;
+          link.textContent = visible ? `More (${count})` : "Less";
+        });
+      });
       root.querySelectorAll(".cu-run-expand").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const origContent = btn.innerHTML;
@@ -1564,9 +1652,12 @@
         delete $("banner").dataset.reason;
       }
       const repoSummary = n
-        ? `<strong>Repositories:<br/></strong> ${selectedRepos().map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}`
-        : "<strong>Repositories:<br/></strong> <i>None selected</i>";
-      $("selection-note").innerHTML = repoSummary;
+        ? `<strong>Repositories:</strong> &nbsp;&nbsp;<span class="cu-note-detail">${selectedRepos().map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}</span>`
+        : "<strong>Repositories:</strong> &nbsp;&nbsp;<span class=\"cu-note-detail\"><i>None selected</i></span>";
+      const note = $("selection-note");
+      note.classList.remove("cu-note-expanded");
+      note.innerHTML = repoSummary;
+      note.classList.toggle("cu-note-overflowing", note.scrollWidth > note.clientWidth);
     }
     function renderChatSelect() {
       $("chat-repo").innerHTML = state.queryable.map((o) =>
@@ -1700,7 +1791,51 @@
           bindRunCards($("runs"));
         };
         renderRuns(false);
+        $("run-view-report").onclick = async function() {
+          const btn = this;
+          if (!btn.dataset.runId) return;
+          btn.disabled = true;
+          try {
+            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
+            const gitRepo = btn.dataset.gitRepo;
+            const gitBranch = btn.dataset.gitBranch;
+            $("report-viewer-title").textContent = gitRepo
+              ? `${shortName(gitRepo).replace(/\.git$/, "")} @ ${gitBranch}`
+              : "Combined repos";
+            $("report-viewer-subtitle").textContent = btn.dataset.runName;
+            const content = snap.analysis_report;
+            $("report-viewer-content").innerHTML = content
+              ? renderMarkdown(content)
+              : `<p class="cu-muted">No analysis report available.</p>`;
+            runMermaid($("report-viewer-content"));
+            $("report-viewer").classList.remove("hidden");
+            showTab("analysis");
+          } catch (e) {
+            banner(String(e.message || e), true);
+          } finally {
+            btn.disabled = false;
+          }
+        };
+        $("run-download-report").onclick = async function() {
+          const btn = this;
+          if (!btn.dataset.runId) return;
+          try {
+            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
+            const report = snap.analysis_report;
+            if (!report) { banner("No analysis report available.", true); return; }
+            const blob = new Blob([report], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${btn.dataset.runName || btn.dataset.runId}_analysis_report.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (e) {
+            banner(String(e.message || e), true);
+          }
+        };
         $("selection-note").classList.remove("hidden");
+        $("selection-note").onclick = () => $("selection-note").classList.toggle("cu-note-expanded");
         $("chat-loading").classList.add("hidden");
         $("chat-repo-row").classList.remove("hidden");
         renderRepos();
