@@ -105,7 +105,6 @@ unexport LOCAL_MLFLOW_GATEWAY_HOST LOCAL_MLFLOW_TRACKING_URI local_mlflow_gatewa
 
 # Local MLflow index transfer
 INDEX_GIT_SLUG                     ?=
-INDEX_RUN_ID                       ?=
 INDEX_BUNDLE                       ?=
 INDEX_FORCE                        ?= false
 
@@ -292,7 +291,7 @@ help:
 	@echo "  clean-mlflow                Mark quickstart MLflow experiments and runs for deletion"
 	@echo "  deploy-otel                 Deploy OpenTelemetry and Tempo resources when available"
 	@echo "  list-indexes                List completed index runs, including combined indexes"
-	@echo "  export-indexes              Download by INDEX_GIT_SLUG (latest) or INDEX_RUN_ID"
+	@echo "  export-indexes              Download by INDEX_GIT_SLUG (latest) or PIPELINE_RUN_ID"
 	@echo "  import-indexes              Import a local INDEX_BUNDLE archive"
 	@echo ""
 	@echo "Run 'make help-all' to list all administrative and development tasks."
@@ -365,7 +364,7 @@ help-all:
 	@echo "  upload-mlflow-assets        Upload MLflow-hosted application assets"
 	@echo "  upload-prebuilt-index       Upload the prebuilt code index"
 	@echo "  list-indexes                List completed indexing runs with IDs and timestamps"
-	@echo "  export-indexes              Export by INDEX_GIT_SLUG or INDEX_RUN_ID (exactly one)"
+	@echo "  export-indexes              Export by INDEX_GIT_SLUG or PIPELINE_RUN_ID (exactly one)"
 	@echo "  import-indexes              Import INDEX_BUNDLE into KFP_NAMESPACE"
 	@echo "  run-adhoc-query             Run an ad hoc code-understanding query"
 	@echo "  run-pipelines               Submit the configured pipeline run"
@@ -400,11 +399,10 @@ help-all:
 	@echo "  PIPELINE_GIT_REPO           Override the repository used by run-pipelines"
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
-	@echo "  PIPELINE_RUN_ID             KFP run ID of a previous run (required for --analysis-only)"
+	@echo "  PIPELINE_RUN_ID             Pipeline ID for --analysis-only or index export"
 	@echo "  ARGS                        Arguments passed to run-pipelines"
 	@echo "  KFP_NAMESPACE               Namespace used for this project"
 	@echo "  INDEX_GIT_SLUG              Export the latest completed single-repository index"
-	@echo "  INDEX_RUN_ID                Export a specific single or combined index run"
 	@echo "  INDEX_BUNDLE                Optional export output path; required import archive path"
 	@echo "  INDEX_FORCE                 Import an identical archive again (default: false)"
 	@echo "  QUESTION_FILE               Required input file for run-adhoc-query"

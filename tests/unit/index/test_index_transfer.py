@@ -82,11 +82,20 @@ def test_prebuilt_bundle_has_portable_metadata_and_anonymous_tar_headers(tmp_pat
 @pytest.fixture(autouse=True)
 def isolated_mlflow_environment(monkeypatch):
     for key in list(os.environ):
-        if key.startswith(("MLFLOW_", "LOCAL_MLFLOW_", "INDEX_")) or key == "KFP_NAMESPACE":
+        if key.startswith(("MLFLOW_", "LOCAL_MLFLOW_", "INDEX_")) or key in {
+            "KFP_NAMESPACE",
+            "PIPELINE_RUN_ID",
+        }:
             monkeypatch.delenv(key)
 
 
-def make_run(run_id="source-id", start_time=1, combined=False, **info_overrides):
+def make_run(
+    run_id="source-id",
+    start_time=1,
+    combined=False,
+    pipeline_run_id="pipeline-123",
+    **info_overrides,
+):
     info = {
         "run_id": run_id,
         "experiment_id": "source-exp",
@@ -103,6 +112,7 @@ def make_run(run_id="source-id", start_time=1, combined=False, **info_overrides)
                 "category": "indexing",
                 "git_slug": "owner-repo-main",
                 "multi_repo": str(combined),
+                "pipeline_run_id": pipeline_run_id,
             }
         ),
     )
@@ -113,7 +123,7 @@ def fake_client(runs=None):
     client.get_experiment_by_name.return_value = SimpleNamespace(
         experiment_id="source-exp", lifecycle_stage="active"
     )
-    client.search_runs.return_value = runs or []
+    client.search_runs.return_value = [make_run()] if runs is None else runs
     client.get_run.return_value = make_run()
     client.list_artifacts.return_value = []
     return client
@@ -170,9 +180,9 @@ def package_stub(monkeypatch, exporter=None, importer=None):
     monkeypatch.setattr(transfer, "_self_hosted_package", functions)
 
 
-def test_latest_selection_order_and_combined_run_id():
+def test_latest_selection_order_and_combined_pipeline_id():
     runs = [make_run("older", 1), make_run("z-tie", 10), make_run("a-tie", 10)]
-    combined = make_run("combined", 20, combined=True)
+    combined = make_run("combined", 20, combined=True, pipeline_run_id="combined-pipeline")
     client = fake_client([combined, *runs])
     wrapper = transfer.IndexTransfer(client, "source")
     indexes = wrapper.list_indexes()["indexes"]
@@ -185,7 +195,7 @@ def test_latest_selection_order_and_combined_run_id():
     assert [item["latest"] for item in indexes] == [True, True, False, False]
     assert wrapper._select("owner-repo-main", None)["run_id"] == "a-tie"
     client.get_run.return_value = combined
-    assert wrapper._select(None, "combined")["artifact_path"].endswith("/multi-repo")
+    assert wrapper._select(None, "combined-pipeline")["artifact_path"].endswith("/multi-repo")
 
 
 def test_listing_paginates_and_does_not_create_missing_experiment():
@@ -204,6 +214,51 @@ def test_listing_paginates_and_does_not_create_missing_experiment():
     client.create_experiment.assert_not_called()
 
 
+def test_pipeline_selection_uses_latest_across_pages_and_reports_duplicates(capsys):
+    class Page(list):
+        token = None
+
+    first = Page([make_run("older", 10), make_run("unrelated", 100, pipeline_run_id="other")])
+    first.token = "next-page"
+    client = fake_client()
+    client.search_runs.side_effect = [first, Page([make_run("newer", 20)])]
+    selected = transfer.IndexTransfer(client, "source")._select(None, "pipeline-123")
+    assert selected["run_id"] == "newer"
+    assert selected["matching_indexes"] == 2
+    for call in client.search_runs.call_args_list:
+        assert call.kwargs["experiment_ids"] == ["source-exp"]
+        assert call.kwargs["run_view_type"] == 1
+        assert "FINISHED" in call.kwargs["filter_string"]
+        assert "category = 'indexing'" in call.kwargs["filter_string"]
+    cli.print_export({**selected, "namespace": "source", "bundle_path": "index.tar.gz"})
+    output = capsys.readouterr().out
+    assert "Found 2 completed indexes" in output
+    assert "exporting the latest by start time" in output
+    assert "Pipeline Run ID: pipeline-123" in output
+    assert "newer" not in output and "older" not in output
+    client.get_run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "pipeline_run_id", ["source-id", "missing", "x' OR tags.category = 'indexing"]
+)
+def test_pipeline_selection_does_not_fall_back_to_internal_id(pipeline_run_id):
+    with pytest.raises(transfer.IndexTransferError, match="No active, completed indexing run"):
+        transfer.IndexTransfer(fake_client(), "source")._select(None, pipeline_run_id)
+
+
+def test_legacy_listing_and_export_require_explicit_bundle_path(capsys):
+    legacy = make_run(pipeline_run_id=None)
+    wrapper = transfer.IndexTransfer(fake_client([legacy]), "source")
+    cli.print_indexes(wrapper.list_indexes())
+    output = capsys.readouterr().out
+    assert "Pipeline Run ID" in output and "unavailable" in output
+    assert "cannot be selected by PIPELINE_RUN_ID" in output
+    assert "source-id" not in output
+    with pytest.raises(transfer.IndexTransferError, match="Supply INDEX_BUNDLE"):
+        wrapper.export_index(git_slug="owner-repo-main")
+
+
 @pytest.mark.parametrize("slug,run_id", [(None, None), ("slug", "id")])
 def test_invalid_selector_combinations(slug, run_id):
     with pytest.raises(transfer.IndexTransferError, match="exactly one"):
@@ -214,14 +269,15 @@ def test_invalid_selector_combinations(slug, run_id):
     "change",
     [
         {"status": "RUNNING"},
+        {"lifecycle_stage": "deleted"},
         {"experiment_id": "wrong-experiment"},
     ],
 )
 def test_explicit_run_rejects_ineligible_source(change):
     client = fake_client()
-    client.get_run.return_value = make_run(**change)
+    client.search_runs.return_value = [make_run(**change)]
     with pytest.raises(transfer.IndexTransferError):
-        transfer.IndexTransfer(client, "source").export_index(run_id="source-id")
+        transfer.IndexTransfer(client, "source").export_index(pipeline_run_id="pipeline-123")
 
 
 @pytest.mark.parametrize(
@@ -286,7 +342,7 @@ def test_missing_artifacts_and_source_export_failure(tmp_path, monkeypatch):
     wrapper = transfer.IndexTransfer(client, "source")
     bundle = tmp_path / "output.tar.gz"
     with pytest.raises(transfer.IndexTransferError, match="Missing or empty"):
-        wrapper.export_index(run_id="source-id", bundle=bundle)
+        wrapper.export_index(pipeline_run_id="pipeline-123", bundle=bundle)
     monkeypatch.setattr(
         wrapper,
         "_remote_files",
@@ -295,13 +351,13 @@ def test_missing_artifacts_and_source_export_failure(tmp_path, monkeypatch):
     exporter = MagicMock(return_value=None)
     package_stub(monkeypatch, exporter=exporter)
     with pytest.raises(transfer.IndexTransferError, match="did not produce"):
-        wrapper.export_index(run_id="source-id", bundle=bundle)
+        wrapper.export_index(pipeline_run_id="pipeline-123", bundle=bundle)
     assert exporter.call_args.kwargs["raise_exception"] is True
     assert not bundle.exists()
     assert not list(tmp_path.glob(".index-export-*"))
     exporter.side_effect = RuntimeError("download failed")
     with pytest.raises(RuntimeError, match="download failed"):
-        wrapper.export_index(run_id="source-id", bundle=bundle)
+        wrapper.export_index(pipeline_run_id="pipeline-123", bundle=bundle)
     assert not bundle.exists()
 
 
@@ -315,7 +371,7 @@ def test_existing_export_is_not_overwritten(tmp_path, monkeypatch):
     bundle = tmp_path / "existing.tar.gz"
     bundle.write_bytes(b"original")
     with pytest.raises(transfer.IndexTransferError, match="overwrite"):
-        wrapper.export_index(run_id="source-id", bundle=bundle)
+        wrapper.export_index(pipeline_run_id="pipeline-123", bundle=bundle)
     assert bundle.read_bytes() == b"original"
 
 
@@ -337,11 +393,51 @@ def test_cli_requires_kfp_namespace(monkeypatch):
     assert exc.value.code == 2
 
 
+def test_cli_pipeline_selector_from_environment_and_argument(monkeypatch):
+    monkeypatch.setenv("KFP_NAMESPACE", "source")
+    monkeypatch.setenv("PIPELINE_RUN_ID", "pipeline-env")
+    assert cli.parse_args(["export"]).pipeline_run_id == "pipeline-env"
+    assert (
+        cli.parse_args(["export", "--pipeline-run-id", "pipeline-arg"]).pipeline_run_id
+        == "pipeline-arg"
+    )
+    monkeypatch.delenv("PIPELINE_RUN_ID")
+    monkeypatch.setenv("INDEX_RUN_ID", "internal-id")
+    with pytest.raises(SystemExit):
+        cli.parse_args(["export"])
+    with pytest.raises(SystemExit):
+        cli.parse_args(["export", "--run-id", "internal-id"])
+
+
+def test_cli_import_json_keeps_mlflow_ids_internal(monkeypatch, capsys):
+    monkeypatch.setenv("KFP_NAMESPACE", "destination")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    result = {
+        "operation": "import",
+        "outcome": "imported",
+        "pipeline_run_id": "pipeline-123",
+        "source_run_id": "source-internal",
+        "destination_run_id": "destination-internal",
+    }
+    wrapper = MagicMock()
+    wrapper.import_index.return_value = result
+    monkeypatch.setattr(cli, "IndexTransfer", MagicMock(return_value=wrapper))
+    assert cli.main(["import", "--bundle", "index.tar.gz"]) == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {
+        "operation": "import",
+        "outcome": "imported",
+        "pipeline_run_id": "pipeline-123",
+    }
+    assert "source-internal" not in output.out + output.err
+    assert "destination-internal" not in output.out + output.err
+
+
 @pytest.mark.parametrize(
     "operation,env",
     [
         ("export", {}),
-        ("export", {"INDEX_GIT_SLUG": "slug", "INDEX_RUN_ID": "id"}),
+        ("export", {"INDEX_GIT_SLUG": "slug", "PIPELINE_RUN_ID": "id"}),
         ("import", {}),
         ("import", {"INDEX_BUNDLE": "file", "INDEX_FORCE": "maybe"}),
     ],
@@ -425,7 +521,7 @@ def mlflow_server(tmp_path_factory):
 
 
 @pytest.mark.parametrize("combined", [False, True])
-def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
+def test_real_workspace_round_trip(mlflow_server, tmp_path, monkeypatch, combined):
     import mlflow
     from mlflow.entities import Metric
     from mlflow.tracking import MlflowClient
@@ -433,7 +529,9 @@ def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
 
     client = MlflowClient(tracking_uri=mlflow_server)
     mlflow.set_tracking_uri(mlflow_server)
+    monkeypatch.chdir(tmp_path)
     slug = "" if combined else "owner-repo-main"
+    pipeline_run_id = "combined-pipeline" if combined else "single-pipeline"
     source_tree = tmp_path / "source-tree"
     index_path = f"{transfer.INDEX_ROOT}/{'multi-repo' if combined else slug}"
     file_data = {
@@ -460,6 +558,7 @@ def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
                 "multi_repo": str(combined),
                 "mlflow.parentRunId": "source-parent",
                 "custom": "preserved",
+                "pipeline_run_id": pipeline_run_id,
             },
         )
         source_id = source.info.run_id
@@ -471,13 +570,14 @@ def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
         client.log_artifacts(source_id, str(source_tree))
         client.set_terminated(source_id, "FINISHED", end_time=2000)
         wrapper = transfer.IndexTransfer(client, "source")
-        bundle = tmp_path / "index.tar.gz"
         exported = wrapper.export_index(
-            run_id=source_id if combined else None,
+            pipeline_run_id=pipeline_run_id if combined else None,
             git_slug=None if combined else slug,
-            bundle=bundle,
         )
+        bundle = Path(exported["bundle_path"]).resolve()
+        assert bundle.name == f"{'multi-repo' if combined else slug}-{pipeline_run_id}.tar.gz"
         assert exported["source_run_id"] == source_id
+        assert exported["pipeline_run_id"] == pipeline_run_id
     with WorkspaceContext("destination"):
         experiment_name = "destination" + transfer.EXPERIMENT_SUFFIX
         importer = transfer.IndexTransfer(client, "destination")
@@ -489,6 +589,7 @@ def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
         assert client.get_experiment(run.info.experiment_id).name == experiment_name
         assert run.data.params == {"embedding_model": "test-model"}
         assert run.data.tags["custom"] == "preserved"
+        assert imported["pipeline_run_id"] == run.data.tags["pipeline_run_id"] == pipeline_run_id
         assert run.data.tags["index_transfer.destination_namespace"] == "destination"
         assert run.data.tags["index_transfer.source_parent_run_id"] == "source-parent"
         assert run.data.tags["bundle_sha256"] == exported["bundle_sha256"]
@@ -503,6 +604,25 @@ def test_real_workspace_round_trip(mlflow_server, tmp_path, combined):
         assert importer.import_index(bundle)["destination_run_id"] == new_id
         forced = importer.import_index(bundle, force=True)
         assert forced["destination_run_id"] != new_id
+        selected = importer._select(None, pipeline_run_id)
+        assert selected["matching_indexes"] == 2
+        assert selected["run_id"] in {new_id, forced["destination_run_id"]}
+        # Analysis-only resolves the same preserved tag within this index experiment.
+        analysis_candidates = client.search_runs(
+            experiment_ids=[run.info.experiment_id],
+            filter_string=(
+                f"tags.pipeline_run_id = '{pipeline_run_id}' AND tags.category = 'indexing'"
+            ),
+        )
+        assert {item.info.run_id for item in analysis_candidates} == {
+            new_id,
+            forced["destination_run_id"],
+        }
+        reexported = importer.export_index(
+            pipeline_run_id=pipeline_run_id, bundle=tmp_path / "reexport.tar.gz"
+        )
+        assert reexported["pipeline_run_id"] == pipeline_run_id
+        assert reexported["matching_indexes"] == 2
 
 
 def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_server, tmp_path):
@@ -521,14 +641,14 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
         "MLFLOW_TRACKING_AUTH": "",
     }
 
-    def run_import():
+    outputs = []
+
+    def run_cli(*arguments):
         completed = subprocess.run(
             [
                 sys.executable,
                 str(REPO_ROOT / "workflows/examples/code_understanding/scripts/transfer_index.py"),
-                "import",
-                "--bundle",
-                str(PREBUILT_BUNDLE),
+                *arguments,
             ],
             cwd=REPO_ROOT,
             env=environment,
@@ -537,14 +657,31 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
             timeout=60,
         )
         assert completed.returncode == 0, completed.stderr
-        return json.loads(completed.stdout)
+        outputs.append(completed.stdout + completed.stderr)
+        return completed.stdout
+
+    def run_import():
+        return json.loads(run_cli("import", "--bundle", str(PREBUILT_BUNDLE)))
 
     imported = run_import()
     assert imported["outcome"] == "imported"
     mlflow.set_tracking_uri(mlflow_server)
     client = MlflowClient(tracking_uri=mlflow_server)
     with WorkspaceContext("destination"):
-        run_id = imported["destination_run_id"]
+        assert imported["pipeline_run_id"] is None
+        assert "source_run_id" not in imported
+        assert "destination_run_id" not in imported
+        assert "cannot be selected by PIPELINE_RUN_ID" in imported["message"]
+        runs = client.search_runs(
+            experiment_ids=[
+                client.get_experiment_by_name(
+                    "destination" + transfer.EXPERIMENT_SUFFIX
+                ).experiment_id
+            ],
+            filter_string=f"tags.bundle_sha256 = '{imported['bundle_sha256']}'",
+        )
+        assert len(runs) == 1
+        run_id = runs[0].info.run_id
         run = client.get_run(run_id)
         assert run.info.status == "FINISHED"
         assert client.get_experiment(run.info.experiment_id).name == (
@@ -564,4 +701,17 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
                     )
         existing = run_import()
         assert existing["outcome"] == "existing"
-        assert existing["destination_run_id"] == run_id
+        assert existing["pipeline_run_id"] is None
+        assert "destination_run_id" not in existing
+        listing = run_cli("list")
+        assert "unavailable" in listing
+        assert "cannot be selected by PIPELINE_RUN_ID" in listing
+        exported = run_cli(
+            "export",
+            "--git-slug",
+            "agapebondservant-tic-tac-toe-sample-main",
+            "--bundle",
+            str(tmp_path / "legacy-export.tar.gz"),
+        )
+        assert "Pipeline Run ID: unavailable" in exported
+        assert all(run_id not in output for output in outputs)
