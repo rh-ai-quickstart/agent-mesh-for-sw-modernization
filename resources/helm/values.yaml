@@ -99,6 +99,7 @@ adhocQuery:
   jobId: ""
   gitRepo: ""
   gitBranch: "main"
+  pipelineRunId: ""
 
 runPipelines:
   run: false

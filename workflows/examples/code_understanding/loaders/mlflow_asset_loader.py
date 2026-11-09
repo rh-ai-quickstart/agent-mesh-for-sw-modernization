@@ -385,11 +385,12 @@ class MlFlowAssetLoader(AssetLoader):
         try:
             is_dir = os.path.isdir(results_path)
 
-            from utils.pipeline_utils import get_pipeline_run_id
+            if "pipeline_run_id" not in (tags or {}):
+                from utils.pipeline_utils import get_pipeline_run_id
 
-            pipeline_run_id = get_pipeline_run_id()
-            if pipeline_run_id:
-                tags = {**(tags or {}), "pipeline_run_id": pipeline_run_id}
+                pipeline_run_id = get_pipeline_run_id()
+                if pipeline_run_id:
+                    tags = {**(tags or {}), "pipeline_run_id": pipeline_run_id}
 
             if os.path.dirname(results_path):
 

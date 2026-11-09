@@ -87,6 +87,7 @@ class AnalysisPipeline:
         git_repo: str = "",
         git_branch: str = "main",
         multi_repo: bool = False,
+        pipeline_run_id: str = "",
         namespace: str | None = None,
     ):
         """Queries the GraphRAG index with an LLM and returns the result."""
@@ -171,6 +172,7 @@ class AnalysisPipeline:
                 "adhoc_query": "true",
                 "git_slug": git_slug,
                 "multi_repo": use_multi_repo,
+                **({"pipeline_run_id": pipeline_run_id} if pipeline_run_id else {}),
             },
         )
 

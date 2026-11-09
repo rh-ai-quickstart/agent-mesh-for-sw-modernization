@@ -272,14 +272,15 @@ embedding space and 4,096 dimensions. Otherwise,
 ### 6. Generate a migration report using the prebuilt index
 
 You can generate a migration report from the same prebuilt Tic-Tac-Toe index
-without running data generation or indexing. Submit the single-repository
-pipeline with `--analysis-only`, passing the KFP run ID of the full pipeline
+without re-running data generation or indexing. Submit the single-repository
+pipeline with `--analysis-only`, passing the **run ID** of the full pipeline
 run whose index you want to reuse.
 
 The run ID is printed at the end of every `make run-pipelines` invocation:
 
 ```
-==> Pipeline run ID: abc123-def456-7890abcd
+✅ Submitted: SUCCESS
+==> Pipeline run ID: <the pipeline-run-id>
 ```
 
 It can also be found in the OpenShift AI console under **Develop & train >
@@ -414,7 +415,8 @@ After the run succeeds, review its combined migration report in MLflow.
 
 ![Multi-repo migration report](docs/images/multi_repo_mlflow_report.png)
 
-To ask a question across the combined index, omit the repository flags:
+To ask a question across the combined index, include the **pipeline run 
+ID** of the previous run in the query:
 
 ```sh
 wrappers/adhoc.sh "Which repositories share dependencies that affect migration order?"

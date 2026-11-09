@@ -143,12 +143,12 @@ if [[ "$MODE" == "single" ]]; then
     fi
     trigger_pipeline "single_repo" "single_repo_${TIMESTAMP}" \
         "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\"}" \
-        "" \
+        "[{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\"}]" \
         "$ANALYSIS_ONLY"
 else
     trigger_pipeline "multi_repo" "multi_repo_${TIMESTAMP}" \
         "{\"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\"}" \
-        "" \
+        "${GIT_REPO_LIST_CONTENTS:-}" \
         "$ANALYSIS_ONLY"
 fi
 
