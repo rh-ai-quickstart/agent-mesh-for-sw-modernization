@@ -70,6 +70,14 @@ class MlFlowAssetLoader(AssetLoader):
         for stale_run in stale:
             client.set_tag(stale_run.info.run_id, "archived", "true")
 
+    @staticmethod
+    def _has_prior_enrichment_checkpoint(runs: list) -> bool:
+        """Return True if any run in the list is a checkpoint (tagged latest=true)."""
+        return any(
+            (getattr(getattr(r, "data", None), "tags", None) or {}).get("latest") == "true"
+            for r in runs
+        )
+
     def _get_artifact_base_uri(self, client, experiment, filter_string: str) -> str:
         """Return the artifact URI of the latest matching run in *experiment*."""
         latest_runs = client.search_runs(
@@ -106,18 +114,20 @@ class MlFlowAssetLoader(AssetLoader):
             )
             if not runs:
                 return [os.path.join(enrichment_experiment.artifact_location, asset_file_path)]
-            # Prepend the static base so enrichment deltas merge on top of
-            # the full original content
-            static_experiment = self.get_or_create_experiment_by_name(
-                client, self.STATIC_ASSET_EXPERIMENT
-            )
-            static_base_uri = self._get_artifact_base_uri(
-                client, static_experiment, "tags.latest = 'true'"
-            )
             enrichment_uris = [
                 os.path.join(run.info.artifact_uri, asset_file_path) for run in runs
             ]
-            return [os.path.join(static_base_uri, asset_file_path)] + enrichment_uris
+            # When no checkpoint exists yet, prepend the static base so
+            # enrichment deltas merge on top of the full original content.
+            if not self._has_prior_enrichment_checkpoint(runs):
+                static_experiment = self.get_or_create_experiment_by_name(
+                    client, self.STATIC_ASSET_EXPERIMENT
+                )
+                static_base_uri = self._get_artifact_base_uri(
+                    client, static_experiment, "tags.latest = 'true'"
+                )
+                enrichment_uris.insert(0, os.path.join(static_base_uri, asset_file_path))
+            return enrichment_uris
 
         filter_string = (
             "tags.latest = 'true'"
