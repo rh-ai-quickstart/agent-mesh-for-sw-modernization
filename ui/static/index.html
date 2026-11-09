@@ -378,6 +378,21 @@
       border-color: #8a8d90;
       background: radial-gradient(circle, #8a8d90 40%, #fff 45%);
     }
+    .cu-toggle-group { display: inline-flex; border-radius: 999px; overflow: hidden; border: 1px solid #d0d0d0; }
+    .cu-toggle-group input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+    .cu-toggle-group label {
+      display: inline-flex; align-items: center; gap: .35rem;
+      padding: .45rem 1rem; font-size: .9rem; font-weight: 500;
+      cursor: pointer; background: #fff; color: var(--cu-charcoal);
+      border-right: 1px solid #d0d0d0; transition: background .15s, color .15s;
+      user-select: none;
+    }
+    .cu-toggle-group label:last-of-type { border-right: none; }
+    .cu-toggle-group input[type="radio"]:checked + span { /* handled via parent */ }
+    .cu-toggle-group label:has(input:checked) {
+      background: #e06060; color: #fff;
+    }
+    .cu-toggle-group label:hover:not(:has(input:checked)) { background: #f0f0f0; }
     .cu-repo-body { min-width: 0; }
     .cu-repo-title {
       display: block;
@@ -903,6 +918,25 @@
       <div class="cu-modal-footer">
         <button type="button" class="cu-btn cu-btn-link" id="add-repo-cancel">Cancel</button>
         <button type="button" class="cu-btn cu-btn-secondary" id="add-custom">Add repository</button>
+      </div>
+    </div>
+  </div>
+  <div id="rerun-modal" class="cu-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rerun-title">
+    <div class="cu-modal">
+      <div class="cu-modal-header">
+        <h3 id="rerun-title">Re-run Analysis</h3>
+        <button type="button" class="cu-modal-close" id="rerun-close" aria-label="Close">&#x2715;</button>
+      </div>
+      <div class="cu-modal-body">
+        <div class="cu-toggle-group">
+          <label><input type="radio" name="rerun-mode" value="scratch" checked /><span>Re-run from scratch</span></label>
+          <label><input type="radio" name="rerun-mode" value="report" /><span>Re-run report only</span></label>
+        </div>
+        <p id="rerun-description" style="margin-top:.75rem;color:#6a6e73;font-size:.85rem">Regenerates the knowledge graph from scratch.</p>
+      </div>
+      <div class="cu-modal-footer">
+        <button type="button" class="cu-btn cu-btn-link" id="rerun-cancel">Cancel</button>
+        <button type="button" class="cu-btn cu-btn-secondary" id="rerun-confirm">Re-run</button>
       </div>
     </div>
   </div>
@@ -1550,7 +1584,7 @@
         <td><div style="display:flex;align-items:center;gap:0.4rem"><span class="cu-job-dot ${esc(run.status)}"></span><span class="cu-muted" style="font-size:0.85rem">${repoCell}</span></div></td>
         <td><span class="cu-chip ${succeeded ? "indexed" : ""}">${esc(run.status)}</span></td>
         <td><span class="cu-muted" style="font-size:0.8rem">${started}</span></td>
-        <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-tooltip="Ask about this code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>` : ""}</td>
+        <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-tooltip="Explore code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ""}</td>
       </tr>`;
     }
 
@@ -2053,8 +2087,36 @@
       a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.tab); });
     });
     $("back-to-runs").onclick = () => showTab("runs");
-    $("run-rerun").onclick = async () => {
+    $("run-rerun").onclick = () => {
       if (state.thinking) return;
+      const btn = $("run-rerun");
+      if (!btn.dataset.runId) return;
+      // Reset radio to default
+      const scratchRadio = document.querySelector('input[name="rerun-mode"][value="scratch"]');
+      if (scratchRadio) { scratchRadio.checked = true; scratchRadio.dispatchEvent(new Event("change")); }
+      $("rerun-modal").classList.remove("hidden");
+    };
+    // Radio change handler
+    document.querySelectorAll('input[name="rerun-mode"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        const mode = document.querySelector('input[name="rerun-mode"]:checked').value;
+        $("rerun-description").textContent = mode === "scratch"
+          ? "Regenerates the knowledge graph from scratch."
+          : "Regenerates the analysis report only without rebuilding the knowledge graph from scratch.";
+      });
+    });
+    // Rerun modal close
+    function closeRerunModal() { $("rerun-modal").classList.add("hidden"); }
+    $("rerun-close").onclick = closeRerunModal;
+    $("rerun-cancel").onclick = closeRerunModal;
+    $("rerun-modal").addEventListener("click", (e) => { if (e.target === $("rerun-modal")) closeRerunModal(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("rerun-modal").classList.contains("hidden")) closeRerunModal();
+    });
+    // Rerun confirm handler
+    $("rerun-confirm").onclick = async () => {
+      const mode = document.querySelector('input[name="rerun-mode"]:checked').value;
+      closeRerunModal();
       const btn = $("run-rerun");
       const runId = btn.dataset.runId;
       const gitRepo = btn.dataset.gitRepo;
@@ -2063,14 +2125,14 @@
       const origContent = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = `<svg style="animation:cu-spin 1s linear infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Re-run`;
-      setThinking({ kind: "pipeline", label: "Re-running analysis", status: "Submitting analysis-only job…" });
+      const label = mode === "scratch" ? "Re-running from scratch" : "Re-running analysis";
+      const statusMsg = mode === "scratch" ? "Submitting full re-run job…" : "Submitting analysis-only job…";
+      setThinking({ kind: "pipeline", label, status: statusMsg });
       try {
-        const body = {
-          repos: gitRepo ? [{ git_repo: gitRepo, git_branch: gitBranch }] : [],
-          pipeline_run_id: runId,
-        };
+        const body = { repos: gitRepo ? [{ git_repo: gitRepo, git_branch: gitBranch }] : [] };
+        if (mode === "report") body.pipeline_run_id = runId;
         const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify(body) });
-        setThinking({ kind: "pipeline", label: "Re-running analysis", status: `KFP run ${result.job_id} started` });
+        setThinking({ kind: "pipeline", label, status: `KFP run ${result.job_id} started` });
         pollV2(result.job_id);
       } catch (e) {
         setThinking(null);
