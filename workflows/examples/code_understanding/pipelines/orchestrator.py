@@ -44,6 +44,7 @@ def single_repo_pipeline(
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     multi_repo: bool = False,
     pipeline_run_id: str = "",
+    runnable_repos: str = "[]",
 ):
 
     if uses_kfp():
@@ -110,16 +111,16 @@ def single_repo_pipeline(
 def multi_repo_pipeline(
     parent_source_path: str = os.getenv("PARENT_SOURCE_PATH", "source"),
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
-    repos: str = "[]",  # JSON-encoded list; avoids KFP v2 parameterType: LIST runtime drop
+    runnable_repos: str = "[]",  # JSON-encoded; avoids KFP v2 parameterType: LIST drop
     pipeline_run_id: str = "",
 ):
 
     if uses_kfp():
 
-        rp = DataGenerationPipeline.get_repo_list(repos=repos)
+        rp = DataGenerationPipeline.get_repo_list(runnable_repos=runnable_repos)
 
         dg = DataGenerationPipeline.run_multi_repo(
-            repos=rp.output, pipeline_run_id=pipeline_run_id
+            runnable_repos=rp.output, pipeline_run_id=pipeline_run_id
         )
 
         idx = IndexingPipeline.run_multi_repo(
@@ -131,7 +132,9 @@ def multi_repo_pipeline(
 
     else:
 
-        git_repos = json.loads(repos) or json.loads(os.getenv("GIT_REPO_LIST_CONTENTS", "[]"))
+        git_repos = json.loads(runnable_repos) or json.loads(
+            os.getenv("GIT_REPO_LIST_CONTENTS", "[]")
+        )
 
         if not git_repos:
             logging.info(

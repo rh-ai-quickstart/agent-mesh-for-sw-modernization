@@ -107,7 +107,7 @@ def test_successful_invocation_passes_parameters_and_repos(
     }
     if mode == "single":
         expected_params.update(git_repo=env["GIT_REPO"], git_branch="develop")
-        expected_params["repos"] = json.dumps(
+        expected_params["runnable_repos"] = json.dumps(
             [{"git_repo": env["GIT_REPO"], "git_branch": "develop"}]
         )
     assert submission["params"] == expected_params

@@ -415,8 +415,7 @@ After the run succeeds, review its combined migration report in MLflow.
 
 ![Multi-repo migration report](docs/images/multi_repo_mlflow_report.png)
 
-To ask a question across the combined index, include the **pipeline run 
-ID** of the previous run in the query:
+To ask a question across the combined index, omit the repository flags:
 
 ```sh
 wrappers/adhoc.sh "Which repositories share dependencies that affect migration order?"

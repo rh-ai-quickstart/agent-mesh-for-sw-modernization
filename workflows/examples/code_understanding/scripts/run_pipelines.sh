@@ -102,7 +102,7 @@ if repos_json:
         log_repos(json.loads(repos_json))
     except Exception:
         logging.warning("log_repos failed; continuing with pipeline submission.", exc_info=True)
-    params["repos"] = repos_json
+    params["runnable_repos"] = repos_json
 enable_caching = os.environ.get("KFP_TRIGGER_ENABLE_CACHING", "false").lower() == "true"
 run = trigger_run(os.environ["KFP_TRIGGER_PIPELINE"], os.environ["KFP_TRIGGER_RUN"], params,
                   enable_caching=enable_caching)
