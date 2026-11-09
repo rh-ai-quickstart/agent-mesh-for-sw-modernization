@@ -1415,10 +1415,11 @@
           : run.git_repo
             ? [esc(run.git_repo)]
             : [];
-      const visibleRepos = repoList.slice(0, 2).join("<br/>");
-      const hiddenRepos = repoList.length > 2
-        ? `<span class="cu-repo-overflow" style="display:none">${repoList.slice(2).map((r) => "<br/>" + r).join("")}</span>`
-          + `<br/><a href="#" class="cu-repo-toggle" style="font-size:0.8rem">More (${repoList.length - 2})</a>`
+      const visibleCount = isMulti ? 1 : 2;
+      const visibleRepos = repoList.slice(0, visibleCount).join("<br/>");
+      const hiddenRepos = repoList.length > visibleCount
+        ? `<span class="cu-repo-overflow" style="display:none">${repoList.slice(visibleCount).map((r) => "<br/>" + r).join("")}</span>`
+          + `<br/><a href="#" class="cu-repo-toggle" data-total="${repoList.length}" style="font-size:0.8rem">${isMulti ? `Show all (${repoList.length})` : `More (${repoList.length - visibleCount})`}</a>`
         : "";
       const repoCell = repoList.length
         ? visibleRepos + hiddenRepos
@@ -1480,13 +1481,14 @@
         });
       });
       root.querySelectorAll(".cu-repo-toggle").forEach((link) => {
+        const totalCount = parseInt(link.dataset.total || "0", 10);
+        const collapsedLabel = link.textContent;
         link.addEventListener("click", (e) => {
           e.preventDefault();
           const overflow = link.parentElement.querySelector(".cu-repo-overflow");
           const visible = overflow.style.display !== "none";
           overflow.style.display = visible ? "none" : "inline";
-          const count = overflow.querySelectorAll("br").length;
-          link.textContent = visible ? `More (${count})` : "Less";
+          link.textContent = visible ? collapsedLabel : "Show less";
         });
       });
       root.querySelectorAll(".cu-run-expand").forEach((btn) => {
