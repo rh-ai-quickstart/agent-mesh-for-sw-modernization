@@ -817,18 +817,18 @@ test-index-transfer:
 
 format:
 	@echo "==> Sorting Python imports with isort..."
-	uv run --project ui --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' .
+	uv run --project . --group lint --frozen isort --skip-glob '*/.venv/*' .
 	@echo "==> Formatting Python code with Black..."
-	uv run --project ui --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/' .
+	uv run --project . --group lint --frozen black --extend-exclude '/\.venv/' .
 	@echo "==> Formatting completed successfully."
 
 lint:
 	@echo "==> Running Flake8..."
 	uv run --project . --group lint --frozen flake8 --extend-exclude=.venv,temp --max-line-length=99 --extend-ignore=E203,W503 .
 	@echo "==> Checking Python formatting with Black..."
-	uv run --project . --group lint --frozen black --config ui/pyproject.toml --extend-exclude '/\.venv/|/temp/' --check --diff .
+	uv run --project . --group lint --frozen black --extend-exclude '/\.venv/' --check --diff .
 	@echo "==> Checking Python import sorting with isort..."
-	uv run --project . --group lint --frozen isort --settings-path ui/pyproject.toml --skip-glob '*/.venv/*' --skip-glob '*/temp/*' --check-only --diff .
+	uv run --project . --group lint --frozen isort --skip-glob '*/.venv/*' --check-only --diff .
 	@echo "==> Lint checks completed successfully."
 
 # ============================================================================
