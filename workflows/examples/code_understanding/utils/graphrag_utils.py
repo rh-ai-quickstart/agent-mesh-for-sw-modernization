@@ -1,7 +1,16 @@
 import os
 import ssl
 
-if os.getenv("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "false").lower() in ("true", "1", "yes"):
+
+def should_skip_tls() -> bool:
+    return os.getenv("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    ) or os.getenv("ENABLE_TLS_VERIFICATION", "true").lower() in ("false", "0", "no")
+
+
+if should_skip_tls():
     _orig_create_default_context = ssl.create_default_context
 
     def _unverified_context(*args, **kwargs):
@@ -12,14 +21,24 @@ if os.getenv("GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY", "false").lower() in ("true"
 
     ssl.create_default_context = _unverified_context
 
-import logging
-from pathlib import Path
+import logging  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-import graphrag.api as api
-from graphrag.config.load_config import load_config
+import graphrag.api as api  # noqa: E402
+from graphrag.config.load_config import load_config  # noqa: E402
+
+if should_skip_tls():
+    import litellm as _litellm
+
+    _litellm.ssl_verify = False
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 import pandas as pd  # noqa: E402
+
+
+def is_empty_dir(path: str) -> bool:
+    """Returns True if the directory at *path* exists but contains no entries."""
+    return not any(os.scandir(path))
 
 
 class DependencyAnalyzer:
@@ -423,43 +442,72 @@ class DependencyAnalyzer:
         multi_repo: bool,
         git_repo: str = "",
         namespace: str | None = None,
+        pipeline_run_id: str = "",
     ):
         """Downloads GraphRAG index artifacts and prepares settings.
 
+        Artifacts are downloaded into a staging subdirectory named after the artifact
+        leaf, then moved into an ``output/`` subdirectory of ``download_dir`` so that
+        ``DependencyAnalyzer._setup_search`` can find them at
+        ``{download_dir}/output/*.parquet``.  ``settings.yaml`` is written to
+        ``download_dir``.
+
         Args:
-            download_dir: Root directory of the GraphRAG source. Artifacts are
-                downloaded into its output/ subdirectory and settings.yaml is written here.
+            download_dir: Root directory of the GraphRAG source.  After this call,
+                parquet files are at ``{download_dir}/output/`` and
+                ``settings.yaml`` is at ``{download_dir}/settings.yaml``.
             git_slug: Repository slug used to scope the artifact lookup.
             multi_repo: Whether the index spans multiple repositories.
             git_repo: Repository URL, used in error messages.
 
         Raises:
-            Exception: If the index artifacts cannot be downloaded.
+            Exception: If the index artifacts cannot be downloaded or staged.
         """
         import os
+        import shutil
         import traceback
 
         from loaders.default_asset_loader import DefaultAssetLoader
         from utils.loader_utils import download_result_directory
 
-        output_dir = os.path.join(download_dir, "output")
+        artifact_path = DefaultAssetLoader.get_log_results_artifact_path(
+            DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+            git_slug=git_slug,
+            multi_repo=multi_repo,
+        )
+
+        artifact_download_dir = os.path.join(download_dir, os.path.basename(artifact_path))
 
         try:
             download_result_directory(
                 git_slug=git_slug,
-                download_dir=output_dir,
+                download_dir=artifact_download_dir,
                 results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
                 multi_repo=multi_repo,
                 asset_tags={
                     "git_slug": git_slug,
                     "multi_repo": multi_repo,
                     "category": "indexing",
+                    **({"pipeline_run_id": pipeline_run_id} if pipeline_run_id else {}),
                 },
                 namespace=namespace,
             )
         except Exception:
             logging.debug(traceback.format_exc())
             raise
+
+        # DependencyAnalyzer._setup_search reads from {root_dir}/output/*.parquet, so move
+        # the downloaded artifact directory into an output/ subdirectory of download_dir.
+        output_dir = os.path.join(download_dir, "output")
+        try:
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir)
+            shutil.move(artifact_download_dir, output_dir)
+        except Exception as e:
+            raise RuntimeError(
+                f"Downloaded index to '{artifact_download_dir}' but could not stage it "
+                f"at '{output_dir}': {e}"
+            ) from e
 
         DependencyAnalyzer.prepare_settings(template_dir=output_dir, output_dir=download_dir)
 

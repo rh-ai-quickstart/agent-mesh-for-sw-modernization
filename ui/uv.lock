@@ -40,7 +40,7 @@ requires-dist = [
     { name = "jsonpath-ng", specifier = ">=1.7.0" },
     { name = "kfp", specifier = ">=2.0.0,<3.0.0" },
     { name = "kubernetes", specifier = ">=8.0.0,<31" },
-    { name = "mlflow", specifier = ">=2.0.0" },
+    { name = "mlflow", specifier = ">=3.0.0,<4.0.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.40.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pygithub", specifier = ">=2.0.0" },

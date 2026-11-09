@@ -24,11 +24,11 @@ class DefaultCustomTelemetry(CustomTelemetry):
         self._telemetry.track()
 
     @staticmethod
-    def get_token_usage(kfp_run_id: str) -> dict:
+    def get_token_usage(pipeline_run_id: str) -> dict:
 
         if os.getenv("CUSTOM_EVALUATOR") == "mlflow":
 
-            return MlFlowCustomTelemetry.get_token_usage(kfp_run_id)
+            return MlFlowCustomTelemetry.get_token_usage(pipeline_run_id)
 
         else:
 

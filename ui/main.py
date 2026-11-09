@@ -11,6 +11,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+import mlflow  # noqa: E402, F401  - pre-warm: avoids first-import races across threads
 from fastapi import Cookie, FastAPI, HTTPException, Response  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
@@ -19,7 +20,6 @@ from pydantic import BaseModel  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 
-import catalog  # noqa: E402
 import cluster  # noqa: E402
 import indexes  # noqa: E402
 
@@ -47,9 +47,11 @@ app.add_middleware(
 
 from api.pipelines import router as _v2_router  # noqa: E402
 from api.queries import router as _v2_queries_router  # noqa: E402
+from api.repositories import router as _v2_repositories_router  # noqa: E402
 
 app.include_router(_v2_router, prefix="/api/v2")
 app.include_router(_v2_queries_router, prefix="/api/v2")
+app.include_router(_v2_repositories_router, prefix="/api/v2")
 
 
 class NamespaceRequest(BaseModel):
@@ -101,18 +103,21 @@ def set_namespace(body: NamespaceRequest, response: Response) -> dict[str, str]:
 
 
 @app.get("/api/catalog")
-def get_catalog() -> dict[str, Any]:
-    entries = catalog.load_catalog()
-    default = catalog.default_repo_entry()
-    return {
-        "repos": entries,
-        "default_key": catalog.repo_key(default) if default else None,
-    }
+def get_catalog(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None),
+) -> dict[str, Any]:
+    from api import repositories_service
+
+    return {"repos": repositories_service.get_catalog_repos(cu_namespace)}
 
 
 @app.get("/api/indexes")
-def get_indexes() -> dict[str, Any]:
+def get_indexes(
+    cu_namespace: str | None = Cookie(alias=NAMESPACE_COOKIE, default=None),
+) -> dict[str, Any]:
+    from api import repositories_service
+
     data = indexes.list_indexed_repos()
-    catalog_entries = catalog.load_catalog()
+    catalog_entries = repositories_service.get_catalog_repos(cu_namespace)
     options = indexes.queryable_repos(data.get("indexes") or [], catalog_entries)
     return {**data, "queryable": options}

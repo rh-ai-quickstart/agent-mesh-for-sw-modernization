@@ -23,7 +23,13 @@
 
 {{- define "agent-mesh.awsCompatibleStorage.apiPort" -}}
 {{- $storage := index .Values "aws-compatible-storage" -}}
-{{- $storage.service.s3Port | default 7480 -}}
+{{- if and $storage.service $storage.service.s3Port -}}
+{{- $storage.service.s3Port -}}
+{{- else if eq .Values.objectStoreBackend "minio" -}}
+{{- 9000 -}}
+{{- else -}}
+{{- 7480 -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "agent-mesh.awsCompatibleStorage.uiPort" -}}

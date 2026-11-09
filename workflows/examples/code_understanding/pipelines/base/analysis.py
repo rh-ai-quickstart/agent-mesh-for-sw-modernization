@@ -49,7 +49,11 @@ class AnalysisPipeline:
                 multi_repo=multi_repo,
             ),
             content=report,
-            tags={"git_slug": git_slug, "multi_repo": multi_repo, "category": "analysis"},
+            tags={
+                "git_slug": git_slug,
+                "multi_repo": multi_repo,
+                "category": "analysis",
+            },
         )
 
         return report
@@ -59,20 +63,17 @@ class AnalysisPipeline:
         import logging
         import os
 
-        from loaders.default_asset_loader import DefaultAssetLoader
-        from utils.loader_utils import download_result_directory
+        from utils.graphrag_utils import DependencyAnalyzer
 
         logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
         graphrag_source_path = os.getenv("KFP_DATA_INDEXING_OUTPUT_PATH", "graph_rag_app/source")
 
         logging.info("Downloading multi-repo GraphRAG index...")
-        download_result_directory(
-            git_slug=None,
-            download_dir=os.path.join(graphrag_source_path, "output"),
-            results_prefix=DefaultAssetLoader.RESULTS_PATH_PREFIX_REPO_DATASETS,
+        DependencyAnalyzer.download_graphrag_directory(
+            download_dir=graphrag_source_path,
+            git_slug="",
             multi_repo=True,
-            asset_tags={"multi_repo": True, "category": "indexing"},
         )
 
         self.run(graphrag_source_path=graphrag_source_path, multi_repo=True)
@@ -86,6 +87,7 @@ class AnalysisPipeline:
         git_repo: str = "",
         git_branch: str = "main",
         multi_repo: bool = False,
+        pipeline_run_id: str = "",
         namespace: str | None = None,
     ):
         """Queries the GraphRAG index with an LLM and returns the result."""
@@ -115,6 +117,7 @@ class AnalysisPipeline:
                 multi_repo=use_multi_repo,
                 git_repo=git_repo,
                 namespace=namespace,
+                pipeline_run_id=pipeline_run_id,
             )
         except Exception:
             msg = (
@@ -134,9 +137,7 @@ class AnalysisPipeline:
             graphrag_source_path, git_slug=git_slug, multi_repo=use_multi_repo
         )
 
-        postamble = (
-            "Provide as much detail as possible. Include the git repo url(s) in the report."
-        )
+        postamble = "Provide as much detail as possible. Include the git repo url(s) in the report."  # noqa: E501
 
         if use_multi_repo:
             postamble += (
@@ -172,6 +173,7 @@ class AnalysisPipeline:
                 "adhoc_query": "true",
                 "git_slug": git_slug,
                 "multi_repo": use_multi_repo,
+                **({"pipeline_run_id": pipeline_run_id} if pipeline_run_id else {}),
             },
         )
 
@@ -190,12 +192,27 @@ def write_migration_report(
     git_repo: str = "",
     git_branch: str = "",
     multi_repo: bool = False,
+    pipeline_run_id: str = "",
 ):
     """Run the migration report and write the result to report_path."""
     import os
 
+    if pipeline_run_id:
+        from utils.loader_utils import download_graphrag_output_directory
+
+        download_graphrag_output_directory(
+            graphrag_source_path,
+            pipeline_run_id,
+            git_repo=git_repo,
+            git_branch=git_branch,
+            multi_repo=multi_repo,
+        )
+
     migration_report = AnalysisPipeline().run(
-        graphrag_source_path, git_repo=git_repo, git_branch=git_branch, multi_repo=multi_repo
+        graphrag_source_path,
+        git_repo=git_repo,
+        git_branch=git_branch,
+        multi_repo=multi_repo,
     )
     if dirname := os.path.dirname(report_path):
         os.makedirs(dirname, exist_ok=True)

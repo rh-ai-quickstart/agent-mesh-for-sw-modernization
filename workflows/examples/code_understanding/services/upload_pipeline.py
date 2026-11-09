@@ -24,7 +24,11 @@ def upload_pipeline(yaml_path: str, pipeline_name: str) -> None:
         filt = json.dumps(
             {
                 "predicates": [
-                    {"key": "display_name", "operation": "EQUALS", "stringValue": pipeline_name}
+                    {
+                        "key": "display_name",
+                        "operation": "EQUALS",
+                        "stringValue": pipeline_name,
+                    }
                 ]
             }
         )

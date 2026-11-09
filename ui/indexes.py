@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
-
-from catalog import git_slug
 
 RESULT_DIRECTORY_EXPERIMENT_SUFFIX = "/code-refactoring/assets/result-directories"
 
@@ -24,36 +21,46 @@ def _as_bool(value: Any) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _valid_slug(slug: str) -> bool:
+    """Return True when *slug* is a safe, single path component."""
+    if not slug:
+        return False
+    if slug in {".", ".."}:
+        return False
+    if "/" in slug or "\\" in slug:
+        return False
+    return True
+
+
 def _run_index_metadata(run: Any) -> dict[str, Any]:
-    """Describe an indexed repository from its MLflow run tags."""
+    """Build index metadata from an MLflow run object."""
     tags = getattr(getattr(run, "data", None), "tags", None) or {}
     slug = str(tags.get("git_slug") or "")
     multi = _as_bool(tags.get("multi_repo"))
+    uploaded = _as_bool(tags.get("uploaded"))
+    kfp_run_id = str(tags.get("pipeline_run_id") or "")
 
-    if not multi and (
-        not slug.strip() or slug.strip() in {".", ".."} or "/" in slug or "\\" in slug
-    ):
-        raise ValueError("git_slug must be a single path component")
+    if not multi and not _valid_slug(slug):
+        raise ValueError(f"invalid or missing git_slug for single-repository index: {slug!r}")
 
     run_info = getattr(run, "info", None)
     started = getattr(run_info, "start_time", None)
     return {
         "git_slug": slug,
         "multi_repo": multi,
+        "uploaded": uploaded,
         "run_id": str(getattr(run_info, "run_id", "")),
+        "kfp_run_id": kfp_run_id,
         "indexed_at": (
             datetime.fromtimestamp(started / 1000, tz=timezone.utc).isoformat() if started else ""
         ),
     }
 
 
-def _public_index_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Return index fields needed by the browser without exposing artifact layout."""
-    return {key: metadata[key] for key in ("git_slug", "multi_repo", "run_id", "indexed_at")}
-
-
 def create_mlflow_client() -> Any:
     """Create an MLflow client authenticated with the pod service account."""
+    from pathlib import Path
+
     from mlflow.tracking import MlflowClient
 
     token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -102,19 +109,25 @@ def list_indexed_repos() -> dict[str, Any]:
             if key in seen:
                 continue
             seen.add(key)
-            indexes.append(_public_index_metadata(metadata))
+            indexes.append(metadata)
         return {"ok": True, "source": "mlflow", "indexes": indexes, "message": ""}
     except Exception as exc:
         return {"ok": False, "source": "mlflow", "indexes": [], "message": str(exc)}
 
 
 def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Map git_slug -> index metadata."""
-    return {item["git_slug"]: item for item in indexes if item.get("git_slug")}
+    """Map git_slug -> single-repo index metadata (multi_repo entries excluded)."""
+    return {
+        item["git_slug"]: item
+        for item in indexes
+        if item.get("git_slug") and not item.get("multi_repo")
+    }
 
 
 def repo_is_indexed(git_repo: str, git_branch: str, indexes: list[dict[str, Any]]) -> bool:
-    slug = git_slug(git_repo, git_branch)
+    from utils.code_utils import generate_slug_from_repo
+
+    slug = generate_slug_from_repo(git_repo, git_branch)
     return any(item.get("git_slug") == slug and not item.get("multi_repo") for item in indexes)
 
 
@@ -127,21 +140,27 @@ def queryable_repos(
     catalog: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     """Catalog entries that have a GraphRAG index, plus optional multi-repo index."""
-    from catalog import repo_key
+    from utils.code_utils import generate_slug_from_repo
 
+    lkp = index_lookup(indexes)
     options: list[dict[str, Any]] = []
     for item in catalog:
-        if repo_is_indexed(item["git_repo"], item["git_branch"], indexes):
-            short = item["git_repo"].rsplit("/", 1)[-1]
-            options.append(
-                {
-                    **item,
-                    "label": f"{short} @ {item['git_branch']}",
-                    "key": repo_key(item),
-                    "use_global": False,
-                }
-            )
+        slug = generate_slug_from_repo(item["git_repo"], item["git_branch"])
+        idx_meta = lkp.get(slug)
+        if not idx_meta:
+            continue
+        short = item["git_repo"].rsplit("/", 1)[-1]
+        options.append(
+            {
+                **item,
+                "label": f"{short} @ {item['git_branch']}",
+                "key": f"{item['git_repo']}|{item['git_branch']}",
+                "use_global": False,
+                "kfp_run_id": idx_meta.get("kfp_run_id", ""),
+            }
+        )
     if multi_repo_indexed(indexes):
+        multi_meta = next((i for i in indexes if i.get("multi_repo")), {})
         options.append(
             {
                 "git_repo": "",
@@ -149,6 +168,7 @@ def queryable_repos(
                 "label": "Combined multi-repo index",
                 "key": "__multi_repo__",
                 "use_global": True,
+                "kfp_run_id": multi_meta.get("kfp_run_id", ""),
             }
         )
     return options

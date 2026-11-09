@@ -272,19 +272,34 @@ embedding space and 4,096 dimensions. Otherwise,
 ### 6. Generate a migration report using the prebuilt index
 
 You can generate a migration report from the same prebuilt Tic-Tac-Toe index
-without running data generation or indexing. Submit the single-repository
-pipeline with `--analysis-only`:
+without re-running data generation or indexing. Submit the single-repository
+pipeline with `--analysis-only`, passing the **run ID** of the full pipeline
+run whose index you want to reuse.
+
+The run ID is printed at the end of every `make run-pipelines` invocation:
+
+```
+✅ Submitted: SUCCESS
+==> Pipeline run ID: <the pipeline-run-id>
+```
+
+It can also be found in the OpenShift AI console under **Develop & train >
+Pipelines > Runs** — open the completed full run and copy the value shown in
+the **pipeline_run_id** input parameter.
+
+For the prebuilt index, install first to upload the sample index (step 4), then
+locate its run ID in the Pipelines view and pass it here:
 
 ```sh
 make run-pipelines ARGS="--single-repo --analysis-only" \
+  PIPELINE_RUN_ID=<run-id-of-full-pipeline-run> \
   PIPELINE_GIT_REPO=https://github.com/agapebondservant/tic-tac-toe-sample \
   PIPELINE_GIT_BRANCH=main
 ```
 
-The command submits an analysis-only run and prints its run ID. In your
-OpenShift AI project's **Develop & train > Pipelines > Runs** view, wait for
-the run to succeed. This run skips data generation and indexing and uses the
-existing index to produce the report.
+In your OpenShift AI project's **Develop & train > Pipelines > Runs** view,
+wait for the run to succeed. This run skips data generation and indexing and
+uses the existing index to produce the report.
 
 ![Openshift AI analysis only pipeline](docs/images/analysis_only_pipeline.png)
 
@@ -379,6 +394,21 @@ submit the multi-repository pipeline:
 ```sh
 make apply-secrets
 make run-pipelines ARGS="--multi-repo"
+```
+
+To override the default list with your own repositories, pass a local JSON file:
+
+```sh
+make run-pipelines ARGS="--multi-repo" PIPELINE_GIT_REPO_LIST=/path/to/repos.json
+```
+
+The JSON file must be an array of repository objects:
+
+```json
+[
+  { "git_repo": "https://github.com/org/repo1", "git_branch": "main" },
+  { "git_repo": "https://github.com/org/repo2", "git_branch": "main" }
+]
 ```
 
 After the run succeeds, review its combined migration report in MLflow.

@@ -30,3 +30,4 @@ exclude = ["scripts*", "notebooks*", "compiled_pipelines*", "*.egg-info*"]
     "*.html",
     "*.parquet",
 ]
+

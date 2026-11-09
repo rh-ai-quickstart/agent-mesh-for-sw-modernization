@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -20,53 +22,44 @@ from services.fetch_reports import fetch_reports as _fetch_reports  # noqa: E402
 from services.get_run_status import get_kfp_run_state  # noqa: E402
 from services.list_runs import get_run_git_metadata, list_kfp_runs  # noqa: E402
 from services.trigger_run import trigger_run as _trigger_run  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Submit
-# ---------------------------------------------------------------------------
+from services.update_repos import log_repos  # noqa: E402
 
 
 def submit_pipeline_run(
-    repos: list[dict[str, str]],
-    namespace: str | None = None,
-    *,
-    analysis_only: bool = False,
-    multi_repo: bool = False,
+    repos: list[dict[str, str]], namespace: str | None = None, pipeline_run_id: str = ""
 ) -> dict[str, Any]:
-    if multi_repo and not analysis_only:
-        raise ValueError("The multi_repo flag requires analysis_only=true.")
-    if analysis_only:
-        if multi_repo:
-            if repos:
-                raise ValueError("Combined-index analysis must not include repositories.")
-        elif len(repos) != 1 or not repos[0].get("git_repo", "").strip():
-            raise ValueError("Select one indexed repository or the combined multi-repo index.")
-    elif not repos:
+    if not repos:
         raise ValueError("Select at least one repository.")
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-    single = not multi_repo and len(repos) == 1
+    single = len(repos) == 1
     git_repo = repos[0]["git_repo"] if single else ""
     git_branch = repos[0].get("git_branch", "main") if single else "main"
     pipeline_name = "single_repo" if single else "multi_repo"
-    run_name = f"{pipeline_name}{'_analysis' if analysis_only else ''}_{timestamp}"
+    run_name = f"{pipeline_name}_{timestamp}"
     mode = "single-repo" if single else "multi-repo"
+    enable_caching = bool(pipeline_run_id)
 
     params: dict[str, Any] = {
         **({"git_repo": git_repo, "git_branch": git_branch} if single else {}),
+        "runnable_repos": json.dumps(repos),
+        "pipeline_run_id": pipeline_run_id,
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
     }
-    if analysis_only:
-        params["analysis_only"] = True
+
+    try:
+        log_repos(repos, namespace)
+    except Exception:
+        logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
 
     run = _trigger_run(
         pipeline_name,
         run_name,
         params,
-        repos=None if single or analysis_only else repos,
         namespace=namespace,
+        enable_caching=enable_caching,
     )
     return {"job_id": run.run_id, "mode": mode, "run_name": run_name}
 
@@ -88,7 +81,7 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
     analysis_report: str | None = None
     if state in {"SUCCEEDED", "SKIPPED"}:
         git_slug, multi_repo = get_run_git_metadata(job_id, namespace=namespace)
-        evaluation_report, analysis_report = _fetch_reports(git_slug, multi_repo, job_id)
+        evaluation_report, analysis_report = _fetch_reports(job_id, git_slug, multi_repo)
 
     return {
         "status": state.lower(),

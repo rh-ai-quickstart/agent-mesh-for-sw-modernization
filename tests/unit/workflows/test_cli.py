@@ -59,13 +59,16 @@ def capture_submission(tmp_path):
         "import json, os, sys\n"
         "from types import ModuleType, SimpleNamespace\n"
         "service = ModuleType('services.trigger_run')\n"
-        "def trigger_run(pipeline_name, run_name, params, repos=None):\n"
+        "def trigger_run(pipeline_name, run_name, params, *, enable_caching=False):\n"
         "    with open(os.environ['TEST_SUBMISSION'], 'w') as output:\n"
         "        json.dump(dict(pipeline_name=pipeline_name, run_name=run_name, "
-        "params=params, repos=repos), output)\n"
+        "params=params, enable_caching=enable_caching), output)\n"
         "    return SimpleNamespace(run_id='mock-run-123')\n"
         "service.trigger_run = trigger_run\n"
         "sys.modules['services.trigger_run'] = service\n"
+        "repo_service = ModuleType('services.update_repos')\n"
+        "repo_service.log_repos = lambda repos, **kw: None\n"
+        "sys.modules['services.update_repos'] = repo_service\n"
     )
     return capture, {
         "PYTHONPATH": str(tmp_path),
@@ -84,12 +87,8 @@ def test_successful_invocation_passes_parameters_and_repos(
     capture_submission, mode, analysis_only
 ):
     capture, env = capture_submission
-    repos = [
-        {"git_repo": "https://github.com/example/one", "git_branch": "dev"},
-        {"git_repo": "https://github.com/example/two"},
-    ]
-    # Analysis-only must work without a repository list (or an upload).
-    env["GIT_REPO_LIST_CONTENTS"] = "" if analysis_only else json.dumps(repos)
+    if analysis_only:
+        env["PIPELINE_RUN_ID"] = "prev-run"
     args = [f"--{mode}-repo"]
     if analysis_only:
         args.append("--analysis-only")
@@ -100,26 +99,27 @@ def test_successful_invocation_passes_parameters_and_repos(
     assert "Submitted run id: mock-run-123" in result.stdout
     submission = json.loads(capture.read_text())
     assert submission["pipeline_name"] == f"{mode}_repo"
-    prefix = "analysis_" if analysis_only else ""
-    assert re.fullmatch(f"{prefix}{mode}_repo_" + r"\d{8}_\d{6}", submission["run_name"])
+    assert re.fullmatch(f"{mode}_repo_" + r"\d{8}_\d{6}", submission["run_name"])
     expected_params = {
         "parent_source_path": "custom/source",
         "parent_target_path": "custom/target",
+        "pipeline_run_id": "prev-run" if analysis_only else "",
     }
     if mode == "single":
         expected_params.update(git_repo=env["GIT_REPO"], git_branch="develop")
-    if analysis_only:
-        expected_params["analysis_only"] = True
+        expected_params["runnable_repos"] = json.dumps(
+            [{"git_repo": env["GIT_REPO"], "git_branch": "develop"}]
+        )
     assert submission["params"] == expected_params
-    assert submission["repos"] == (repos if mode == "multi" and not analysis_only else None)
+    assert submission["enable_caching"] is analysis_only
 
 
-def test_full_multi_repo_requires_repository_list(capture_submission):
+def test_analysis_only_requires_pipeline_run_id(capture_submission):
     capture, env = capture_submission
-    env["GIT_REPO_LIST_CONTENTS"] = "[]"
+    env.pop("PIPELINE_RUN_ID", None)
 
-    result = run_script("--multi-repo", env=env)
+    result = run_script("--single-repo", "--analysis-only", env=env)
 
-    assert result.returncode != 0
-    assert "GIT_REPO_LIST_CONTENTS is required" in result.stderr
+    assert result.returncode == 1
+    assert "PIPELINE_RUN_ID must be set" in result.stderr
     assert not capture.exists()
