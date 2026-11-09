@@ -35,6 +35,24 @@ QUERYABLE = [
         "kfp_run_id": "kfp-run-combined",
     }
 ]
+MOCK_RUNS = [
+    {
+        "run_id": "run-1",
+        "name": "run-1",
+        "git_repo": "https://github.com/example/one",
+        "git_branch": "develop",
+        "status": "Succeeded",
+        "start_time": "2026-01-01T00:00:00Z",
+    },
+    {
+        "run_id": "run-2",
+        "name": "run-2",
+        "git_repo": "https://github.com/example/two",
+        "git_branch": "release",
+        "status": "Failed",
+        "start_time": "2026-01-02T00:00:00Z",
+    },
+]
 
 
 @pytest.fixture
@@ -44,7 +62,7 @@ def mock_console(page: Page):
     page_errors = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
 
-    def open_console(*, indexed=True):
+    def open_console(*, indexed=True, runs=None):
         responses = {
             "/api/status": {"ok": True, "namespace": "test"},
             "/api/v2/repositories/catalog-repos": {"repos": REPOS, "default_key": None},
@@ -54,7 +72,7 @@ def mock_console(page: Page):
                 "queryable": QUERYABLE if indexed else [],
             },
             "/api/namespaces": {"namespaces": ["test"], "current": "test"},
-            "/api/v2/pipelines/runs": {"runs": []},
+            "/api/v2/pipelines/runs": {"runs": runs if runs is not None else []},
             "/api/v2/pipelines/runs/mock-run": {"status": "running"},
         }
         static_files = {
@@ -93,57 +111,86 @@ def mock_console(page: Page):
 
 
 @pytest.mark.parametrize("repo_count", [1, 2], ids=["single-repo", "multi-repo"])
-def test_indexing_submits_selected_repositories(page: Page, mock_console, repo_count):
+def test_analyze_submits_selected_repositories(page: Page, mock_console, repo_count):
     submissions = mock_console()
     checkboxes = page.locator("#repo-list input[type=checkbox]")
     for index in range(repo_count):
         checkboxes.nth(index).check()
-    page.locator('.cu-tabs button[data-tab="pipelines"]').click()
 
+    # Click Analyze to open the confirmation modal.
+    page.locator("#open-analyze").click()
+    expect(page.locator("#analyze-modal")).to_be_visible()
+
+    # Confirm the analysis.
     with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
-        page.get_by_role("button", name="Run Indexing", exact=True).click()
+        page.locator("#start-analysis").click()
     page.wait_for_load_state("networkidle")
     assert submissions == [{"repos": REPOS[:repo_count]}]
 
 
-@pytest.mark.parametrize("repo_idx", [0, 1], ids=["first-repo", "second-repo"])
-def test_analysis_submits_selected_index(page: Page, mock_console, repo_idx):
-    submissions = mock_console()
-    # Select all repos in the indexing tab to confirm analysis uses its own selection.
-    page.get_by_role("button", name="Select all", exact=True).click()
-    page.locator('.cu-tabs button[data-tab="analysis"]').click()
-    key = QUERYABLE[repo_idx]["key"]
-    page.locator("#analysis-repo").select_option(key)
-
-    with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
-        page.get_by_role("button", name="Run Analysis", exact=True).click()
-    page.wait_for_load_state("networkidle")
-    assert submissions == [
-        {
-            "repos": [REPOS[repo_idx]],
-            "pipeline_run_id": QUERYABLE[repo_idx]["kfp_run_id"],
-        }
-    ]
-
-
-def test_indexing_without_selected_repositories_does_not_submit(page: Page, mock_console):
-    submissions = mock_console()
+def test_analyze_without_selected_repositories_is_disabled(page: Page, mock_console):
+    mock_console()
     page.get_by_role("button", name="Clear", exact=True).click()
-    page.locator('.cu-tabs button[data-tab="pipelines"]').click()
 
-    page.get_by_role("button", name="Run Indexing", exact=True).click()
-
-    expect(page.get_by_role("alert")).to_have_text(
-        "Select at least one repository before running."
-    )
-    assert submissions == []
+    analyze_btn = page.locator("#open-analyze")
+    expect(analyze_btn).to_be_disabled()
 
 
-def test_analysis_without_available_indexes_does_not_submit(page: Page, mock_console):
-    submissions = mock_console(indexed=False)
-    page.locator('.cu-tabs button[data-tab="analysis"]').click()
+def test_runs_tab_renders_run_list(page: Page, mock_console):
+    mock_console(runs=MOCK_RUNS)
+    page.locator('.cu-nav-item[data-tab="runs"]').click()
+    expect(page.locator("#tab-runs")).to_be_visible()
 
-    expect(page.locator("#analysis-empty")).to_be_visible()
-    expect(page.locator("#analysis-repo option")).to_have_count(0)
-    expect(page.locator("#run-analysis")).to_be_hidden()
-    assert submissions == []
+    rows = page.locator("#run-list tr")
+    expect(rows).to_have_count(2)
+
+
+def test_failed_run_shows_failed_chip(page: Page, mock_console):
+    mock_console(runs=MOCK_RUNS)
+    page.locator('.cu-nav-item[data-tab="runs"]').click()
+
+    failed_chip = page.locator("#run-list .cu-chip.failed")
+    expect(failed_chip).to_have_count(1)
+    expect(failed_chip).to_have_text("Failed")
+
+
+def test_theme_toggle_persists_in_local_storage(page: Page, mock_console):
+    mock_console()
+
+    # Default is light — body should not have dark class.
+    body = page.locator("body")
+    expect(body).not_to_have_class("dark")
+
+    # Switch to dark mode.
+    page.locator('input[name="theme-mode"][value="dark"]').check(force=True)
+    expect(body).to_have_class("dark")
+
+    # Verify localStorage was set.
+    theme = page.evaluate("localStorage.getItem('theme')")
+    assert theme == "dark"
+
+    # Switch back to light mode.
+    page.locator('input[name="theme-mode"][value="light"]').check(force=True)
+    expect(body).not_to_have_class("dark")
+    theme = page.evaluate("localStorage.getItem('theme')")
+    assert theme == "light"
+
+
+def test_select_all_and_clear_buttons(page: Page, mock_console):
+    mock_console()
+    checkboxes = page.locator("#repo-list input[type=checkbox]")
+
+    page.get_by_role("button", name="Select all", exact=True).click()
+    for i in range(checkboxes.count()):
+        expect(checkboxes.nth(i)).to_be_checked()
+
+    page.get_by_role("button", name="Clear", exact=True).click()
+    for i in range(checkboxes.count()):
+        expect(checkboxes.nth(i)).not_to_be_checked()
+
+
+def test_namespace_dropdown_is_visible(page: Page, mock_console):
+    mock_console()
+    ns_row = page.locator("#ns-row")
+    expect(ns_row).to_be_visible()
+    expect(page.locator("#ns-select")).to_have_value("test")
