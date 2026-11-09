@@ -78,6 +78,13 @@ def test_all_pipelines_compile(tmp_path):
         assert all("None" not in image for image in images)
         assert all(not image.endswith(":latest") for image in images)
 
+        preflight = document["deploymentSpec"]["executors"].get("exec-preflight-op")
+        if preflight is not None:
+            resources = preflight["container"]["resources"]
+            # A CPU limit without a request becomes a full reservation in Kubernetes.
+            assert resources["resourceCpuRequest"] == "250m"
+            assert resources["resourceCpuLimit"] == "2"
+
     for mode in ("single", "multi"):
         document = _load_pipeline(tmp_path / f"{mode}_repo.yaml")
         # pipeline_run_id (string) replaces analysis_only (bool) from ext-tools
