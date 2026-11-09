@@ -52,6 +52,7 @@ def test_prebuilt_bundle_has_portable_metadata_and_anonymous_tar_headers(tmp_pat
         "category": "indexing",
         "git_slug": "agapebondservant-tic-tac-toe-sample-main",
         "multi_repo": "False",
+        "pipeline_run_id": "8e71296d-5458-4433-a7b5-48aea9caf346",
         "mlflow.runName": "tic-tac-toe-prebuilt-index",
     }
     assert metadata["mlflow"]["params"] == {
@@ -550,6 +551,7 @@ def test_prebuilt_bundle_imports_through_job_cli_and_skips_duplicate(mlflow_serv
             "destination" + transfer.EXPERIMENT_SUFFIX
         )
         assert run.data.tags["uploaded"] == "true"
+        assert run.data.tags["pipeline_run_id"] == "8e71296d-5458-4433-a7b5-48aea9caf346"
         assert run.data.tags["bundle_sha256"] == transfer.bundle_sha256(PREBUILT_BUNDLE)
         assert run.data.params["embedding_model"] == "intfloat/e5-mistral-7b-instruct"
         downloaded = Path(client.download_artifacts(run_id, "", str(tmp_path)))
