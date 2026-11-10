@@ -92,6 +92,8 @@
     body.dark .cu-progress { background: #2a2a2a; }
 
     body.dark .cu-row-fail td.gridjs-td { background-color: #3a1a1a !important; }
+    body.dark tr.cu-row-fail { background-color: #3a1a1a !important; }
+    body.dark tr.cu-row-fail td { background-color: #3a1a1a !important; }
     body.dark .cu-eval-chip { background: #3a3a3a; color: #e0e0e0; }
     body.dark .cu-eval-chip--overall { background: #e0e0e0; color: #1a1a1a; }
 
@@ -643,6 +645,8 @@
     .cu-diagram-flyover-src { margin: 0; white-space: pre-wrap; color: var(--cu-charcoal); font-size: 0.78rem; max-height: 260px; overflow-y: auto; }
     .gridjs-td { vertical-align: top; }
     .cu-row-fail td.gridjs-td { background-color: #fff0f0 !important; }
+    tr.cu-row-fail { background-color: #fff0f0 !important; }
+    tr.cu-row-fail td { background-color: #fff0f0 !important; }
     .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
     .cu-eval-summary { margin-bottom: 1.25rem; display: flex; flex-wrap: wrap; gap: 1.25rem; }
     .cu-eval-summary-section h4 { margin: 0 0 0.35rem; font-size: 0.85rem; color: var(--cu-gray); }
@@ -1335,10 +1339,14 @@
             if (csvRows.length < 2) {
               $("report-viewer-content").innerHTML = `<p class="cu-muted">No evaluation data.</p>`;
             } else {
-              const ANALYSIS_EVALUATION_THRESHOLD = 4;
+              const ANALYSIS_EVALUATION_THRESHOLD = 3;
               const headers = csvRows[0];
               const scoreColIndices = headers.reduce((acc, h, i) => {
                 if (h.includes("/v1/score")) acc.push(i);
+                return acc;
+              }, []);
+              const failColIndices = headers.reduce((acc, h, i) => {
+                if (h.includes("/v1/score") && !h.includes("answer_similarity")) acc.push(i);
                 return acc;
               }, []);
               /* ── Aggregate score summary (server-provided) ── */
@@ -1347,6 +1355,7 @@
                 const summary = document.createElement("div");
                 summary.className = "cu-eval-summary";
                 summary.innerHTML =
+                  `<h3 style="margin:0 0 0.75rem">Summary</h3>` +
                   `<div class="cu-eval-summary-section">` +
                     `<h4>Per-Metric Averages</h4>` +
                     `<div class="cu-eval-chips">` +
@@ -1361,7 +1370,7 @@
                       scores.metrics.map(m =>
                         `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_3.toFixed(1)}%</span>`
                       ).join("") +
-                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Overall</strong> ${scores.overall_pass_rate_3.toFixed(1)}%</span>` +
+                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Average</strong> ${scores.average_pass_rate_3.toFixed(1)}%</span>` +
                     `</div>` +
                   `</div>` +
                   `<div class="cu-eval-summary-section">` +
@@ -1370,7 +1379,7 @@
                       scores.metrics.map(m =>
                         `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_4.toFixed(1)}%</span>`
                       ).join("") +
-                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Overall</strong> ${scores.overall_pass_rate_4.toFixed(1)}%</span>` +
+                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Average</strong> ${scores.average_pass_rate_4.toFixed(1)}%</span>` +
                     `</div>` +
                   `</div>`;
                 $("report-viewer-content").appendChild(summary);
@@ -1408,13 +1417,18 @@
                   return r;
                 }),
                 sort: true,
-                search: true,
+                search: false,
                 pagination: { limit: 20 },
                 style: { table: { fontSize: "0.875rem" } },
                 className: {
-                  tr: (row) => scoreColIndices.some(i => parseFloat(row[i]) < ANALYSIS_EVALUATION_THRESHOLD)
-                    ? "cu-row-fail"
-                    : "",
+                  tr: (row) => {
+                    const cells = row._cells || row.cells || row;
+                    return failColIndices.some(i => {
+                      const c = cells[i];
+                      const v = c != null && typeof c === "object" ? c.data : c;
+                      return parseFloat(v) < ANALYSIS_EVALUATION_THRESHOLD;
+                    }) ? "cu-row-fail" : "";
+                  },
                 },
               }).render(gridContainer);
               appendReportDl(content, `${runName || "report"}_evaluation_report.csv`);
