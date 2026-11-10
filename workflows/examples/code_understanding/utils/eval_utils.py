@@ -112,6 +112,7 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
         pass3 = sum(1 for v in vals if v >= 3)
         pass4 = sum(1 for v in vals if v >= 4)
         name = col_name.replace("/v1/score", "").replace("_", " ").strip()
+<<<<<<< HEAD
         excluded = name in PASS_RATE_EXCLUDES
         metric: dict[str, Any] = {"name": name, "average": round(avg, 2)}
         if not excluded:
