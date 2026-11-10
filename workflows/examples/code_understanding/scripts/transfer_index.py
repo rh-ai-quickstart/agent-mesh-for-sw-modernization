@@ -21,7 +21,7 @@ from code_understanding.utils.index_transfer import IndexTransfer  # noqa: E402
 
 
 def print_indexes(result: dict) -> None:
-    """Display repository identities and complete run IDs for copying."""
+    """Display repository identities and pipeline run IDs for copying."""
     indexes = result["indexes"]
     if not indexes:
         print(f"No completed indexes found in {result['namespace']}.")
@@ -32,7 +32,7 @@ def print_indexes(result: dict) -> None:
         "Uploaded",
         "Latest",
         "Started (UTC)",
-        "Run ID",
+        "Pipeline Run ID",
     )
     rows = []
     for index in indexes:
@@ -50,7 +50,7 @@ def print_indexes(result: dict) -> None:
                     if started is not None
                     else "-"
                 ),
-                index["run_id"],
+                index["pipeline_run_id"] or "unavailable",
             )
         )
     widths = [max(len(row[column]) for row in (headers, *rows)) for column in range(len(headers))]
@@ -63,18 +63,28 @@ def print_indexes(result: dict) -> None:
     print(line(tuple("-" * width for width in widths)))
     for row in rows:
         print(line(row))
+    if any(not index["pipeline_run_id"] for index in indexes):
+        print(
+            "\nOlder indexes with an unavailable pipeline run ID cannot be selected by "
+            "PIPELINE_RUN_ID. Export by INDEX_GIT_SLUG with an explicit INDEX_BUNDLE."
+        )
 
 
 def print_export(result: dict) -> None:
+    if result["matching_indexes"] > 1:
+        print(
+            f"Found {result['matching_indexes']} completed indexes for pipeline run ID "
+            f"{result['pipeline_run_id']}; exporting the latest by start time.\n"
+        )
     print(f"Index:     {'Combined index' if result['multi_repo'] else result['git_slug']}")
     print(f"Type:      {'Combined' if result['multi_repo'] else 'Single repository'}")
-    print(f"Run ID:    {result['source_run_id']}")
+    print(f"Pipeline Run ID: {result['pipeline_run_id'] or 'unavailable'}")
     print(f"Namespace: {result['namespace']}")
     print(f"\nIndex saved to \"{result['bundle_path']}\"")
 
 
 @contextmanager
-def quiet_export_logs(enabled: bool):
+def quiet_transfer_logs(enabled: bool):
     """Hide routine package logs without affecting progress bars or errors."""
     previous = logging.root.manager.disable
     if enabled:
@@ -94,7 +104,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         if operation == "export":
             selectors = command.add_mutually_exclusive_group()
             selectors.add_argument("--git-slug", default=os.getenv("INDEX_GIT_SLUG") or None)
-            selectors.add_argument("--run-id", default=os.getenv("INDEX_RUN_ID") or None)
+            selectors.add_argument(
+                "--pipeline-run-id", default=os.getenv("PIPELINE_RUN_ID") or None
+            )
         if operation in {"export", "import"}:
             command.add_argument("--bundle", type=Path, default=os.getenv("INDEX_BUNDLE") or None)
         if operation == "import":
@@ -103,8 +115,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args.namespace = os.getenv("KFP_NAMESPACE", "")
     if not args.namespace or not args.namespace.strip():
         parser.error("KFP_NAMESPACE is required")
-    if args.operation == "export" and bool(args.git_slug) == bool(args.run_id):
-        parser.error("Supply exactly one of INDEX_GIT_SLUG or INDEX_RUN_ID")
+    if args.operation == "export" and bool(args.git_slug) == bool(args.pipeline_run_id):
+        parser.error("Supply exactly one of INDEX_GIT_SLUG or PIPELINE_RUN_ID")
     if args.operation == "import":
         if not args.bundle:
             parser.error("INDEX_BUNDLE or --bundle is required for import")
@@ -121,7 +133,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         # The pinned package installs stdout logging handlers when imported.
         # Redirect during imports and transfer so stdout contains only the result.
-        with redirect_stdout(sys.stderr), quiet_export_logs(args.operation == "export"):
+        with (
+            redirect_stdout(sys.stderr),
+            quiet_transfer_logs(args.operation in {"export", "import"}),
+        ):
             from urllib3.exceptions import InsecureRequestWarning
 
             warnings.filterwarnings("ignore", category=InsecureRequestWarning)
@@ -132,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["MLFLOW_WORKSPACE"] = args.namespace
             os.environ["MLFLOW_NAMESPACE"] = args.namespace
             os.environ["MLFLOW_TRACKING_URI"] = uri
+            os.environ["MLFLOW_SUPPRESS_PRINTING_URL_TO_STDOUT"] = "true"
             os.environ.setdefault("MLFLOW_TRACKING_AUTH", "kubernetes-namespaced")
             import mlflow
             from mlflow.tracking import MlflowClient
@@ -141,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.operation == "list":
                 result = transfer.list_indexes()
             elif args.operation == "export":
-                result = transfer.export_index(args.git_slug, args.run_id, args.bundle)
+                result = transfer.export_index(args.git_slug, args.pipeline_run_id, args.bundle)
             else:
                 result = transfer.import_index(args.bundle, args.force)
     except Exception as exc:
@@ -154,7 +170,18 @@ def main(argv: list[str] | None = None) -> int:
     elif args.operation == "export":
         print_export(result)
     else:
-        print(json.dumps(result))
+        # Source and destination MLflow IDs remain internal transfer metadata.
+        public_result = {
+            key: value
+            for key, value in result.items()
+            if key not in {"source_run_id", "destination_run_id"}
+        }
+        if not result["pipeline_run_id"]:
+            public_result["message"] = (
+                "Pipeline run ID is unavailable for this older index; "
+                "it cannot be selected by PIPELINE_RUN_ID."
+            )
+        print(json.dumps(public_result))
     return 0
 
 

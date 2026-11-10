@@ -122,7 +122,7 @@ def test_pipeline_artifact_checks_use_run_and_repository_scope(tmp_path, multi_r
 
     def search_runs(**kwargs):
         filters = kwargs["filter_string"]
-        assert "tags.kfp_run_id = 'selected-run'" in filters
+        assert "tags.pipeline_run_id = 'selected-run'" in filters
         assert ("tags.git_slug" in filters) is not multi_repo
         return [
             SimpleNamespace(
@@ -167,6 +167,61 @@ def test_pipeline_artifact_checks_use_run_and_repository_scope(tmp_path, multi_r
     helpers["_assert_index"](client, "namespace", "selected-run", tmp_path, multi_repo=multi_repo)
 
     assert client.download_artifacts.call_count == 6
+
+
+@pytest.mark.parametrize("creates_index", [False, True])
+def test_analysis_only_reuses_prebuilt_index_and_checks_new_run(
+    monkeypatch, tmp_path, creates_index
+):
+    helpers = runpy.run_path(str(CLI_TESTS / "test_cli_pipelines.py"))
+    test = helpers["test_analysis_only_pipeline_returns_report"]
+    waiter = Mock()
+    monkeypatch.setitem(test.__globals__, "_wait_for_run", waiter)
+    client = Mock()
+    client.get_experiment_by_name.return_value = SimpleNamespace(experiment_id="1")
+    report = tmp_path / "report.md"
+    report.write_text("# Analysis from the prebuilt index", encoding="utf-8")
+    report_path = f"results/pipelines/{helpers['GIT_SLUG']}/migration_report.md"
+    client.list_artifacts.return_value = [SimpleNamespace(path=report_path, is_dir=False)]
+    client.download_artifacts.return_value = str(report)
+
+    def search_runs(**kwargs):
+        filters = kwargs["filter_string"]
+        assert "tags.pipeline_run_id = 'new-analysis-run'" in filters
+        assert "8e71296d-5458-4433-a7b5-48aea9caf346" not in filters
+        if "tags.category = 'analysis'" in filters:
+            return [
+                SimpleNamespace(
+                    info=SimpleNamespace(run_id="analysis-artifacts"),
+                    data=SimpleNamespace(tags={"multi_repo": "False"}),
+                )
+            ]
+        assert "tags.category = 'indexing'" in filters
+        return (
+            [SimpleNamespace(info=SimpleNamespace(run_id="unexpected-index"))]
+            if creates_index
+            else []
+        )
+
+    client.search_runs.side_effect = search_runs
+
+    def run_cli(command, **kwargs):
+        if command[0] == "make":
+            assert "ARGS=--single-repo --analysis-only" in command
+            assert "PIPELINE_RUN_ID=8e71296d-5458-4433-a7b5-48aea9caf346" in command
+            return ""
+        assert command[:3] == ["oc", "logs", "job/run-pipelines"]
+        return "Submitted run id: new-analysis-run\n"
+
+    kfp = Mock()
+    if creates_index:
+        with pytest.raises(AssertionError, match="created.*index"):
+            test(run_cli, kfp, client, "namespace", tmp_path)
+    else:
+        test(run_cli, kfp, client, "namespace", tmp_path)
+        assert client.search_runs.call_count == 2
+    waiter.assert_called_once()
+    assert waiter.call_args.args[:2] == (kfp, "new-analysis-run")
 
 
 def test_multi_repo_submission_applies_readme_list_before_submitting(monkeypatch):

@@ -250,6 +250,7 @@ class IndexTransfer:
             "git_slug": slug,
             "multi_repo": combined,
             "run_id": info.run_id,
+            "pipeline_run_id": run.data.tags.get("pipeline_run_id") or None,
             "experiment_id": info.experiment_id,
             "start_time": info.start_time,
             "end_time": info.end_time,
@@ -282,7 +283,7 @@ class IndexTransfer:
                 try:
                     indexes.append(self._describe(run, experiment.experiment_id))
                 except IndexTransferError as exc:
-                    LOG.warning("Skipping run %s: %s", run.info.run_id, exc)
+                    LOG.warning("Skipping ineligible index: %s", exc)
         indexes.sort(key=lambda index: (-(index["start_time"] or 0), index["run_id"]))
         seen = set()
         for index in indexes:
@@ -297,16 +298,23 @@ class IndexTransfer:
             "indexes": indexes,
         }
 
-    def _select(self, git_slug: str | None, run_id: str | None) -> dict:
-        if bool(git_slug) == bool(run_id):
-            raise IndexTransferError("Supply exactly one of INDEX_GIT_SLUG or INDEX_RUN_ID")
+    def _select(self, git_slug: str | None, pipeline_run_id: str | None) -> dict:
+        if bool(git_slug) == bool(pipeline_run_id):
+            raise IndexTransferError("Supply exactly one of INDEX_GIT_SLUG or PIPELINE_RUN_ID")
         experiment = self._experiment()
         if not experiment:
             raise IndexTransferError(f"Experiment does not exist: {self.experiment_name}")
-        if run_id:
-            return self._describe(self.client.get_run(run_id), experiment.experiment_id)
+        indexes = self.list_indexes()["indexes"]
+        if pipeline_run_id:
+            matches = [index for index in indexes if index["pipeline_run_id"] == pipeline_run_id]
+            if not matches:
+                raise IndexTransferError(
+                    f"No active, completed indexing run for pipeline run ID {pipeline_run_id!r} "
+                    f"in {self.experiment_name}"
+                )
+            return {**matches[0], "matching_indexes": len(matches)}
         _index_identity({"category": "indexing", "git_slug": git_slug, "multi_repo": "false"})
-        for index in self.list_indexes()["indexes"]:
+        for index in indexes:
             if index["git_slug"] == git_slug and not index["multi_repo"]:
                 return index
         raise IndexTransferError(f"No completed single-repository index for slug {git_slug!r}")
@@ -341,18 +349,26 @@ class IndexTransfer:
     def export_index(
         self,
         git_slug: str | None = None,
-        run_id: str | None = None,
+        pipeline_run_id: str | None = None,
         bundle: Path | None = None,
     ) -> dict:
-        index = self._select(git_slug, run_id)
+        index = self._select(git_slug, pipeline_run_id)
         source_run_id = index["run_id"]
+        pipeline_run_id = index["pipeline_run_id"]
+        if bundle is None:
+            if not pipeline_run_id:
+                raise IndexTransferError(
+                    "Pipeline run ID is unavailable for this older index. "
+                    "Supply INDEX_BUNDLE or --bundle to export by repository slug."
+                )
+            _safe_path(pipeline_run_id)
+            if "/" in pipeline_run_id:
+                raise IndexTransferError("Pipeline run ID must be a single filename component")
+            label = "multi-repo" if index["multi_repo"] else index["git_slug"]
+            bundle = Path(f"artifacts/indexes/{label}-{pipeline_run_id}.tar.gz")
         files = self._remote_files(source_run_id)
         _require_index(files, index["artifact_path"])
-        label = "multi-repo" if index["multi_repo"] else index["git_slug"]
-        _safe_path(source_run_id)
-        if "/" in source_run_id:
-            raise IndexTransferError("Invalid source run ID")
-        bundle = Path(bundle or f"artifacts/indexes/{label}-{source_run_id}.tar.gz")
+        bundle = Path(bundle)
         if bundle.exists():
             raise IndexTransferError(f"Refusing to overwrite {bundle}")
         bundle.parent.mkdir(parents=True, exist_ok=True)
@@ -373,6 +389,7 @@ class IndexTransfer:
             if (
                 metadata["info"]["run_id"] != source_run_id
                 or metadata["info"]["experiment_id"] != index["experiment_id"]
+                or (metadata["tags"].get("pipeline_run_id") or None) != pipeline_run_id
                 or _index_identity(metadata["tags"])
                 != (index["git_slug"], index["multi_repo"], index["artifact_path"])
             ):
@@ -400,6 +417,8 @@ class IndexTransfer:
             "bundle_path": str(bundle),
             "bundle_sha256": digest,
             "source_run_id": source_run_id,
+            "pipeline_run_id": pipeline_run_id,
+            "matching_indexes": index.get("matching_indexes", 1),
             "namespace": self.namespace,
             "experiment": self.experiment_name,
             "git_slug": index["git_slug"],
@@ -422,6 +441,7 @@ class IndexTransfer:
                 "bundle_path": str(bundle),
                 "bundle_sha256": digest,
                 "source_run_id": source["info"]["run_id"],
+                "pipeline_run_id": source["tags"].get("pipeline_run_id") or None,
                 "destination_namespace": self.namespace,
                 "destination_experiment": self.experiment_name,
                 "git_slug": slug,
@@ -439,6 +459,7 @@ class IndexTransfer:
                     if (
                         index["git_slug"] == slug
                         and index["multi_repo"] == combined
+                        and index["pipeline_run_id"] == result["pipeline_run_id"]
                         and run.data.tags.get("uploaded") == "true"
                         and run.data.tags.get("index_transfer.destination_namespace")
                         == self.namespace
@@ -487,8 +508,13 @@ class IndexTransfer:
                     raise IndexTransferError("Import did not produce a new destination run")
                 destination = self.client.get_run(destination_id)
                 index = self._describe(destination, experiment.experiment_id)
-                if (index["git_slug"], index["multi_repo"]) != (slug, combined) or any(
-                    destination.data.tags.get(key) != value for key, value in provenance.items()
+                if (
+                    (index["git_slug"], index["multi_repo"]) != (slug, combined)
+                    or index["pipeline_run_id"] != result["pipeline_run_id"]
+                    or any(
+                        destination.data.tags.get(key) != value
+                        for key, value in provenance.items()
+                    )
                 ):
                     raise IndexTransferError("Imported tags do not match the bundle")
                 if "mlflow.parentRunId" in destination.data.tags:

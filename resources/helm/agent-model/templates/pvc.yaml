@@ -1,0 +1,15 @@
+{{- $config := include "agent-model.config" . | fromYaml -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "agent-model.fullname" . }}-cache
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - {{ $config.cache.accessMode }}
+  resources:
+    requests:
+      storage: {{ $config.cache.size }}
+  {{- with $config.cache.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
