@@ -1373,7 +1373,7 @@
                       scores.metrics.filter(m => m.pass_rate_3 != null).map(m =>
                         `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_3.toFixed(1)}%</span>`
                       ).join("") +
-                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Average</strong> ${scores.average_pass_rate_3.toFixed(1)}%</span>` +
+                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Mean</strong> ${scores.average_pass_rate_3.toFixed(1)}%</span>` +
                     `</div>` +
                   `</div>` +
                   `<div class="cu-eval-summary-section">` +
@@ -1382,7 +1382,7 @@
                       scores.metrics.filter(m => m.pass_rate_4 != null).map(m =>
                         `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_4.toFixed(1)}%</span>`
                       ).join("") +
-                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Average</strong> ${scores.average_pass_rate_4.toFixed(1)}%</span>` +
+                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Mean</strong> ${scores.average_pass_rate_4.toFixed(1)}%</span>` +
                     `</div>` +
                   `</div>`;
                 $("report-viewer-content").appendChild(summary);
