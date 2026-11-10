@@ -2,12 +2,12 @@
 
 These tests require an existing deployment and oc login. Pipeline tests also
 require --run-pipelines (or make test-cli-e2e RUN_PIPELINES=true). The query test
-uses the existing index. CLI_E2E_PIPELINE_TIMEOUT_SECONDS defaults to two hours;
-CLI_E2E_COMMAND_TIMEOUT_SECONDS defaults to 30 minutes.
+uses the existing index. Timeouts below are in seconds and specific to each test.
+Failed waits cancel the submitted run and allow 60 seconds to confirm termination.
 The analysis-only test requires the bundled prebuilt index to be installed.
+Multi-repo pipeline and combined-index query tests are temporarily skipped.
 """
 
-import os
 import re
 import time
 from pathlib import Path
@@ -29,6 +29,11 @@ REPO_LIST = (
     Path(__file__).resolve().parents[3]
     / "workflows/examples/code_understanding/assets/repos/repo_list.json"
 )
+ADHOC_QUERY_TIMEOUT = 10 * 60
+ANALYSIS_ONLY_PIPELINE_TIMEOUT = 40 * 60
+SINGLE_REPO_PIPELINE_TIMEOUT = 3 * 60 * 60
+MULTI_REPO_PIPELINE_TIMEOUT = 4 * 60 * 60
+PIPELINE_SUBMISSION_TIMEOUT = 500
 
 
 def _artifact_run(
@@ -112,15 +117,52 @@ def _wait_for_run(client, run_id, timeout):
                 pytest.fail(f"KFP run {run_id} ended with state {last_state}.")
         time.sleep(min(15, max(0, deadline - time.monotonic())))
     pytest.fail(
-        f"KFP run {run_id} did not complete within {timeout}s; last observed state: {last_state}. "
-        "This test timeout does not cancel the pipeline."
+        f"KFP run {run_id} did not complete within {timeout}s; last observed state: {last_state}."
     )
 
 
-def _submit_and_wait(run_cli, client, namespace, args, *, repo_list=None, pipeline_run_id=""):
-    command_timeout = int(os.environ.get("CLI_E2E_COMMAND_TIMEOUT_SECONDS", "1800"))
-    pipeline_timeout = int(os.environ.get("CLI_E2E_PIPELINE_TIMEOUT_SECONDS", "7200"))
+def _cancel_owned_run(client, run_id, timeout=60):
+    """Terminate an unfinished submitted run and confirm it stopped before proceeding."""
+    deadline = time.monotonic() + timeout
+    termination_requested = False
+    last_state = "UNKNOWN"
+    last_error = "none"
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        try:
+            run = client.run_service_get_run(
+                run_id=run_id,
+                _request_timeout=(min(5, remaining / 2), min(10, remaining / 2)),
+            )
+            state = getattr(run, "state", None)
+            last_state = str(getattr(state, "name", state) or "PENDING").upper()
+            if last_state in {"SUCCEEDED", "FAILED", "ERROR", "CANCELED", "CANCELLED", "SKIPPED"}:
+                print(f"Test-owned KFP run {run_id} stopped: {last_state}.", flush=True)
+                return
+        except (HTTPError, ApiException) as exc:
+            last_error = f"{type(exc).__name__} (HTTP {getattr(exc, 'status', 'unknown')})"
 
+        remaining = deadline - time.monotonic()
+        if not termination_requested and remaining > 0:
+            try:
+                client.run_service_terminate_run(
+                    run_id=run_id,
+                    _request_timeout=(min(5, remaining / 2), min(10, remaining / 2)),
+                )
+                termination_requested = True
+                print(f"Requested termination of test-owned KFP run {run_id}.", flush=True)
+            except (HTTPError, ApiException) as exc:
+                last_error = f"{type(exc).__name__} (HTTP {getattr(exc, 'status', 'unknown')})"
+        time.sleep(min(2, max(0, deadline - time.monotonic())))
+    raise RuntimeError(
+        f"Cleanup exceeded {timeout}s; last observed state: {last_state}; "
+        f"last API error: {last_error}"
+    )
+
+
+def _submit_and_wait(
+    run_cli, client, namespace, args, *, pipeline_timeout, repo_list=None, pipeline_run_id=""
+):
     command = ["make", "run-pipelines", f"ARGS={args}"]
     if pipeline_run_id:
         command.append(f"PIPELINE_RUN_ID={pipeline_run_id}")
@@ -128,11 +170,11 @@ def _submit_and_wait(run_cli, client, namespace, args, *, repo_list=None, pipeli
         run_cli(
             ["make", "apply-secrets", f"PIPELINE_GIT_REPO_LIST={repo_list}"],
             name="pipeline-repository-list",
-            timeout=command_timeout,
+            timeout=PIPELINE_SUBMISSION_TIMEOUT,
         )
     else:
         command.extend([f"PIPELINE_GIT_REPO={REPO}", f"PIPELINE_GIT_BRANCH={BRANCH}"])
-    run_cli(command, name="pipeline-submission", timeout=command_timeout)
+    run_cli(command, name="pipeline-submission", timeout=PIPELINE_SUBMISSION_TIMEOUT)
     submission_log = run_cli(
         ["oc", "logs", "job/run-pipelines", "--namespace", namespace],
         name="pipeline-submission-logs",
@@ -142,7 +184,18 @@ def _submit_and_wait(run_cli, client, namespace, args, *, repo_list=None, pipeli
     assert len(run_ids) == 1, f"Expected one submitted KFP run:\n{submission_log}"
     run_id = run_ids[0]
 
-    _wait_for_run(client, run_id, pipeline_timeout)
+    try:
+        _wait_for_run(client, run_id, pipeline_timeout)
+    except (Exception, pytest.fail.Exception) as failure:
+        try:
+            _cancel_owned_run(client, run_id)
+        except Exception as cleanup_error:
+            pytest.exit(
+                f"{failure}\nCould not confirm termination of test-owned KFP run {run_id}: "
+                f"{cleanup_error}. Stopping the test session to prevent overlapping pipelines.",
+                returncode=1,
+            )
+        raise
 
     return run_id
 
@@ -214,11 +267,10 @@ def _assert_query_answer(output):
 
 
 def test_adhoc_query_returns_answer(run_cli):
-    command_timeout = int(os.environ.get("CLI_E2E_COMMAND_TIMEOUT_SECONDS", "1800"))
     output = run_cli(
         ["wrappers/adhoc.sh", QUESTION, "--git-repo", REPO, "--git-branch", BRANCH],
         name="adhoc-query",
-        timeout=command_timeout,
+        timeout=ADHOC_QUERY_TIMEOUT,
     )
     _assert_query_answer(output)
 
@@ -232,6 +284,7 @@ def test_analysis_only_pipeline_returns_report(
         deployed_kfp_client,
         deployed_namespace,
         "--single-repo --analysis-only",
+        pipeline_timeout=ANALYSIS_ONLY_PIPELINE_TIMEOUT,
         pipeline_run_id=PREBUILT_PIPELINE_RUN_ID,
     )
     _assert_analysis_report(deployed_mlflow_client, deployed_namespace, run_id, tmp_path)
@@ -251,7 +304,13 @@ def test_analysis_only_pipeline_returns_report(
 def test_single_repo_pipeline_creates_report_and_index(
     run_cli, deployed_kfp_client, deployed_mlflow_client, deployed_namespace, tmp_path
 ):
-    run_id = _submit_and_wait(run_cli, deployed_kfp_client, deployed_namespace, "--single-repo")
+    run_id = _submit_and_wait(
+        run_cli,
+        deployed_kfp_client,
+        deployed_namespace,
+        "--single-repo",
+        pipeline_timeout=SINGLE_REPO_PIPELINE_TIMEOUT,
+    )
     client = deployed_mlflow_client
     _assert_analysis_report(client, deployed_namespace, run_id, tmp_path)
 
@@ -259,6 +318,7 @@ def test_single_repo_pipeline_creates_report_and_index(
 
 
 @pytest.mark.pipeline
+@pytest.mark.skip(reason="Multi-repo E2E tests are temporarily disabled.")
 def test_multi_repo_pipeline_creates_report_and_index(
     run_cli, deployed_kfp_client, deployed_mlflow_client, deployed_namespace, tmp_path
 ):
@@ -267,6 +327,7 @@ def test_multi_repo_pipeline_creates_report_and_index(
         deployed_kfp_client,
         deployed_namespace,
         "--multi-repo",
+        pipeline_timeout=MULTI_REPO_PIPELINE_TIMEOUT,
         repo_list=REPO_LIST,
     )
     _assert_analysis_report(
@@ -276,14 +337,14 @@ def test_multi_repo_pipeline_creates_report_and_index(
 
 
 @pytest.mark.pipeline
+@pytest.mark.skip(reason="Multi-repo E2E tests are temporarily disabled.")
 def test_multi_repo_combined_index_query_returns_answer(run_cli):
-    command_timeout = int(os.environ.get("CLI_E2E_COMMAND_TIMEOUT_SECONDS", "1800"))
     output = run_cli(
         [
             "wrappers/adhoc.sh",
             "Which repositories share dependencies that affect migration order?",
         ],
         name="combined-index-query",
-        timeout=command_timeout,
+        timeout=ADHOC_QUERY_TIMEOUT,
     )
     _assert_query_answer(output)

@@ -82,7 +82,7 @@ def test_all_pipelines_compile(tmp_path):
         if preflight is not None:
             resources = preflight["container"]["resources"]
             # A CPU limit without a request becomes a full reservation in Kubernetes.
-            assert resources["resourceCpuRequest"] == "250m"
+            assert resources["resourceCpuRequest"] == "100m"
             assert resources["resourceCpuLimit"] == "2"
 
     for mode in ("single", "multi"):
