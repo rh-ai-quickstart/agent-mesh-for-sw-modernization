@@ -72,8 +72,8 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
                 },
                 ...
             ],
-            "overall_pass_rate_3": 85.0,
-            "overall_pass_rate_4": 70.0,
+            "average_pass_rate_3": 85.0,
+            "average_pass_rate_4": 70.0,
             "total_rows": 20,
         }
     """
@@ -119,21 +119,12 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
             }
         )
 
-    col_indices = [i for i, _ in score_cols]
-    all_pass3 = sum(
-        1
-        for row in data_rows
-        if all(((v := _parse(_cell(row, i))) is not None and v >= 3) for i in col_indices)
-    )
-    all_pass4 = sum(
-        1
-        for row in data_rows
-        if all(((v := _parse(_cell(row, i))) is not None and v >= 4) for i in col_indices)
-    )
+    avg_pass3 = round(sum(m["pass_rate_3"] for m in metrics) / len(metrics), 1) if metrics else 0.0
+    avg_pass4 = round(sum(m["pass_rate_4"] for m in metrics) / len(metrics), 1) if metrics else 0.0
 
     return {
         "metrics": metrics,
-        "overall_pass_rate_3": round(all_pass3 / total * 100, 1) if total else 0.0,
-        "overall_pass_rate_4": round(all_pass4 / total * 100, 1) if total else 0.0,
+        "average_pass_rate_3": avg_pass3,
+        "average_pass_rate_4": avg_pass4,
         "total_rows": total,
     }
