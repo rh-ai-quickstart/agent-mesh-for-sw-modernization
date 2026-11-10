@@ -1433,6 +1433,7 @@
                 const summary = document.createElement("div");
                 summary.className = "cu-eval-summary";
                 summary.innerHTML =
+                  `<h3 style="margin:0 0 0.75rem">Summary</h3>` +
                   `<div class="cu-eval-summary-section">` +
                     `<h4>Per-Metric Averages (1-5)</h4>` +
                     `<div class="cu-eval-chips">` +
@@ -1497,6 +1498,16 @@
                 search: false,
                 pagination: { limit: 20 },
                 style: { table: { fontSize: "0.875rem" } },
+                className: {
+                  tr: (row) => {
+                    const cells = row._cells || row.cells || row;
+                    return failColIndices.some(i => {
+                      const c = cells[i];
+                      const v = c != null && typeof c === "object" ? c.data : c;
+                      return parseFloat(v) < ANALYSIS_EVALUATION_THRESHOLD;
+                    }) ? "cu-row-fail" : "";
+                  },
+                },
               }).render(gridContainer);
 
               /* ── Highlight rows where any score (except answer_similarity) < threshold ── */
