@@ -92,6 +92,8 @@
     body.dark .cu-progress { background: #2a2a2a; }
 
     body.dark .cu-row-fail td.gridjs-td { background-color: #3a1a1a !important; }
+    body.dark .cu-eval-chip { background: #3a3a3a; color: #e0e0e0; }
+    body.dark .cu-eval-chip--overall { background: #e0e0e0; color: #1a1a1a; }
 
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; }
@@ -642,6 +644,11 @@
     .gridjs-td { vertical-align: top; }
     .cu-row-fail td.gridjs-td { background-color: #fff0f0 !important; }
     .cu-cell-toggle { white-space: nowrap; margin-left: 0.25rem; color: var(--cu-blue); font-size: 0.8em; cursor: pointer; }
+    .cu-eval-summary { margin-bottom: 1.25rem; display: flex; flex-wrap: wrap; gap: 1.25rem; }
+    .cu-eval-summary-section h4 { margin: 0 0 0.35rem; font-size: 0.85rem; color: var(--cu-gray); }
+    .cu-eval-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .cu-eval-chip { display: inline-flex; gap: 0.35rem; align-items: center; padding: 0.25rem 0.6rem; border-radius: 0.75rem; font-size: 0.8rem; background: #f0f0f0; color: var(--cu-charcoal); }
+    .cu-eval-chip--overall { background: var(--cu-charcoal); color: #fff; }
     .cu-pipeline-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; margin-bottom: 0.75rem; }
     .cu-pipeline-row .cu-note { margin: 0; flex: 1; min-width: 0; }
     .cu-pipeline-row .cu-btn { flex-shrink: 0; }
@@ -1334,6 +1341,41 @@
                 if (h.includes("/v1/score")) acc.push(i);
                 return acc;
               }, []);
+              /* ── Aggregate score summary (server-provided) ── */
+              const scores = snap.evaluation_scores;
+              if (scores && scores.metrics && scores.metrics.length > 0) {
+                const summary = document.createElement("div");
+                summary.className = "cu-eval-summary";
+                summary.innerHTML =
+                  `<div class="cu-eval-summary-section">` +
+                    `<h4>Per-Metric Averages</h4>` +
+                    `<div class="cu-eval-chips">` +
+                      scores.metrics.map(m =>
+                        `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.average.toFixed(2)}</span>`
+                      ).join("") +
+                    `</div>` +
+                  `</div>` +
+                  `<div class="cu-eval-summary-section">` +
+                    `<h4>Pass Rate (≥ 3)</h4>` +
+                    `<div class="cu-eval-chips">` +
+                      scores.metrics.map(m =>
+                        `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_3.toFixed(1)}%</span>`
+                      ).join("") +
+                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Overall</strong> ${scores.overall_pass_rate_3.toFixed(1)}%</span>` +
+                    `</div>` +
+                  `</div>` +
+                  `<div class="cu-eval-summary-section">` +
+                    `<h4>Pass Rate (≥ 4)</h4>` +
+                    `<div class="cu-eval-chips">` +
+                      scores.metrics.map(m =>
+                        `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_4.toFixed(1)}%</span>`
+                      ).join("") +
+                      `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Overall</strong> ${scores.overall_pass_rate_4.toFixed(1)}%</span>` +
+                    `</div>` +
+                  `</div>`;
+                $("report-viewer-content").appendChild(summary);
+              }
+
               const gridContainer = document.createElement("div");
               $("report-viewer-content").appendChild(gridContainer);
               new gridjs.Grid({
