@@ -1352,10 +1352,13 @@
               /* ── Aggregate score summary (server-provided) ── */
               const scores = snap.evaluation_scores;
               if (scores && scores.metrics && scores.metrics.length > 0) {
+                const heading = document.createElement("h3");
+                heading.style.cssText = "margin:0 0 0.75rem";
+                heading.textContent = "Summary";
+                $("report-viewer-content").appendChild(heading);
                 const summary = document.createElement("div");
                 summary.className = "cu-eval-summary";
                 summary.innerHTML =
-                  `<h3 style="margin:0 0 0.75rem">Summary</h3>` +
                   `<div class="cu-eval-summary-section">` +
                     `<h4>Per-Metric Averages</h4>` +
                     `<div class="cu-eval-chips">` +
@@ -1367,7 +1370,7 @@
                   `<div class="cu-eval-summary-section">` +
                     `<h4>Pass Rate (≥ 3)</h4>` +
                     `<div class="cu-eval-chips">` +
-                      scores.metrics.map(m =>
+                      scores.metrics.filter(m => m.pass_rate_3 != null).map(m =>
                         `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_3.toFixed(1)}%</span>`
                       ).join("") +
                       `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Average</strong> ${scores.average_pass_rate_3.toFixed(1)}%</span>` +
@@ -1376,7 +1379,7 @@
                   `<div class="cu-eval-summary-section">` +
                     `<h4>Pass Rate (≥ 4)</h4>` +
                     `<div class="cu-eval-chips">` +
-                      scores.metrics.map(m =>
+                      scores.metrics.filter(m => m.pass_rate_4 != null).map(m =>
                         `<span class="cu-eval-chip"><strong>${esc(m.name)}</strong> ${m.pass_rate_4.toFixed(1)}%</span>`
                       ).join("") +
                       `<span class="cu-eval-chip cu-eval-chip--overall"><strong>Average</strong> ${scores.average_pass_rate_4.toFixed(1)}%</span>` +
@@ -1420,17 +1423,23 @@
                 search: false,
                 pagination: { limit: 20 },
                 style: { table: { fontSize: "0.875rem" } },
-                className: {
-                  tr: (row) => {
-                    const cells = row._cells || row.cells || row;
-                    return failColIndices.some(i => {
-                      const c = cells[i];
-                      const v = c != null && typeof c === "object" ? c.data : c;
-                      return parseFloat(v) < ANALYSIS_EVALUATION_THRESHOLD;
-                    }) ? "cu-row-fail" : "";
-                  },
-                },
               }).render(gridContainer);
+
+              /* ── Highlight rows where any score (except answer_similarity) < threshold ── */
+              function highlightFailRows() {
+                gridContainer.querySelectorAll("tbody tr").forEach(tr => {
+                  const tds = tr.querySelectorAll("td");
+                  const fail = failColIndices.some(i => {
+                    const td = tds[i];
+                    if (!td) return false;
+                    return parseFloat(td.textContent) < ANALYSIS_EVALUATION_THRESHOLD;
+                  });
+                  tr.classList.toggle("cu-row-fail", fail);
+                });
+              }
+              const obs = new MutationObserver(highlightFailRows);
+              obs.observe(gridContainer, { childList: true, subtree: true });
+              setTimeout(highlightFailRows, 200);
               appendReportDl(content, `${runName || "report"}_evaluation_report.csv`);
             }
           }

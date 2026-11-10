@@ -102,6 +102,8 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
         except (ValueError, TypeError):
             return None
 
+    PASS_RATE_EXCLUDES = {"answer similarity"}
+
     metrics: list[dict[str, Any]] = []
     for col_idx, col_name in score_cols:
         vals = [v for r in data_rows if (v := _parse(_cell(r, col_idx))) is not None]
@@ -110,17 +112,24 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
         pass3 = sum(1 for v in vals if v >= 3)
         pass4 = sum(1 for v in vals if v >= 4)
         name = col_name.replace("/v1/score", "").replace("_", " ").strip()
-        metrics.append(
-            {
-                "name": name,
-                "average": round(avg, 2),
-                "pass_rate_3": round(pass3 / count * 100, 1) if count else 0.0,
-                "pass_rate_4": round(pass4 / count * 100, 1) if count else 0.0,
-            }
-        )
+        excluded = name in PASS_RATE_EXCLUDES
+        metric: dict[str, Any] = {"name": name, "average": round(avg, 2)}
+        if not excluded:
+            metric["pass_rate_3"] = round(pass3 / count * 100, 1) if count else 0.0
+            metric["pass_rate_4"] = round(pass4 / count * 100, 1) if count else 0.0
+        metrics.append(metric)
 
-    avg_pass3 = round(sum(m["pass_rate_3"] for m in metrics) / len(metrics), 1) if metrics else 0.0
-    avg_pass4 = round(sum(m["pass_rate_4"] for m in metrics) / len(metrics), 1) if metrics else 0.0
+    pr_metrics = [m for m in metrics if "pass_rate_3" in m]
+    avg_pass3 = (
+        round(sum(m["pass_rate_3"] for m in pr_metrics) / len(pr_metrics), 1)
+        if pr_metrics
+        else 0.0
+    )
+    avg_pass4 = (
+        round(sum(m["pass_rate_4"] for m in pr_metrics) / len(pr_metrics), 1)
+        if pr_metrics
+        else 0.0
+    )
 
     return {
         "metrics": metrics,
