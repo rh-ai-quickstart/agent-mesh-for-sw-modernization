@@ -18,6 +18,7 @@ class SkillConfig:
     enabled: bool = True
     target_dir: str | None = None
     repo_branch: str | None = None
+    skill_params: dict | None = None
 
 
 async def _run_as_agent(
@@ -127,20 +128,32 @@ def load_external_skill_instructions(name: str, repo: str, repo_branch: str | No
 
 
 def load_skill_instructions(
-    name: str, repo: str | None = None, repo_branch: str | None = None
+    name: str,
+    repo: str | None = None,
+    repo_branch: str | None = None,
+    **kwargs,
 ) -> str:
     """Return the body of the named skill.
 
     When repo is None the skill is loaded from the asset loader.
     When repo is provided the skill repo is cloned and SKILL.md is read.
+
+    Any extra keyword arguments are rendered as Jinja2 template variables
+    in the skill body (e.g. ``{{ goal }}``).
     """
     if repo is None:
         from loaders.default_asset_loader import DefaultAssetLoader
 
         body, _ = DefaultAssetLoader().load_skill(name)
-        return body
+    else:
+        body = load_external_skill_instructions(name, repo, repo_branch)
 
-    return load_external_skill_instructions(name, repo, repo_branch)
+    if kwargs:
+        from jinja2 import Template
+
+        body = Template(body).render(**kwargs)
+
+    return body
 
 
 def run_local_skill(
@@ -148,6 +161,7 @@ def run_local_skill(
     repo_dir: str,
     git_slug: str,
     use_rhoai_mcp: bool = False,
+    skill_params: dict | None = None,
 ) -> str | None:
     """
     Run a local skill by name against repo_dir.
@@ -156,7 +170,12 @@ def run_local_skill(
     and delegates to run_skill.
     Returns the path to the generated report file, or None if no report was written.
     """
-    return run_skill(SkillConfig(name=skill_name), repo_dir, git_slug, use_rhoai_mcp)
+    return run_skill(
+        SkillConfig(name=skill_name, skill_params=skill_params),
+        repo_dir,
+        git_slug,
+        use_rhoai_mcp,
+    )
 
 
 def run_skill(
@@ -170,13 +189,20 @@ def run_skill(
     """
     logging.info("Running skill: %s", skill.name)
 
-    instructions = load_skill_instructions(skill.name, skill.repo, skill.repo_branch)
-    from utils.tool_utils import get_read_asset_tool, get_register_enrichments_tool
+    instructions = load_skill_instructions(
+        skill.name, skill.repo, skill.repo_branch, **(skill.skill_params or {})
+    )
+    from utils.tool_utils import (
+        get_download_base_prompts_tool,
+        get_read_asset_tool,
+        get_register_enrichments_tool,
+    )
 
     extra_tools = (
         [
             get_read_asset_tool(repo_dir, git_slug),
             get_register_enrichments_tool(repo_dir, git_slug),
+            get_download_base_prompts_tool(),
         ]
         if skill.repo is None
         else None
@@ -212,6 +238,7 @@ def run_composite_skill(
     composite_skill: str,
     git_slug: str,
     use_rhoai_mcp: bool = False,
+    skill_params: dict | None = None,
 ) -> None:
     """
     Run a composite skill against repo_dir using the autonomous agent pattern.
@@ -234,7 +261,7 @@ def run_composite_skill(
     instructions = f"{body}\n\nEnabled skills:\n{skills_desc or 'None'}"
     logging.info("Composite skill instructions:\n%s", instructions)
 
-    skill_tool = get_run_skill_tool(repo_dir, git_slug, use_rhoai_mcp)
+    skill_tool = get_run_skill_tool(repo_dir, git_slug, use_rhoai_mcp, skill_params)
     register_enrichments_tool = get_register_enrichments_tool(repo_dir, git_slug)
     coro = _run_as_agent(
         repo_dir,
