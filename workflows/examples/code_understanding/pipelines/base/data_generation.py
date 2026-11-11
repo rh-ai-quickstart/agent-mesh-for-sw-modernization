@@ -799,11 +799,14 @@ def run_preflight(
 
     if analysis_goal:
         try:
+            from utils.pipeline_utils import get_pipeline_run_id
+
+            run_id = get_pipeline_run_id()
             run_local_skill(
                 "add-custom-report-section",
                 source_path,
                 git_slug=git_slug,
-                skill_params={"analysis_goal": analysis_goal},
+                skill_params={"analysis_goal": analysis_goal, "pipeline_run_id": run_id},
             )
         except Exception:
             logging.error(

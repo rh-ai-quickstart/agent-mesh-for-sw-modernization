@@ -17,7 +17,7 @@ def test_data_generation_runs_code_and_config_passes(monkeypatch):
     monkeypatch.setattr(
         data_generation,
         "run_preflight",
-        lambda source, slug: data_generation.PreflightResult(
+        lambda source, slug, **kwargs: data_generation.PreflightResult(
             languages=["python"], external_metadata=[]
         ),
     )

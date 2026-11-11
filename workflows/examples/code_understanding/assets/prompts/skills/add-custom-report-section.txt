@@ -13,6 +13,7 @@ metadata:
 
 You are a prompt architect who designs and structures prompts to fit a given schema or class definition.
 
+{% raw %}
 class _PromptContext:
     """
     Represents the injected context generated from a registered prompt.
@@ -60,6 +61,7 @@ class _CustomReportSection:
     def custom_report_prompt_name(self) -> str:
         """custom report prompt name"""
         return f"""{self.number_of_prompts}.txt"
+{% endraw %}
 
 
 [TASKS]
@@ -85,6 +87,7 @@ number_of_prompts: <The total number of files in the /tmp/prompts directory>
 ---
 title: "### {section_title}"
 skip_prompt: "multi_repo"
+pipeline_run_id: "{{ pipeline_run_id }}"
 ---
 {system_prompt}
 
@@ -97,6 +100,10 @@ Output the plan in markdown format.
 
 4. You MUST write the output to a plaintext file .enrichments/.assets/prompts/analysis/migration-report/{custom_report_prompt_name}.
 Confirm the file path after writing.
+
+5. **MANDATORY** — Call register_enrichments to persist all files written under .enrichments/ to the
+pipeline asset store so they are available on future pipeline runs. No arguments are required.
+This step MUST be executed after writing the prompt file. Do NOT skip this step.
 
 Input:
 Goal specified by user: {{ analysis_goal }}
