@@ -96,11 +96,12 @@ def test_analyze_opens_confirmation_modal(page: Page) -> None:
 
 def test_recent_run_can_open_its_analysis_report(page: Page) -> None:
     page.locator('.cu-nav-item[data-tab="runs"]').click()
-    expand_buttons = page.locator("#run-list .cu-run-expand")
-    if expand_buttons.count() == 0:
+    succeeded = page.locator('#run-list .cu-run-select[data-succeeded="true"]')
+    if succeeded.count() == 0:
         pytest.skip("No successful pipeline runs are available to open.")
 
-    expand_buttons.first.click()
+    succeeded.first.check()
+    page.locator("#run-view-report").click()
 
     expect(page.locator("#tab-analysis")).to_be_visible(timeout=30_000)
     expect(page.locator("#report-viewer-title")).not_to_be_empty()

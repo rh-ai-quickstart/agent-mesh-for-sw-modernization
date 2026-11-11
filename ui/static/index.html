@@ -84,8 +84,6 @@
     body.dark .cu-bubble-dl-btn:hover { background: #2a2a2a; }
     body.dark .cu-btn-icon { border-color: #555; }
     body.dark .cu-btn-icon:hover { border-color: #ccc; color: #e0e0e0; }
-    body.dark .cu-run-list-actions button { border-color: #555; }
-    body.dark .cu-run-list-actions button:hover { border-color: #ccc; color: #e0e0e0; }
     body.dark .cu-paginator { border-top-color: #3a3a3a; }
     body.dark .cu-modal-header { border-bottom-color: #3a3a3a; }
     body.dark .cu-modal-footer { border-top-color: #3a3a3a; }
@@ -233,7 +231,6 @@
     }
     .cu-run-table tbody tr:last-child td { border-bottom: 0; }
     .cu-run-table tbody tr:hover td { background: #f5f5f5; }
-    .cu-run-list-actions { display: flex; gap: 0.4rem; }
     .cu-paginator {
       display: flex;
       align-items: center;
@@ -242,8 +239,6 @@
       padding: 0.65rem;
       border-top: 1px solid var(--cu-border);
     }
-    .cu-run-list-actions button { display: inline-flex; align-items: center; gap: 0.3rem; background: none; border: 1px solid var(--cu-border); border-radius: 4px; padding: 0.2rem 0.6rem; cursor: pointer; color: var(--cu-gray); font-size: 0.85rem; }
-    .cu-run-list-actions button:hover { color: var(--cu-charcoal); border-color: var(--cu-charcoal); }
     .cu-report-viewer { margin-top: 1.5rem; border-top: 1px solid var(--cu-border); padding-top: 1rem; }
     .cu-report-viewer h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.15rem; }
     #report-viewer-subtitle { font-size: 0.8rem; color: var(--cu-gray); margin-bottom: 0.6rem; }
@@ -1464,7 +1459,6 @@
     }
 
 
-    const iconExpand = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="11" y1="9" x2="8" y2="9"/></svg>`;
     const iconDownload = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
     function runListCard(run) {
@@ -1485,12 +1479,6 @@
       const helpIcon = repoSummary
         ? `<span class="cu-help" style="flex-shrink:0"><button type="button" class="cu-help-btn" aria-label="Repositories"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></button><span class="cu-help-popover" role="tooltip">${repoSummary}</span></span>`
         : "";
-      const actions = succeeded
-        ? `<div class="cu-run-list-actions">
-            <button type="button" class="cu-run-expand" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" title="View analysis report">${iconExpand}</button>
-            <button type="button" class="cu-run-download" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" title="Download analysis report">${iconDownload}</button>
-          </div>`
-        : "";
       const repoList = storedRepos && storedRepos.length
         ? storedRepos.map((r) => esc(r.git_repo))
         : isMulti
@@ -1510,7 +1498,7 @@
       return `<tr>
         <td>
           <div style="display:flex;align-items:center;gap:0.75rem">
-            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-succeeded="${succeeded}"/>
+            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-repos="${esc(JSON.stringify(storedRepos || (run.git_repo ? [{git_repo: run.git_repo, git_branch: run.git_branch || "main"}] : [])))}" data-succeeded="${succeeded}"/>
             <div>
               <span class="cu-index-title">${esc(title)}</span>
               <div class="cu-index-owner" style="font-size:0.8rem">${esc(run.name || "")}</div>
@@ -1558,8 +1546,7 @@
           $("run-download-report").dataset.runId = selected ? cb.dataset.runId : "";
           $("run-download-report").dataset.runName = selected ? cb.dataset.runName : "";
           $("run-rerun").dataset.runId = selected ? cb.dataset.runId : "";
-          $("run-rerun").dataset.gitRepo = selected ? cb.dataset.gitRepo : "";
-          $("run-rerun").dataset.gitBranch = selected ? cb.dataset.gitBranch : "";
+          $("run-rerun").dataset.repos = selected ? cb.dataset.repos : "[]";
           updateRunSelectionNote(selected ? cb : null);
         });
       });
@@ -1572,41 +1559,6 @@
           const visible = overflow.style.display !== "none";
           overflow.style.display = visible ? "none" : "inline";
           link.textContent = visible ? collapsedLabel : "Show less";
-        });
-      });
-      root.querySelectorAll(".cu-run-expand").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const origContent = btn.innerHTML;
-          btn.disabled = true;
-          btn.setAttribute("aria-busy", "true");
-          btn.innerHTML = `<svg style="animation:cu-spin 1s linear infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
-          try {
-            await openReport(btn.dataset.runId, btn.dataset.runName, btn.dataset.gitRepo, btn.dataset.gitBranch);
-          } catch (e) {
-            banner(String(e.message || e), true);
-          } finally {
-            btn.disabled = false;
-            btn.removeAttribute("aria-busy");
-            btn.innerHTML = origContent;
-          }
-        });
-      });
-      root.querySelectorAll(".cu-run-download").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          try {
-            const snap = await api(`/api/v2/pipelines/runs/${btn.dataset.runId}`);
-            const report = snap.analysis_report;
-            if (!report) { banner("No analysis report available.", true); return; }
-            const blob = new Blob([report], { type: "text/markdown" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${btn.dataset.runName || btn.dataset.runId}_analysis_report.md`;
-            a.click();
-            URL.revokeObjectURL(url);
-          } catch (e) {
-            banner(String(e.message || e), true);
-          }
         });
       });
       root.querySelectorAll(".cu-run-chat").forEach((btn) => {
@@ -1784,6 +1736,13 @@
           }
           bindRunCards($("run-list"));
           updateRunSelectionNote(null);
+          $("run-view-report").disabled = true;
+          $("run-download-report").disabled = true;
+          $("run-rerun").disabled = true;
+          $("run-view-report").dataset.runId = "";
+          $("run-download-report").dataset.runId = "";
+          $("run-rerun").dataset.runId = "";
+          $("run-rerun").dataset.repos = "[]";
         };
         renderRunPage(0);
         $("run-view-report").onclick = async function() {
@@ -1947,7 +1906,7 @@
       if (gitRepo || isMulti) {
         const sel = $("slider-chat-repo");
         const match = state.queryable.find((o) => {
-          if (isMulti) return o.multi_repo;
+          if (isMulti) return o.key === "__multi_repo__";
           return o.git_repo === gitRepo && (!gitBranch || o.git_branch === gitBranch);
         });
         if (match) sel.value = match.key;
@@ -1983,7 +1942,6 @@
       const option = state.queryable.find((o) => o.key === $("slider-chat-repo").value) || {};
       state.chat.push({ role: "user", content: question });
       $("slider-question").value = "";
-      openChatSlider();
       setThinking({ kind: "query", label: "Thinking", status: "Analyzing knowledge graph…" });
       renderChat();
       try {
@@ -2044,9 +2002,8 @@
       closeRerunModal();
       const btn = $("run-rerun");
       const runId = btn.dataset.runId;
-      const gitRepo = btn.dataset.gitRepo;
-      const gitBranch = btn.dataset.gitBranch;
-      if (!runId) return;
+      const repos = JSON.parse(btn.dataset.repos || "[]");
+      if (!runId || !repos.length) return;
       const origContent = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = `<svg style="animation:cu-spin 1s linear infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Re-run`;
@@ -2054,7 +2011,7 @@
       const statusMsg = mode === "scratch" ? "Submitting full re-run job…" : "Submitting analysis-only job…";
       setThinking({ kind: "pipeline", label, status: statusMsg });
       try {
-        const body = { repos: gitRepo ? [{ git_repo: gitRepo, git_branch: gitBranch }] : [] };
+        const body = { repos };
         if (mode === "report") body.pipeline_run_id = runId;
         const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify(body) });
         setThinking({ kind: "pipeline", label, status: `KFP run ${result.job_id} started` });
