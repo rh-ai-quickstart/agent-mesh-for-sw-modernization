@@ -26,7 +26,10 @@ from services.update_repos import log_repos  # noqa: E402
 
 
 def submit_pipeline_run(
-    repos: list[dict[str, str]], namespace: str | None = None, pipeline_run_id: str = ""
+    repos: list[dict[str, str]],
+    namespace: str | None = None,
+    pipeline_run_id: str = "",
+    analysis_goal: str = "",
 ) -> dict[str, Any]:
     if not repos:
         raise ValueError("Select at least one repository.")
@@ -47,6 +50,7 @@ def submit_pipeline_run(
         "pipeline_run_id": pipeline_run_id,
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
+        "analysis_goal": analysis_goal,
     }
 
     try:
@@ -79,12 +83,18 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
 
     evaluation_report: str | None = None
     analysis_report: str | None = None
+    evaluation_scores: dict[str, Any] | None = None
     if state in {"SUCCEEDED", "SKIPPED"}:
         git_slug, multi_repo = get_run_git_metadata(job_id, namespace=namespace)
         evaluation_report, analysis_report = _fetch_reports(job_id, git_slug, multi_repo)
+        if evaluation_report:
+            from utils.eval_utils import aggregate_evaluation_scores
+
+            evaluation_scores = aggregate_evaluation_scores(evaluation_report)
 
     return {
         "status": state.lower(),
         "evaluation_report": evaluation_report,
         "analysis_report": analysis_report,
+        "evaluation_scores": evaluation_scores,
     }

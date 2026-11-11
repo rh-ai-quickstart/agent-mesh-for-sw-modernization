@@ -128,3 +128,35 @@ def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None
         return content
 
     return read_asset
+
+
+def get_download_base_prompts_tool(destination_folder: str = "/tmp"):
+    """Return a LangChain tool that downloads all top-level prompts from
+    ``analysis/migration-report`` to a local folder.
+
+    Each prompt is written as ``{index}.txt`` inside *destination_folder*,
+    preserving the rendered body.  The directory is created if it does not exist.
+
+    Args:
+        destination_folder: Local directory path to write the prompt files into.
+    """
+    from langchain_core.tools import tool
+
+    @tool
+    def download_base_prompts(download_dir: str = destination_folder) -> str:
+        """Download all top-level analysis/migration-report prompts to a local directory.
+
+        Args:
+            download_dir: Directory to write prompt files into. Defaults to /tmp.
+        """
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        loader = DefaultAssetLoader()
+        prompts = loader.download_prompts("analysis/migration-report")
+        os.makedirs(download_dir, exist_ok=True)
+        for index, (body, _meta) in enumerate(prompts):
+            with open(os.path.join(download_dir, f"{index}.txt"), "w") as f:
+                f.write(body)
+        return f"Downloaded {len(prompts)} prompts to {download_dir}"
+
+    return download_base_prompts

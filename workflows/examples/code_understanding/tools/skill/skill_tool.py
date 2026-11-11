@@ -4,7 +4,12 @@ import os
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 
-def get_run_skill_tool(repo_dir: str, git_slug: str, use_rhoai_mcp: bool = False):
+def get_run_skill_tool(
+    repo_dir: str,
+    git_slug: str,
+    use_rhoai_mcp: bool = False,
+    skill_params: dict | None = None,
+):
     """Return a LangChain tool that runs a single skill against the repository.
 
     Args:
@@ -12,6 +17,8 @@ def get_run_skill_tool(repo_dir: str, git_slug: str, use_rhoai_mcp: bool = False
         git_slug:       Repository slug forwarded to local sub-skill agents so their
                         register_enrichments tool can tag artifacts correctly.
         use_rhoai_mcp:  Whether to include rhoai-mcp tools in the skill agent.
+        skill_params:   Optional dict of template variables passed at runtime,
+                        rendered into skill bodies via Jinja2.
 
     Returns:
         A LangChain tool named ``run_skill``.
@@ -58,7 +65,11 @@ def get_run_skill_tool(repo_dir: str, git_slug: str, use_rhoai_mcp: bool = False
 
         try:
             skill = SkillConfig(
-                name=skill_name, repo=repo, target_dir=target_dir, repo_branch=repo_branch
+                name=skill_name,
+                repo=repo,
+                target_dir=target_dir,
+                repo_branch=repo_branch,
+                skill_params=skill_params,
             )
             skill_output_path = _run_skill(
                 skill, repo_dir, use_rhoai_mcp=use_rhoai_mcp, git_slug=git_slug

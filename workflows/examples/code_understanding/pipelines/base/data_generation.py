@@ -462,6 +462,7 @@ def save_code_and_metadata_files(
     """Writes annotated code and flattened metadata files to target_path."""
     import logging
     import os
+    from functools import reduce
     from pathlib import Path
 
     from loaders.default_asset_loader import DefaultAssetLoader
@@ -500,14 +501,12 @@ def save_code_and_metadata_files(
 
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
-            record = next(
-                (
-                    m
-                    for m in (external_metadata or [])
-                    if "file_path" not in m or m.get("file_path") == rel_file_path
-                ),
-                {},
-            )
+            matching = [
+                m
+                for m in (external_metadata or [])
+                if "file_path" not in m or m.get("file_path") == rel_file_path
+            ]
+            record = reduce(json_utils.merge_json, matching) if matching else {}
 
             code_header_comment = (
                 generate_code_comment(
@@ -767,22 +766,28 @@ class PreflightResult:
     external_metadata: list
 
 
-def run_preflight(source_path: str, git_slug: str, pipeline_run_id: str = "") -> PreflightResult:
+def run_preflight(
+    source_path: str,
+    git_slug: str,
+    pipeline_run_id: str = "",
+    analysis_goal: str = "",
+) -> PreflightResult:
     """Runs all preflight steps for the repository.
 
     Steps:
     1) Run external-metadata composite skill (non-fatal if it fails)
-    2) Run detect_languages
-    3) Run add-languages skill as a fallback when detect_languages fails
+    2) Run add-custom-report-section skill when analysis_goal is provided (non-fatal)
+    3) Run detect_languages
+    4) Run add-languages skill as a fallback when detect_languages fails
     (if ALLOW_DYNAMIC_LANGUAGE_SUPPORT is enabled)
-    4) Load external metadata enrichments
+    5) Load external metadata enrichments
     """
     import logging
 
     if pipeline_run_id:
         return PreflightResult(languages=[], external_metadata=[])
 
-    from tools.skill.skill_util import run_composite_skill
+    from tools.skill.skill_util import run_composite_skill, run_local_skill
 
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -790,6 +795,24 @@ def run_preflight(source_path: str, git_slug: str, pipeline_run_id: str = "") ->
         run_composite_skill(source_path, "external-metadata", git_slug=git_slug)
     except Exception:
         logging.error("Composite skill 'external-metadata' failed", exc_info=True)
+
+    if analysis_goal:
+        try:
+            from utils.pipeline_utils import get_pipeline_run_id
+
+            run_id = get_pipeline_run_id()
+            run_local_skill(
+                "add-custom-report-section",
+                source_path,
+                git_slug=git_slug,
+                skill_params={"analysis_goal": analysis_goal, "pipeline_run_id": run_id},
+            )
+        except Exception:
+            logging.error(
+                "Skill 'add-custom-report-section' failed for goal=%s",
+                analysis_goal,
+                exc_info=True,
+            )
 
     languages = detect_languages(source_path, git_slug=git_slug)
     external_metadata = load_external_metadata(
@@ -815,6 +838,7 @@ class DataGenerationPipeline:
         source_path: str,
         target_path: str,
         multi_repo: bool = False,
+        analysis_goal: str = "",
     ):
         """Prepares the environment, generates code metadata for all detected languages, and
         returns a status dict."""
@@ -835,7 +859,7 @@ class DataGenerationPipeline:
                 git_branch=git_branch,
             )
 
-            preflight = run_preflight(source_path, git_slug)
+            preflight = run_preflight(source_path, git_slug, analysis_goal=analysis_goal)
 
             generate_code_and_meta(
                 git_repo=git_repo,
@@ -869,7 +893,7 @@ class DataGenerationPipeline:
 
         return result
 
-    def run_multi_repo(self, git_repos: list):
+    def run_multi_repo(self, git_repos: list, analysis_goal: str = ""):
         """Runs run for each repository in git_repos and returns a list of status dicts."""
         import logging
         import os
@@ -909,6 +933,7 @@ class DataGenerationPipeline:
                 source_path=source_path,
                 target_path=target_path,
                 multi_repo=True,
+                analysis_goal=analysis_goal,
             )
 
             pipeline_results.append(result)

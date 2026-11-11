@@ -552,21 +552,22 @@ class MlFlowAssetLoader(AssetLoader):
         variables."""
         try:
 
-            from jinja2 import Template
-
             name = self.get_prompt_name(prompt_path)
 
             prompt = mlflow.genai.load_prompt(name)
 
-            body, meta = self._get_prompt_body_and_metadata(prompt.template)
-
-            return Template(body).render(**kwargs), meta
+            return self._get_prompt_body_and_metadata(prompt.template, **kwargs)
 
         except Exception as e:
 
             logging.error(f"Error loading prompt {prompt_path}: {e}")
 
             raise e
+
+    def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
+        """Downloads all prompts from the MLflow registry matching the given prefix."""
+        count = self.num_prompts(prompt_path_prefix)
+        return [self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs) for i in range(count)]
 
     def register_enrichments(
         self,
