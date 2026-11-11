@@ -26,7 +26,10 @@ from services.update_repos import log_repos  # noqa: E402
 
 
 def submit_pipeline_run(
-    repos: list[dict[str, str]], namespace: str | None = None, pipeline_run_id: str = ""
+    repos: list[dict[str, str]],
+    namespace: str | None = None,
+    pipeline_run_id: str = "",
+    analysis_goal: str = "",
 ) -> dict[str, Any]:
     if not repos:
         raise ValueError("Select at least one repository.")
@@ -47,6 +50,7 @@ def submit_pipeline_run(
         "pipeline_run_id": pipeline_run_id,
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
+        "analysis_goal": analysis_goal,
     }
 
     try:

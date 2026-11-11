@@ -905,6 +905,10 @@
       </div>
       <div class="cu-modal-body">
         <div id="analyze-selection" style="font-size:0.9rem"></div>
+        <div id="analysis-goal-group" class="hidden">
+          <label for="analysis-goal" style="display:block;font-size:0.85rem;margin:0.75rem 0 0.3rem;color:var(--cu-gray)">(Optional) Describe any special outcomes you are targeting that should be included in the report.</label>
+          <textarea id="analysis-goal" class="cu-field" style="border-radius:6px;min-height:3.5rem;resize:vertical"></textarea>
+        </div>
         <div class="cu-alert-warning">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div><strong>Before You Run</strong><br/>Analysis is an intensive process and can take <b>30+ minutes</b>.<br/></div>
@@ -2113,6 +2117,9 @@
         return;
       }
       $("analyze-selection").innerHTML = `<strong>Selected:</strong> ${selectedRepos().map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}`;
+      const isSingle = selectedRepos().length === 1;
+      $("analysis-goal-group").classList.toggle("hidden", !isSingle);
+      if (!isSingle) $("analysis-goal").value = "";
       $("analyze-modal").classList.remove("hidden");
     };
     $("analyze-modal-close").onclick = closeAnalyzeModal;
@@ -2130,7 +2137,8 @@
       setThinking({ kind: "pipeline", label: "Running pipeline", status: "Submitting indexing job…" });
       try {
         const submittedRepos = selectedRepos();
-        const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify({ repos: submittedRepos }) });
+        const analysisGoal = ($("analysis-goal").value || "").trim();
+        const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify({ repos: submittedRepos, analysis_goal: analysisGoal }) });
         setThinking({ kind: "pipeline", label: "Running pipeline", status: `KFP run ${result.job_id} started` });
         pollV2(result.job_id);
         showTab("runs");

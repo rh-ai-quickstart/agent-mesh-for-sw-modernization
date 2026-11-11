@@ -25,6 +25,7 @@ class Repo(BaseModel):
 class RunPipelinesRequest(BaseModel):
     repos: list[Repo] = Field(default_factory=list)
     pipeline_run_id: str = ""
+    analysis_goal: str = ""
 
 
 @router.post("/pipelines")
@@ -39,6 +40,7 @@ async def post_pipeline_service(
             repos,
             cu_namespace,
             body.pipeline_run_id,
+            body.analysis_goal,
         )
     except ValueError as exc:
         logging.error(traceback.format_exc())
