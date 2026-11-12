@@ -1430,7 +1430,7 @@
       return `<tr>
         <td>
           <div style="display:flex;align-items:center;gap:0.75rem">
-            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-repos="${esc(JSON.stringify(storedRepos || (run.git_repo ? [{git_repo: run.git_repo, git_branch: run.git_branch || "main"}] : [])))}" data-succeeded="${succeeded}"/>
+            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-repos="${esc(JSON.stringify(storedRepos || (run.git_repo ? [{git_repo: run.git_repo, git_branch: run.git_branch || "main"}] : [])))}" data-succeeded="${succeeded}" data-uploaded="${!!run.uploaded}"/>
             <div>
               <span class="cu-index-title">${esc(title)}</span>
               <div class="cu-index-owner" style="font-size:0.8rem">${esc(run.name || "")}</div>
@@ -1440,7 +1440,7 @@
         <td><div style="display:flex;align-items:center;gap:0.4rem"><span class="cu-job-dot ${esc(run.status)}"></span><span class="cu-muted" style="font-size:0.85rem">${repoCell}</span></div></td>
         <td><span class="cu-chip ${succeeded ? "indexed" : (run.status === "Failed" || run.status === "Cancelled") ? "failed" : ""}">${esc(run.status)}</span></td>
         <td><span class="cu-muted" style="font-size:0.8rem">${started}</span></td>
-        <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-tooltip="Explore code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ""}</td>
+        <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-git-slug="${esc(run.git_slug || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-tooltip="Explore code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ""}</td>
       </tr>`;
     }
 
@@ -1468,9 +1468,10 @@
           });
           const selected = cb.checked;
           const succeeded = cb.dataset.succeeded === "true";
-          $("run-view-report").disabled = !(selected && succeeded);
-          $("run-download-report").disabled = !(selected && succeeded);
-          $("run-rerun").disabled = !(selected && succeeded);
+          const uploaded = cb.dataset.uploaded === "true";
+          $("run-view-report").disabled = !(selected && succeeded && !uploaded);
+          $("run-download-report").disabled = !(selected && succeeded && !uploaded);
+          $("run-rerun").disabled = !(selected && succeeded && !uploaded);
           $("run-view-report").dataset.runId = selected ? cb.dataset.runId : "";
           $("run-view-report").dataset.runName = selected ? cb.dataset.runName : "";
           $("run-view-report").dataset.gitRepo = selected ? cb.dataset.gitRepo : "";
@@ -1500,7 +1501,8 @@
             btn.dataset.gitBranch || "",
             btn.dataset.multiRepo === "true",
             btn.dataset.runTitle || "",
-            btn.dataset.runName || ""
+            btn.dataset.runName || "",
+            btn.dataset.gitSlug || ""
           );
         });
       });
@@ -1833,13 +1835,14 @@
       state.poll = setInterval(tick, 4000);
     }
 
-    function openChatSlider(gitRepo, gitBranch, isMulti, runTitle, runName) {
+    function openChatSlider(gitRepo, gitBranch, isMulti, runTitle, runName, gitSlug) {
       renderChatSelect();
-      if (gitRepo || isMulti) {
+      if (gitRepo || isMulti || gitSlug) {
         const sel = $("slider-chat-repo");
         const match = state.queryable.find((o) => {
           if (isMulti) return o.key === "__multi_repo__";
-          return o.git_repo === gitRepo && (!gitBranch || o.git_branch === gitBranch);
+          if (gitRepo) return o.git_repo === gitRepo && (!gitBranch || o.git_branch === gitBranch);
+          return o.git_slug === gitSlug;
         });
         if (match) sel.value = match.key;
       }
