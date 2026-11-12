@@ -73,7 +73,10 @@ def list_pipeline_runs(namespace: str | None = None) -> list[dict[str, Any]]:
     """Return all KFP runs newest-first, plus uploaded indexes as synthetic entries."""
     runs = list_kfp_runs(namespace=namespace)
     try:
-        from ui.indexes import list_uploaded_indexes_as_runs
+        try:
+            from ui.indexes import list_uploaded_indexes_as_runs
+        except ImportError:
+            from indexes import list_uploaded_indexes_as_runs
 
         runs.extend(list_uploaded_indexes_as_runs())
     except Exception:
