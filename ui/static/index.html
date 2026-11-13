@@ -1108,7 +1108,7 @@
       const isOl = (line) => /^\d+\. /.test(line);
       const isHeading = (line) => /^#{1,3} /.test(line);
       const isStep = (line) => /^\*\*\d+\.\s+.+\*\*$/.test(line.trim());
-      const isTableRow = (line) => /\|/.test(line.trim()) && line.trim().length > 1;
+      const isTableRow = (line) => line.trim().startsWith("|") && line.trim().length > 1;
       const isTableSep = (line) => /^\s*\|?(\s*:?-{2,}:?\s*\|)+(\s*:?-{2,}:?\s*)?\s*$/.test(line.trim());
       while (i < lines.length) {
         const line = lines[i];
@@ -1175,6 +1175,7 @@
           para.push(lines[i]);
           i += 1;
         }
+        if (!para.length) { i += 1; continue; } // skip unrecognised line, avoid infinite loop
         html.push(`<p>${inlineMd(para.join(" "))}</p>`);
       }
       return `<div class="cu-md">${html.join("")}</div>`;
