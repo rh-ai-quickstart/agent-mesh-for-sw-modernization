@@ -247,7 +247,7 @@
     .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
     .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
     .cu-improvement-row { display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--cu-gray); }
-    .cu-improvement-row.disabled { opacity: 0.45; pointer-events: none; }
+    .cu-improvement-row.disabled { opacity: 0.45; cursor: default; }
     .cu-bubble-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; padding-top: 0.35rem; border-top: 1px solid #f0f0f0; }
     .cu-bubble-dl-btn { background: none; border: none; padding: 0.15rem 0.2rem; color: #c8cacc; display: inline-flex; align-items: center; border-radius: 3px; line-height: 0; cursor: pointer; }
     .cu-bubble-dl-btn:hover { color: var(--cu-gray); background: #f0f0f0; }
@@ -1034,7 +1034,6 @@
           // Capture source before mermaid.run() mutates the node.
           const src = node.textContent || "";
           try {
-            node.dataset.processed = "true";
             // Catch mermaid-internal unhandled rejections (e.g. RangeError)
             // that bypass the returned promise.
             let escapedErr = null;
@@ -1345,10 +1344,12 @@
 
       const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
 
+      const ipRow = $("improvement-plan-row");
       const ipBtn = $("improvement-plan-btn");
       if (snap.improvement_plan) {
         ipBtn.disabled = false;
-        $("improvement-plan-row").classList.remove("disabled");
+        ipRow.classList.remove("disabled");
+        ipRow.removeAttribute("title");
         ipBtn.onclick = () => {
           $("improvement-modal-content").innerHTML = renderMarkdown(snap.improvement_plan);
           runMermaid($("improvement-modal-content"));
@@ -1357,7 +1358,8 @@
       } else {
         ipBtn.disabled = true;
         ipBtn.onclick = null;
-        $("improvement-plan-row").classList.add("disabled");
+        ipRow.classList.add("disabled");
+        ipRow.setAttribute("title", "No improvement plan exists for this report");
       }
 
       function appendReportDl(rawContent, filename) {
