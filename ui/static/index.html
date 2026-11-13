@@ -1014,7 +1014,7 @@
 
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
-      defaultKey: null, poll: null, chat: [], thinking: null,
+      defaultKey: null, poll: null, chat: [], chatKey: null, thinking: null,
       animateLatest: false,
     };
 
@@ -1837,6 +1837,7 @@
 
     function openChatSlider(gitRepo, gitBranch, isMulti, runTitle, runName, gitSlug) {
       renderChatSelect();
+      let newKey = null;
       if (gitRepo || isMulti || gitSlug) {
         const sel = $("slider-chat-repo");
         const match = state.queryable.find((o) => {
@@ -1844,7 +1845,11 @@
           if (gitRepo) return o.git_repo === gitRepo && (!gitBranch || o.git_branch === gitBranch);
           return o.git_slug === gitSlug;
         });
-        if (match) sel.value = match.key;
+        if (match) { sel.value = match.key; newKey = match.key; }
+      }
+      if (newKey && newKey !== state.chatKey) {
+        state.chat = [];
+        state.chatKey = newKey;
       }
       if (runTitle) {
         const label = runName ? `${runTitle}@${runName}` : runTitle;
