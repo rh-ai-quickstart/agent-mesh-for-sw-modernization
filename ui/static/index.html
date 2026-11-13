@@ -1897,6 +1897,7 @@
             git_branch: option.git_branch || "main",
             use_global: option.use_global || false,
             multi_repo: option.multi_repo || false,
+            pipeline_run_id: option.kfp_run_id || "",
           }),
         });
         pollQuery(result.query_id);
