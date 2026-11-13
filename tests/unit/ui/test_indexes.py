@@ -96,6 +96,7 @@ def test_discovered_indexes_remain_available_to_analysis_and_chat(discovered_run
     assert options == [
         {
             **repo,
+            "git_slug": "acme-widget-main",
             "label": "widget @ main",
             "key": f"{repo['git_repo']}|main",
             "use_global": False,
