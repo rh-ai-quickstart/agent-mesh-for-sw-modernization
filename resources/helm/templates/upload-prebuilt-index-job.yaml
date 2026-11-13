@@ -29,7 +29,8 @@ spec:
               git -C /opt/app-root/src fetch --depth=1 origin "{{ .Values.repoRef }}"
               git -C /opt/app-root/src reset --hard FETCH_HEAD
               python workflows/examples/code_understanding/scripts/transfer_index.py import \
-                --bundle "{{ .Values.prebuiltIndex.bundlePath }}"
+                --bundle "{{ .Values.prebuiltIndex.bundlePath }}" \
+                --pipeline-run-id "$(python -c 'import uuid; print(uuid.uuid4())')"
           workingDir: /opt/app-root/src
           env:
             - name: KFP_NAMESPACE
