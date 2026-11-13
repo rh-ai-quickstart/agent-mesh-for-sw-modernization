@@ -976,7 +976,32 @@
   </div>
   <script>
     if (typeof mermaid !== "undefined") {
-      mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+      try { mermaid.initialize({ startOnLoad: false, theme: "neutral" }); }
+      catch (_) { /* mermaid init failed; diagrams will be shown as source */ }
+    }
+
+    function _mermaidErrBadge(src, msg) {
+      const badge = document.createElement("span");
+      badge.className = "cu-diagram-err";
+      badge.textContent = "\u26a0 Diagram error";
+      let fly = null;
+      badge.addEventListener("mouseenter", () => {
+        fly = document.createElement("div");
+        fly.className = "cu-diagram-flyover";
+        fly.innerHTML =
+          `<div class="cu-diagram-flyover-title">\u26a0 Diagram could not be rendered</div>` +
+          `<div class="cu-diagram-flyover-msg">${msg.replace(/</g, "&lt;")}</div>` +
+          `<pre class="cu-diagram-flyover-src">${src.replace(/</g, "&lt;")}</pre>`;
+        document.body.appendChild(fly);
+        const r = badge.getBoundingClientRect();
+        const fw = fly.offsetWidth, fh = fly.offsetHeight;
+        const top = r.bottom + 6 + fh > window.innerHeight ? r.top - fh - 6 : r.bottom + 6;
+        const left = Math.min(r.left, window.innerWidth - fw - 10);
+        fly.style.top = top + "px";
+        fly.style.left = Math.max(6, left) + "px";
+      });
+      badge.addEventListener("mouseleave", () => { if (fly) { fly.remove(); fly = null; } });
+      return badge;
     }
 
     function runMermaid(container) {
@@ -988,7 +1013,20 @@
       (async () => {
         for (const node of nodes) {
           await new Promise(resolve => setTimeout(resolve, 0));
+          // Capture source before mermaid.run() mutates the node.
+          const src = node.textContent || "";
           try {
+            node.dataset.processed = "true";
+            // Catch mermaid-internal unhandled rejections (e.g. RangeError)
+            // that bypass the returned promise.
+            let escapedErr = null;
+            const trap = (ev) => {
+              if (ev.reason instanceof RangeError || (ev.reason && /array length/i.test(String(ev.reason)))) {
+                ev.preventDefault();
+                escapedErr = ev.reason;
+              }
+            };
+            window.addEventListener("unhandledrejection", trap);
             const timeout = new Promise((_, reject) =>
               setTimeout(() => reject(new Error("mermaid timeout")), 5000)
             );
@@ -996,32 +1034,13 @@
             if (result && typeof result.then === "function") {
               await Promise.race([result, timeout]);
             }
+            // Yield so any queued microtask rejection can fire.
+            await new Promise(resolve => setTimeout(resolve, 0));
+            window.removeEventListener("unhandledrejection", trap);
+            if (escapedErr) throw escapedErr;
           } catch (e) {
-            // Parse error or timeout — replace the block with a small warning badge;
-            // hovering over it opens a flyover showing the error and diagram source.
-            const src = node.textContent || "";
             const msg = (e && e.message) ? e.message : String(e);
-            const badge = document.createElement("span");
-            badge.className = "cu-diagram-err";
-            badge.textContent = "\u26a0 Diagram error";
-            let fly = null;
-            badge.addEventListener("mouseenter", ev => {
-              fly = document.createElement("div");
-              fly.className = "cu-diagram-flyover";
-              fly.innerHTML =
-                `<div class="cu-diagram-flyover-title">\u26a0 Diagram could not be rendered</div>` +
-                `<div class="cu-diagram-flyover-msg">${msg.replace(/</g, "&lt;")}</div>` +
-                `<pre class="cu-diagram-flyover-src">${src.replace(/</g, "&lt;")}</pre>`;
-              document.body.appendChild(fly);
-              const r = badge.getBoundingClientRect();
-              const fw = fly.offsetWidth, fh = fly.offsetHeight;
-              const top = r.bottom + 6 + fh > window.innerHeight ? r.top - fh - 6 : r.bottom + 6;
-              const left = Math.min(r.left, window.innerWidth - fw - 10);
-              fly.style.top = top + "px";
-              fly.style.left = Math.max(6, left) + "px";
-            });
-            badge.addEventListener("mouseleave", () => { if (fly) { fly.remove(); fly = null; } });
-            node.replaceWith(badge);
+            node.replaceWith(_mermaidErrBadge(src, msg));
           }
         }
       })();
