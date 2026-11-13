@@ -894,7 +894,7 @@
           <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
           <button type="button" class="cu-report-tab" data-report="evaluation">Analysis Evaluation</button>
         </div>
-        <div id="improvement-plan-row" class="cu-improvement-row">
+        <div id="improvement-plan-row" class="cu-improvement-row hidden">
           <span>View improvement plan</span>
           <button type="button" class="cu-btn-icon" id="improvement-plan-btn" data-tooltip="View improvement plan">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1381,6 +1381,7 @@
         $("tab-analysis").querySelectorAll(".cu-report-tab").forEach((t) => {
           t.classList.toggle("active", t.dataset.report === type);
         });
+        $("improvement-plan-row").classList.toggle("hidden", type !== "evaluation");
         const content = reports[type];
         if (type === "evaluation") {
           $("report-viewer-content").innerHTML = "";
