@@ -20,7 +20,7 @@ def _sample_df():
     )
 
 
-@patch("utils.eval_utils.completion")
+@patch("litellm.completion")
 @patch("loaders.default_asset_loader.DefaultAssetLoader")
 def test_generate_improvement_plan_calls_llm(MockLoader, mock_completion, monkeypatch):
     monkeypatch.setenv("JUDGE_LLM_PROVIDER", "openai")
@@ -51,7 +51,7 @@ def test_generate_improvement_plan_calls_llm(MockLoader, mock_completion, monkey
     assert "payload" in prompt_call.kwargs
 
 
-@patch("utils.eval_utils.completion")
+@patch("litellm.completion")
 @patch("loaders.default_asset_loader.DefaultAssetLoader")
 def test_generate_improvement_plan_returns_fallback_on_error(
     MockLoader, mock_completion, monkeypatch

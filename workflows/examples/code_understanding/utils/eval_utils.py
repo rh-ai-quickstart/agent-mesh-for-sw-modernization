@@ -7,7 +7,6 @@ import os
 from typing import Any
 
 import pandas as pd
-from litellm import completion
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -143,6 +142,7 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
 def generate_improvement_plan(df: pd.DataFrame) -> str:
     """Analyze evaluation results and return an LLM-generated improvement plan."""
     try:
+        from litellm import completion
         from loaders.default_asset_loader import DefaultAssetLoader
 
         payload = df.to_json(orient="records", indent=2)
