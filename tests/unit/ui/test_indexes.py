@@ -65,7 +65,15 @@ def test_discovery_keeps_newest_run_for_slug(discovered_runs):
             "uploaded": True,
             "kfp_run_id": "",
             "indexed_at": "2023-11-14T22:13:21+00:00",
-        }
+        },
+        {
+            "run_id": "old",
+            "git_slug": "acme-widget-main",
+            "multi_repo": False,
+            "uploaded": False,
+            "kfp_run_id": "",
+            "indexed_at": "2023-11-14T22:13:20+00:00",
+        },
     ]
 
 

@@ -1851,9 +1851,10 @@
         });
         if (match) { sel.value = match.key; newKey = match.key; }
       }
-      if (newKey && newKey !== state.chatKey) {
+      const chatId = runName ? `${newKey || ""}::${runName}` : newKey;
+      if (chatId && chatId !== state.chatKey) {
         state.chat = [];
-        state.chatKey = newKey;
+        state.chatKey = chatId;
       }
       if (runTitle) {
         const label = runName ? `${runTitle}@${runName}` : runTitle;

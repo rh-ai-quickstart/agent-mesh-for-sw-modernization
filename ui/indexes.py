@@ -105,7 +105,7 @@ def list_indexed_repos() -> dict[str, Any]:
                 metadata = _run_index_metadata(run)
             except ValueError:
                 continue
-            key = (metadata["git_slug"], metadata["multi_repo"])
+            key = (metadata["git_slug"], metadata["multi_repo"], metadata["uploaded"])
             if key in seen:
                 continue
             seen.add(key)
