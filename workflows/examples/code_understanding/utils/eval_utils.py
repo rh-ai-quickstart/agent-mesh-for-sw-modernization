@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 import pandas as pd
+from litellm import completion
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -137,3 +138,31 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
         "average_pass_rate_4": avg_pass4,
         "total_rows": total,
     }
+
+
+def generate_improvement_plan(df: pd.DataFrame) -> str:
+    """Analyze evaluation results and return an LLM-generated improvement plan."""
+    try:
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        payload = df.to_json(orient="records", indent=2)
+        prompt_text, _meta = DefaultAssetLoader().download_prompt(
+            "eval/improvement_plan", payload=payload
+        )
+
+        llm_kwargs = {
+            "model": f"{os.getenv('JUDGE_LLM_PROVIDER')}/{os.getenv('JUDGE_LLM_ID')}",
+            "api_base": os.getenv("JUDGE_LLM_API_BASE"),
+            "api_key": os.getenv("JUDGE_LLM_TOKEN"),
+        }
+
+        response = completion(
+            **llm_kwargs,
+            messages=[{"role": "user", "content": prompt_text}],
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as e:
+        logging.warning("Failed to generate improvement plan: %s", e)
+        return f"_Improvement plan generation failed: {e}_"

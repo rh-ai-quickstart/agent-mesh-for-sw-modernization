@@ -89,10 +89,13 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
 
     evaluation_report: str | None = None
     analysis_report: str | None = None
+    improvement_plan: str | None = None
     evaluation_scores: dict[str, Any] | None = None
     if state in {"SUCCEEDED", "SKIPPED"}:
         git_slug, multi_repo = get_run_git_metadata(job_id, namespace=namespace)
-        evaluation_report, analysis_report = _fetch_reports(job_id, git_slug, multi_repo)
+        evaluation_report, analysis_report, improvement_plan = _fetch_reports(
+            job_id, git_slug, multi_repo
+        )
         if evaluation_report:
             from utils.eval_utils import aggregate_evaluation_scores
 
@@ -102,5 +105,6 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
         "status": state.lower(),
         "evaluation_report": evaluation_report,
         "analysis_report": analysis_report,
+        "improvement_plan": improvement_plan,
         "evaluation_scores": evaluation_scores,
     }

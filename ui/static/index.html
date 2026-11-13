@@ -245,6 +245,7 @@
     #report-viewer-subtitle { font-size: 0.8rem; color: var(--cu-gray); margin-bottom: 0.6rem; }
     .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
     .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
+    .cu-improvement-row { display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--cu-gray); }
     .cu-bubble-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; padding-top: 0.35rem; border-top: 1px solid #f0f0f0; }
     .cu-bubble-dl-btn { background: none; border: none; padding: 0.15rem 0.2rem; color: #c8cacc; display: inline-flex; align-items: center; border-radius: 3px; line-height: 0; cursor: pointer; }
     .cu-bubble-dl-btn:hover { color: var(--cu-gray); background: #f0f0f0; }
@@ -891,6 +892,12 @@
           <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
           <button type="button" class="cu-report-tab" data-report="evaluation">Analysis Evaluation</button>
         </div>
+        <div id="improvement-plan-row" class="cu-improvement-row hidden">
+          <span>View improvement plan</span>
+          <button type="button" class="cu-btn-icon" id="improvement-plan-btn" data-tooltip="View improvement plan">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
+        </div>
         <div class="cu-report-viewer-body">
           <div id="report-viewer-content" class="cu-md"></div>
         </div>
@@ -956,6 +963,15 @@
         <button type="button" class="cu-btn cu-btn-link" id="rerun-cancel">Cancel</button>
         <button type="button" class="cu-btn cu-btn-secondary" id="rerun-confirm">Re-run</button>
       </div>
+    </div>
+  </div>
+  <div id="improvement-modal" class="cu-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="improvement-modal-title">
+    <div class="cu-modal" style="max-width:48rem;max-height:80vh;display:flex;flex-direction:column">
+      <div class="cu-modal-header">
+        <h3 id="improvement-modal-title">Improvement Plan</h3>
+        <button type="button" class="cu-modal-close" id="improvement-modal-close" aria-label="Close">&#x2715;</button>
+      </div>
+      <div class="cu-modal-body cu-md" id="improvement-modal-content" style="overflow-y:auto;flex:1"></div>
     </div>
   </div>
   <div id="chat-slider-overlay" class="cu-slider-overlay hidden"></div>
@@ -1326,6 +1342,18 @@
       $("report-viewer-subtitle").textContent = runName;
 
       const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
+
+      const ipRow = $("improvement-plan-row");
+      if (snap.improvement_plan) {
+        ipRow.classList.remove("hidden");
+        $("improvement-plan-btn").onclick = () => {
+          $("improvement-modal-content").innerHTML = renderMarkdown(snap.improvement_plan);
+          runMermaid($("improvement-modal-content"));
+          $("improvement-modal").classList.remove("hidden");
+        };
+      } else {
+        ipRow.classList.add("hidden");
+      }
 
       function appendReportDl(rawContent, filename) {
         const mime = filename.endsWith(".csv") ? "text/csv" : "text/markdown";
@@ -2118,7 +2146,11 @@
     $("analyze-modal-close").onclick = closeAnalyzeModal;
     $("analyze-modal-cancel").onclick = closeAnalyzeModal;
     $("analyze-modal").addEventListener("click", (e) => { if (e.target === $("analyze-modal")) closeAnalyzeModal(); });
+    const closeImprovementModal = () => $("improvement-modal").classList.add("hidden");
+    $("improvement-modal-close").onclick = closeImprovementModal;
+    $("improvement-modal").addEventListener("click", (e) => { if (e.target === $("improvement-modal")) closeImprovementModal(); });
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("improvement-modal").classList.contains("hidden")) closeImprovementModal();
       if (e.key === "Escape" && !$("analyze-modal").classList.contains("hidden")) closeAnalyzeModal();
       if (e.key === "Escape" && $("chat-slider").classList.contains("open")) closeChatSlider();
     });
