@@ -1111,7 +1111,7 @@
               return l.replace(/\s*%%.*$/, "");  // strip ALL %% comments (standalone and inline)
             }).join("\n")
             .replace(/\[([^\]"]+)\]/g, (m, label) => /[()]/.test(label) ? `["${label}"]` : m);
-          fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
+          fences.push(`<pre class="mermaid">${sanitized}</pre>`);
         } else {
           fences.push(`<pre><code>${esc(content)}</code></pre>`);
         }
