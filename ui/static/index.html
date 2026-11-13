@@ -1869,8 +1869,10 @@
       $("chat-slider").classList.remove("open");
       $("chat-slider-overlay").classList.add("hidden");
       if (state.thinking && state.thinking.kind === "query") {
-        $("thinking-status").textContent = "Query cancelled.";
+        setThinking(null);
       }
+      state.chat = [];
+      state.chatKey = null;
     }
     $("chat-slider-close").onclick = closeChatSlider;
     $("chat-slider-overlay").onclick = closeChatSlider;
