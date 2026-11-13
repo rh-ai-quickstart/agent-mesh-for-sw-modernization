@@ -1870,6 +1870,8 @@
       $("chat-slider-overlay").classList.add("hidden");
       if (state.thinking && state.thinking.kind === "query") {
         setThinking(null);
+        banner("Query cancelled.");
+        setTimeout(() => { if ($("banner").textContent === "Query cancelled.") banner(""); }, 3000);
       }
       state.chat = [];
       state.chatKey = null;
