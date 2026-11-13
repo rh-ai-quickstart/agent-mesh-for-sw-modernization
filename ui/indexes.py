@@ -164,16 +164,22 @@ def queryable_repos(
     indexes: list[dict[str, Any]],
     catalog: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
-    """Catalog entries that have a GraphRAG index, plus optional multi-repo index."""
+    """Catalog entries that have a GraphRAG index, plus optional multi-repo index.
+
+    Uploaded indexes that don't match any catalog entry are also included
+    so they can be queried from the chat slider.
+    """
     from utils.code_utils import generate_slug_from_repo
 
     lkp = index_lookup(indexes)
+    matched_slugs: set[str] = set()
     options: list[dict[str, Any]] = []
     for item in catalog:
         slug = generate_slug_from_repo(item["git_repo"], item["git_branch"])
         idx_meta = lkp.get(slug)
         if not idx_meta:
             continue
+        matched_slugs.add(slug)
         short = item["git_repo"].rsplit("/", 1)[-1]
         options.append(
             {
@@ -182,6 +188,22 @@ def queryable_repos(
                 "label": f"{short} @ {item['git_branch']}",
                 "key": f"{item['git_repo']}|{item['git_branch']}",
                 "use_global": False,
+                "kfp_run_id": idx_meta.get("kfp_run_id", ""),
+            }
+        )
+    # Include indexed repos not matched by any catalog entry (e.g. uploaded indexes).
+    for slug, idx_meta in lkp.items():
+        if slug in matched_slugs:
+            continue
+        options.append(
+            {
+                "git_repo": "",
+                "git_branch": "",
+                "git_slug": slug,
+                "label": f"{slug} (uploaded)",
+                "key": slug,
+                "use_global": False,
+                "uploaded": True,
                 "kfp_run_id": idx_meta.get("kfp_run_id", ""),
             }
         )
