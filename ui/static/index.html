@@ -788,6 +788,7 @@
       .cu-shell, .cu-custom, .cu-composer { grid-template-columns: 1fr; }
       .cu-repo { grid-template-columns: 1.25rem minmax(0, 1fr); }
       .cu-chips { grid-column: 2; justify-content: flex-start; margin-top: 0.25rem; }
+      #improvement-modal > .cu-modal { width: 100vw !important; max-width: 100vw !important; }
     }
   </style>
   <link rel="stylesheet" href="/static/vendor/gridjs.min.css"/>
@@ -967,8 +968,8 @@
       </div>
     </div>
   </div>
-  <div id="improvement-modal" class="cu-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="improvement-modal-title">
-    <div class="cu-modal" style="max-width:48rem;max-height:80vh;display:flex;flex-direction:column">
+  <div id="improvement-modal" class="cu-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="improvement-modal-title" style="justify-content:flex-end;align-items:stretch">
+    <div class="cu-modal" style="width:calc(100vw - 20.5rem);max-width:calc(100vw - 20.5rem);border-radius:0;display:flex;flex-direction:column">
       <div class="cu-modal-header">
         <h3 id="improvement-modal-title">Improvement Plan</h3>
         <button type="button" class="cu-modal-close" id="improvement-modal-close" aria-label="Close">&#x2715;</button>
