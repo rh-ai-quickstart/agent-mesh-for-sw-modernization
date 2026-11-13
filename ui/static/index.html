@@ -1438,7 +1438,7 @@
           </div>
         </td>
         <td><div style="display:flex;align-items:center;gap:0.4rem"><span class="cu-job-dot ${esc(run.status)}"></span><span class="cu-muted" style="font-size:0.85rem">${repoCell}</span></div></td>
-        <td><span class="cu-chip ${succeeded ? "indexed" : (run.status === "Failed" || run.status === "Cancelled") ? "failed" : ""}">${esc(run.status)}</span></td>
+        <td><span class="cu-chip ${run.uploaded ? "uploaded" : succeeded ? "indexed" : (run.status === "Failed" || run.status === "Cancelled") ? "failed" : ""}">${run.uploaded ? "Uploaded" : esc(run.status)}</span></td>
         <td><span class="cu-muted" style="font-size:0.8rem">${started}</span></td>
         <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-git-slug="${esc(run.git_slug || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-tooltip="Explore code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ""}</td>
       </tr>`;
@@ -1645,7 +1645,7 @@
         state.defaultKey = catalog.default_key;
         state.indexes = indexes.indexes || [];
         state.queryable = indexes.queryable || [];
-        const allRuns = [...(v2runs.runs || [])];
+        const allRuns = [...(v2runs.runs || [])].sort((a, b) => (b.uploaded ? 1 : 0) - (a.uploaded ? 1 : 0));
         const chevronDown = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         const chevronUp = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         const PAGE_SIZE = 5;
