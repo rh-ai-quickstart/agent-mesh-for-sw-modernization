@@ -192,13 +192,24 @@ def queryable_repos(
             }
         )
     # Include indexed repos not matched by any catalog entry (e.g. uploaded indexes).
+    # Reconstruct git_repo and git_branch from the slug ({owner}-{repo}-{branch})
+    # so the query backend can derive the same slug via generate_slug_from_repo.
     for slug, idx_meta in lkp.items():
         if slug in matched_slugs:
             continue
+        parts = slug.split("-")
+        if len(parts) >= 3:
+            owner, branch = parts[0], parts[-1]
+            repo_name = "-".join(parts[1:-1])
+            git_repo = f"https://uploaded/{owner}/{repo_name}"
+            git_branch = branch
+        else:
+            git_repo = slug
+            git_branch = "main"
         options.append(
             {
-                "git_repo": "",
-                "git_branch": "",
+                "git_repo": git_repo,
+                "git_branch": git_branch,
                 "git_slug": slug,
                 "label": f"{slug} (uploaded)",
                 "key": slug,
