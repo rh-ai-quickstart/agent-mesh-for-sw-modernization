@@ -626,7 +626,8 @@ class DependencyAnalyzer:
         git_urls_list = "\n".join("- " + url for url in sorted(git_urls))
         title = f"# Migration Report\n{git_urls_list}\n\n---\n"
 
-        report = ""
+        pipeline_scoped_report = ""
+        shared_scope_report = ""
 
         for i, prompt_path in enumerate(prompts):
 
@@ -670,13 +671,16 @@ class DependencyAnalyzer:
 
                 answers[i] = result
 
-                report += f"{result}\n\n"
+                if prompt_run_id:
+                    pipeline_scoped_report += f"{result}\n\n"
+                else:
+                    shared_scope_report += f"{result}\n\n"
 
         from utils.visualization_utils import log_interactive_dependency_graph
 
         log_interactive_dependency_graph(self)
 
-        return f"{title}{report}"
+        return f"{title}{pipeline_scoped_report}{shared_scope_report}"
 
     async def generate_report(self, service_name: str):
 

@@ -765,6 +765,8 @@
     }
     .cu-modal-close:hover { color: var(--cu-charcoal); background: #f0f0f0; }
     .cu-modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+    .cu-modal-body summary { list-style: none; }
+    .cu-modal-body summary::-webkit-details-marker { display: none; }
     .cu-modal-body .cu-note { margin-top: 0; }
     .cu-form-group { display: flex; flex-direction: column; gap: 0.3rem; }
     .cu-required { color: var(--cu-red); }
@@ -914,15 +916,21 @@
         <button type="button" class="cu-modal-close" id="analyze-modal-close" aria-label="Close">&#x2715;</button>
       </div>
       <div class="cu-modal-body">
-        <div id="analyze-selection" style="font-size:0.9rem"></div>
-        <div id="analysis-goal-group" class="hidden">
-          <label for="analysis-goal" style="display:block;font-size:0.85rem;margin:0.75rem 0 0.3rem;color:var(--cu-gray)">(Optional) Describe any special outcomes you are targeting that should be included in the report.</label>
-          <textarea id="analysis-goal" class="cu-field" style="border-radius:6px;min-height:3.5rem;resize:vertical"></textarea>
-        </div>
         <div class="cu-alert-warning">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div><strong>Before You Run</strong><br/>Analysis is an intensive process and can take <b>30+ minutes</b>.<br/></div>
         </div>
+        <div id="analyze-selection" style="font-size:0.9rem;border-top:1px dotted var(--cu-border);border-bottom:1px dotted var(--cu-border);padding:0.5rem 0"></div>
+        <details id="analysis-goal-group" class="hidden" style="margin-top:0.25rem;border:1px solid var(--cu-border);border-radius:6px;padding:0.5rem 0.65rem">
+          <summary id="analysis-goal-toggle" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:0.85rem;color:var(--cu-gray);list-style:none">
+            <span><strong>Special Outcomes</strong> (Optional)</span>
+            <svg id="analysis-goal-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.15s;flex-shrink:0;margin-left:0.5rem"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div style="margin-top:0.3rem">
+            <p style="font-size:0.85rem;color:var(--cu-gray);margin:0 0 0.3rem">Describe any special outcomes you are targeting that should be included in the report.</p>
+            <textarea id="analysis-goal" class="cu-field" style="border-radius:6px;min-height:3.5rem;resize:vertical"></textarea>
+          </div>
+        </details>
       </div>
       <div class="cu-modal-footer">
         <button type="button" class="cu-btn cu-btn-link" id="analyze-modal-cancel">Cancel</button>
@@ -2177,12 +2185,20 @@
       $("analyze-selection").innerHTML = `<strong>Selected:</strong> ${selectedRepos().map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}`;
       const isSingle = selectedRepos().length === 1;
       $("analysis-goal-group").classList.toggle("hidden", !isSingle);
-      if (!isSingle) $("analysis-goal").value = "";
+      $("analysis-goal").value = "";
+      $("analysis-goal-group").removeAttribute("open");
+      $("analysis-goal-chevron").style.transform = "";
       $("analyze-modal").classList.remove("hidden");
     };
     $("analyze-modal-close").onclick = closeAnalyzeModal;
     $("analyze-modal-cancel").onclick = closeAnalyzeModal;
     $("analyze-modal").addEventListener("click", (e) => { if (e.target === $("analyze-modal")) closeAnalyzeModal(); });
+    $("analysis-goal-group").addEventListener("toggle", () => {
+      const expanded = $("analysis-goal-group").open;
+      $("analysis-goal-chevron").style.transform = expanded ? "rotate(180deg)" : "";
+      if (expanded) $("analysis-goal").focus();
+      else $("analysis-goal").value = "";
+    });
     const closeImprovementModal = () => $("improvement-modal").classList.add("hidden");
     $("improvement-modal-close").onclick = closeImprovementModal;
     $("improvement-modal").addEventListener("click", (e) => { if (e.target === $("improvement-modal")) closeImprovementModal(); });
