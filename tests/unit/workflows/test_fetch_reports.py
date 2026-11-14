@@ -13,6 +13,7 @@ def _inject_fake_loader(
     *,
     eval_files=None,
     analysis_files=None,
+    improvement_files=None,
     raise_on=(),
     fail_init=False,
 ):
@@ -39,7 +40,12 @@ def _inject_fake_loader(
             if category in raise_on:
                 raise Exception(f"not found: {category}")
             os.makedirs(download_dir, exist_ok=True)
-            files = eval_files if category == "evaluation" else analysis_files
+            files_map = {
+                "evaluation": eval_files,
+                "analysis": analysis_files,
+                "improvement": improvement_files,
+            }
+            files = files_map.get(category)
             for name, content in (files or {}).items():
                 (Path(download_dir) / name).write_text(content, encoding="utf-8")
 
@@ -58,19 +64,33 @@ def test_fetch_reports_downloads_analysis_report(monkeypatch):
         analysis_files={"migration_report_repo-main.md": "# Current analysis"},
     )
 
-    evaluation, analysis = reports.fetch_reports("selected-kfp", "repo-main", False)
+    evaluation, analysis, improvement = reports.fetch_reports("selected-kfp", "repo-main", False)
 
     assert evaluation is None
     assert analysis == "# Current analysis"
+    assert improvement is None
 
 
 def test_fetch_reports_returns_none_when_download_fails(monkeypatch):
-    _inject_fake_loader(monkeypatch, raise_on=("evaluation", "analysis"))
+    _inject_fake_loader(monkeypatch, raise_on=("evaluation", "analysis", "improvement"))
 
-    assert reports.fetch_reports("selected-kfp", "repo-main", False) == (None, None)
+    assert reports.fetch_reports("selected-kfp", "repo-main", False) == (None, None, None)
 
 
 def test_fetch_reports_returns_no_reports_when_loader_unavailable(monkeypatch):
     _inject_fake_loader(monkeypatch, fail_init=True)
 
-    assert reports.fetch_reports("selected-kfp", "repo-main", False) == (None, None)
+    assert reports.fetch_reports("selected-kfp", "repo-main", False) == (None, None, None)
+
+
+def test_fetch_reports_downloads_improvement_plan(monkeypatch):
+    _inject_fake_loader(
+        monkeypatch,
+        improvement_files={"improvement_plan_repo-main.md": "# Plan\n\nImprove X."},
+    )
+
+    evaluation, analysis, improvement = reports.fetch_reports("kfp-1", "repo-main", False)
+
+    assert evaluation is None
+    assert analysis is None
+    assert improvement == "# Plan\n\nImprove X."

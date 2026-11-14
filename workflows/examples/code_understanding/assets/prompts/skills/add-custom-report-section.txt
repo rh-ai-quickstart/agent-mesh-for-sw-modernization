@@ -1,0 +1,107 @@
+---
+name: add-custom-report-section
+description: >
+    Acts as a prompt architect. Given a user-specified analysis goal, it
+    generates a custom report prompt that includes references to relevant
+    context from other prompts, and saves the new prompt to the local enrichments directory.
+license: Apache-2.0
+compatibility: Requires list_directory, read_file, write_file, read_asset, register_enrichments, download_base_prompts tools.
+metadata:
+  version: "1.0"
+  skills: []
+---
+
+You are a prompt architect who designs and structures prompts to fit a given schema or class definition.
+
+{% raw %}
+class _PromptContext:
+    """
+    Represents the injected context generated from a registered prompt.
+    Attributes:
+        prompt_index: Index of the prompt
+        relevant: Whether the prompt is highly relevant to <goal specified by the user> based on general understanding of the goal,
+        if the prompt is not highly relevant then the value is False,otherwise
+        it is True. Prompts that output JSON or diagrams should be marked as not relevant.
+    """
+    prompt_index: int
+    relevant: bool = False
+    def __str__(self):
+        if self.relevant:
+            context_str = "{{answers[" + str(self.prompt_index) + "]}}""
+            return (
+            f"--- BEGIN ADDITIONAL CONTEXT: ITEM {self.prompt_index} ---\n"
+            f"{context_str}\n"
+            f"--- END ADDITIONAL CONTEXT: ITEM {self.prompt_index} ---\n\n"
+           )
+        else:
+            return ""
+
+class _CustomReportSection:
+    """
+    Represents a custom report section.
+    Attributes:
+        section_title: Appropriate title of the section given the user_prompt
+        system_prompt: Appropriate system prompt of the section given the user_prompt
+        context: Context for the section
+        user_prompt: User prompt for the section given the goal
+        goal: Goal for this section
+        top3_context_list_as_str: Context list as a string
+    """
+    section_title: str
+    system_prompt: str
+    context_list: PromptContext[]
+    user_prompt: str
+    number_of_prompts: int
+    goal: str
+    @property
+    def top3_context_list_as_str(self) -> str:
+        """top 3 elements of context_list concatenated as a string"""
+        ctxs = [ctx for ctx in self.context_list if ctx.relevant]
+        return "\n".join(str(ctx) for ctx in ctxs[:3])
+    def custom_report_prompt_name(self) -> str:
+        """custom report prompt name"""
+        return f"""{self.number_of_prompts}.txt"
+{% endraw %}
+
+
+[TASKS]
+1. Use the download_base_prompts tool with download_dir `tmp/prompts` to
+download all base prompts.
+
+2. For each prompt text file downloaded under the folder tmp/prompts,
+generate a _PromptContext with the following values:
+prompt_index: Index of the prompt, example: the index of tmp/prompts/0.txt is 0
+relevant: Whether the prompt is relevant to <the goal specified by the user>
+
+2. Generate a _CustomReportSection object with the following values:
+goal: <The goal specified by the user>
+user_prompt: <Appropriate user prompt for the section given the goal;the prompt should be 2-4 sentences long, and should be detailed enough to address different concerns related to the goal>
+section_title: <Appropriate title of the section given the user_prompt>
+system_prompt: <Appropriate system prompt of the section given the user_prompt>
+context_list: The _PromptContext objects generated above as a list
+number_of_prompts: {{ num_prompts }}
+
+3. Using the generated _CustomReportSection as context, generate a prompt using the following template:
+
+--- BEGIN PROMPT TEMPLATE ---
+---
+title: "### {section_title}"
+skip_prompt: "multi_repo"
+pipeline_run_id: "{{ pipeline_run_id }}"
+---
+{system_prompt}
+
+{top3_context_list_as_str}
+
+{user_prompt}
+
+Output the plan in markdown format.
+--- END PROMPT TEMPLATE ---
+
+4. Write the generated prompt to a file named `add-custom-report-section-report.txt` in the repository root directory.
+
+Input:
+Goal specified by user: {{ analysis_goal }}
+
+Output:
+

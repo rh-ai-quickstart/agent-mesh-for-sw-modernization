@@ -36,12 +36,22 @@ class AssetLoader(ABC):
         """
 
     @staticmethod
-    def _get_prompt_body_and_metadata(raw: str) -> tuple[str, dict]:
-        """Parses YAML frontmatter from a prompt string, returning (body, metadata)."""
+    def _get_prompt_body_and_metadata(raw: str, **kwargs) -> tuple[str, dict]:
+        """Parses YAML frontmatter from a prompt string, returning (body, metadata).
+
+        When keyword arguments are provided the body is rendered as a Jinja2
+        template before being returned.
+        """
         parts = raw.split("---", 2)
         if not raw.startswith("---") or len(parts) < 3:
-            return raw, {}
-        return parts[2].lstrip("\n"), yaml.safe_load(parts[1]) or {}
+            body, meta = raw, {}
+        else:
+            body, meta = parts[2].lstrip("\n"), yaml.safe_load(parts[1]) or {}
+        if kwargs:
+            from jinja2 import Template
+
+            body = Template(body).render(**kwargs)
+        return body, meta
 
     @staticmethod
     def get_log_results_artifact_path(
@@ -226,6 +236,20 @@ class AssetLoader(ABC):
 
         Returns:
             List of repository dicts, or an empty list if neither source is available.
+        """
+
+    @abstractmethod
+    def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
+        """Downloads all prompts matching a path prefix.
+
+        Args:
+            prompt_path_prefix: Directory path relative to _PROMPTS_DIR
+                (e.g. ``"analysis/migration-report"``).
+            **kwargs: Variables to render into each prompt template.
+
+        Returns:
+            List of (rendered prompt string, frontmatter metadata dict) tuples,
+            ordered by prompt index.
         """
 
     @abstractmethod

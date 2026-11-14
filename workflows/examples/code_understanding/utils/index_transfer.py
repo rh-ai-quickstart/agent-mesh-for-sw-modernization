@@ -425,7 +425,12 @@ class IndexTransfer:
             "multi_repo": index["multi_repo"],
         }
 
-    def import_index(self, bundle: Path, force: bool = False) -> dict:
+    def import_index(
+        self,
+        bundle: Path,
+        force: bool = False,
+        pipeline_run_id_fallback: str | None = None,
+    ) -> dict:
         bundle = Path(bundle)
         with tempfile.TemporaryDirectory(prefix="index-import-") as temporary:
             directory = Path(temporary)
@@ -459,7 +464,10 @@ class IndexTransfer:
                     if (
                         index["git_slug"] == slug
                         and index["multi_repo"] == combined
-                        and index["pipeline_run_id"] == result["pipeline_run_id"]
+                        and (
+                            result["pipeline_run_id"] is None
+                            or index["pipeline_run_id"] == result["pipeline_run_id"]
+                        )
                         and run.data.tags.get("uploaded") == "true"
                         and run.data.tags.get("index_transfer.destination_namespace")
                         == self.namespace
@@ -524,6 +532,9 @@ class IndexTransfer:
             except Exception:
                 self.client.set_terminated(destination_id, "FAILED")
                 raise
+            if pipeline_run_id_fallback and not result["pipeline_run_id"]:
+                self.client.set_tag(destination_id, "pipeline_run_id", pipeline_run_id_fallback)
+                result["pipeline_run_id"] = pipeline_run_id_fallback
             return {
                 **result,
                 "outcome": "imported",

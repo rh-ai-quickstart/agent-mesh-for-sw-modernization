@@ -109,10 +109,7 @@ are the generation cue and must remain untouched at the end of the file.
 Do NOT attempt to read the output path before writing. Use write_file to create it directly at:
   .enrichments/.assets/graphrag/extract_graph.txt
 
-## Step 4 — Persist outputs
-
-Call register_enrichments to store all files written under .enrichments/ to the pipeline asset store
-so they are available on future pipeline runs. No arguments are required.
+## Step 4 — Final check
 
 Do NOT write any files other than the two output paths specified in Steps 2 and 3. Do not create
 test files, scratch files, or any other intermediate output.

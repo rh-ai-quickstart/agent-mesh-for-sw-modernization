@@ -130,5 +130,7 @@ class CustomEvaluator(ABC):
             multi_repo: Whether the index spans multiple repositories.
 
         Returns:
-            The updated pandas DataFrame with "answer" and metric columns populated.
+            A dict with keys:
+            - "results": the updated pandas DataFrame with "answer" and metric columns populated.
+            - "improvement_plan": an LLM-generated markdown string with recommendations.
         """

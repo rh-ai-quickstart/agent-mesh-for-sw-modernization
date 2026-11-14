@@ -122,9 +122,54 @@ def get_read_asset_tool(repo_dir: str | None = None, git_slug: str | None = None
             content = DefaultAssetLoader().download(path, git_slug=git_slug)
 
         if content is None:
-            raise RuntimeError(f"Required asset not found: {path}")
+            return f"Error: asset not found at path '{path}'"
         if isinstance(content, (dict, list)):
             return json.dumps(content, indent=2)
         return content
 
     return read_asset
+
+
+def get_download_base_prompts_tool(repo_dir: str, destination_folder: str = "tmp"):
+    """Return a LangChain tool that downloads all top-level prompts from
+    ``analysis/migration-report`` to a local folder.
+
+    Each prompt is written as ``{index}.txt`` inside *destination_folder*,
+    preserving the rendered body.  The directory is created if it does not exist.
+
+    Args:
+        repo_dir: Root of the cloned repository; relative download_dir values
+            are resolved against this path so they land inside the file-tool sandbox.
+        destination_folder: Local directory path to write the prompt files into.
+            Relative paths are resolved against *repo_dir*.
+    """
+    from langchain_core.tools import tool
+
+    abs_destination_folder = (
+        destination_folder
+        if os.path.isabs(destination_folder)
+        else os.path.join(repo_dir, destination_folder)
+    )
+
+    @tool
+    def download_base_prompts(download_dir: str = abs_destination_folder) -> str:
+        """Download all top-level analysis/migration-report prompts to a local directory.
+
+        Args:
+            download_dir: Directory to write prompt files into. Defaults to tmp
+                (resolved relative to the repository root).
+        """
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        resolved = (
+            download_dir if os.path.isabs(download_dir) else os.path.join(repo_dir, download_dir)
+        )
+        loader = DefaultAssetLoader()
+        prompts = loader.download_prompts("analysis/migration-report")
+        os.makedirs(resolved, exist_ok=True)
+        for index, (body, _meta) in enumerate(prompts):
+            with open(os.path.join(resolved, f"{index}.txt"), "w") as f:
+                f.write(body)
+        return f"Downloaded {len(prompts)} prompts to {download_dir}"
+
+    return download_base_prompts

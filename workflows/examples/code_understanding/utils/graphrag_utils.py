@@ -46,13 +46,21 @@ class DependencyAnalyzer:
 
     GIT_URL_REGEX = r"https?://(?:github|gitlab)\.com/[\w\-\.]+/[\w\-\.]+"
 
-    def __init__(self, root_dir=".", git_slug: str = "", multi_repo: bool = False):
+    def __init__(
+        self,
+        root_dir=".",
+        git_slug: str = "",
+        multi_repo: bool = False,
+        pipeline_run_id: str = "",
+    ):
 
         self.root_dir = root_dir
 
         self.git_slug = git_slug
 
         self.multi_repo = multi_repo
+
+        self.pipeline_run_id = pipeline_run_id
 
         self._setup_configuration()
 
@@ -582,9 +590,22 @@ class DependencyAnalyzer:
     async def generate_migration_report(self):
         """Generate a high-level migration report"""
 
+        from loaders.asset_loader import AssetLoader
         from loaders.default_asset_loader import DefaultAssetLoader
+        from utils.loader_utils import get_global_scoped_enrichment_dir
+        from utils.pipeline_utils import get_pipeline_run_id
 
         loader = DefaultAssetLoader()
+
+        # Ensure enrichment assets are available locally so num_prompts counts them.
+        assets_dir = get_global_scoped_enrichment_dir(".")
+        loader.load_results(
+            download_dir=assets_dir,
+            artifact_path=f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets",
+            tags={"category": "enrichments"},
+        )
+
+        effective_run_id = self.pipeline_run_id or get_pipeline_run_id()
 
         graphrag_prompts = [
             f"analysis/migration-report/{i}"
@@ -605,7 +626,8 @@ class DependencyAnalyzer:
         git_urls_list = "\n".join("- " + url for url in sorted(git_urls))
         title = f"# Migration Report\n{git_urls_list}\n\n---\n"
 
-        report = ""
+        pipeline_scoped_report = ""
+        shared_scope_report = ""
 
         for i, prompt_path in enumerate(prompts):
 
@@ -630,6 +652,11 @@ class DependencyAnalyzer:
                 else meta.get("skip_prompt") == "single_repo"
             )
 
+            prompt_run_id = meta.get("pipeline_run_id")
+            if prompt_run_id and prompt_run_id != effective_run_id:
+                logging.info("Skipping prompt %s (pipeline_run_id mismatch)", prompt_path)
+                continue
+
             if not skip_prompt:
 
                 bypass_index = prompt_path.startswith("analysis/migration-report/enhanced")
@@ -644,13 +671,16 @@ class DependencyAnalyzer:
 
                 answers[i] = result
 
-                report += f"{result}\n\n"
+                if prompt_run_id:
+                    pipeline_scoped_report += f"{result}\n\n"
+                else:
+                    shared_scope_report += f"{result}\n\n"
 
         from utils.visualization_utils import log_interactive_dependency_graph
 
         log_interactive_dependency_graph(self)
 
-        return f"{title}{report}"
+        return f"{title}{pipeline_scoped_report}{shared_scope_report}"
 
     async def generate_report(self, service_name: str):
 

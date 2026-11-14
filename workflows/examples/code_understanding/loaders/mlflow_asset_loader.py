@@ -126,7 +126,13 @@ class MlFlowAssetLoader(AssetLoader):
                 static_base_uri = self._get_artifact_base_uri(
                     client, static_experiment, "tags.latest = 'true'"
                 )
-                enrichment_uris.insert(0, os.path.join(static_base_uri, asset_file_path))
+                # Strip the enrichment prefix so the URI matches the static
+                # asset layout (e.g. mappings/language_mappings.json instead
+                # of results/.enrichments/.assets/mappings/...).
+                static_asset_path = asset_file_path.removeprefix(
+                    f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets/"
+                )
+                enrichment_uris.insert(0, os.path.join(static_base_uri, static_asset_path))
             return enrichment_uris
 
         filter_string = (
@@ -552,21 +558,22 @@ class MlFlowAssetLoader(AssetLoader):
         variables."""
         try:
 
-            from jinja2 import Template
-
             name = self.get_prompt_name(prompt_path)
 
             prompt = mlflow.genai.load_prompt(name)
 
-            body, meta = self._get_prompt_body_and_metadata(prompt.template)
-
-            return Template(body).render(**kwargs), meta
+            return self._get_prompt_body_and_metadata(prompt.template, **kwargs)
 
         except Exception as e:
 
             logging.error(f"Error loading prompt {prompt_path}: {e}")
 
             raise e
+
+    def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
+        """Downloads all prompts from the MLflow registry matching the given prefix."""
+        count = self.num_prompts(prompt_path_prefix)
+        return [self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs) for i in range(count)]
 
     def register_enrichments(
         self,

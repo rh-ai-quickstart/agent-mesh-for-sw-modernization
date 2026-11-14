@@ -136,15 +136,17 @@ class LocalAssetLoader(AssetLoader):
 
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
         """Reads a prompt template from the local assets directory and renders it with Jinja2."""
-        from jinja2 import Template
-
         asset_uri = os.path.join(self._PROMPTS_DIR, prompt_path + ".txt")
 
         with open(asset_uri, "r") as f:
             raw = f.read()
 
-        body, meta = self._get_prompt_body_and_metadata(raw)
-        return Template(body).render(**kwargs), meta
+        return self._get_prompt_body_and_metadata(raw, **kwargs)
+
+    def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
+        """Downloads all prompts under the prefixed local directory."""
+        count = self.num_prompts(prompt_path_prefix)
+        return [self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs) for i in range(count)]
 
     def register_enrichments(
         self,

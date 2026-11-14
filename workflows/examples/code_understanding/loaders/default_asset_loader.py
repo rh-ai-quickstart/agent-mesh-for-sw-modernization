@@ -7,14 +7,15 @@ from .local_asset_loader import LocalAssetLoader
 class DefaultAssetLoader(AssetLoader):
     """Delegates to LocalAssetLoader or MlFlowAssetLoader based on the ASSET_LOADER env var.
 
-    Enrichments-aware callers pass git_slug alongside download_dir (which must be the
-    repository root) to activate three-tier resolution:
-      1. Local <download_dir>/.enrichments/.assets/ — checked here before delegating.
+    All asset and prompt loading checks enrichments first before falling back to the
+    static-asset store:
+      1. Local .enrichments/.assets/ — always checked first.
       2. MLflow enrichments experiment, keyed by git_slug — MlFlowAssetLoader only.
       3. Default static-asset store — fallback for both loaders.
     """
 
     def __init__(self, namespace: str = None):
+
         if os.getenv("ASSET_LOADER") == "mlflow":
             from .mlflow_asset_loader import MlFlowAssetLoader
 
@@ -111,8 +112,23 @@ class DefaultAssetLoader(AssetLoader):
         return self._loader.load_skill(name)
 
     def download_prompt(self, prompt_path: str, **kwargs) -> tuple[str, dict]:
+        """Downloads a prompt, checking enrichments first."""
+        from utils.loader_utils import load_local_enrichments
+
+        asset_path = f"prompts/{prompt_path}.txt"
+
+        content = load_local_enrichments(".", asset_path) or self._loader.download(asset_path)
+
+        if content is not None:
+            return self._get_prompt_body_and_metadata(content, **kwargs)
 
         return self._loader.download_prompt(prompt_path, **kwargs)
+
+    def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
+        return [
+            self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs)
+            for i in range(self.num_prompts(prompt_path_prefix))
+        ]
 
     def register_enrichments(
         self,
@@ -137,5 +153,13 @@ class DefaultAssetLoader(AssetLoader):
         return self._loader.load_catalog_repos()
 
     def num_prompts(self, prompt_prefix: str) -> int:
+        from utils.loader_utils import get_global_scoped_enrichment_dir
 
-        return self._loader.num_prompts(prompt_prefix)
+        prompt_count = self._loader.num_prompts(prompt_prefix)
+        enrichment_dir = os.path.join(
+            get_global_scoped_enrichment_dir("."), "prompts", prompt_prefix
+        )
+        if os.path.isdir(enrichment_dir):
+            prompt_count += len([f for f in os.listdir(enrichment_dir) if f.endswith(".txt")])
+
+        return prompt_count
