@@ -65,12 +65,12 @@ class _CustomReportSection:
 
 
 [TASKS]
-1. Use the download_base_prompts tool with download_dir `/tmp/prompts` to
+1. Use the download_base_prompts tool with download_dir `tmp/prompts` to
 download all base prompts.
 
-2. For each prompt text file downloaded under the folder /tmp/prompts,
+2. For each prompt text file downloaded under the folder tmp/prompts,
 generate a _PromptContext with the following values:
-prompt_index: Index of the prompt, example: the index of /tmp/prompts/0.txt is 0
+prompt_index: Index of the prompt, example: the index of tmp/prompts/0.txt is 0
 relevant: Whether the prompt is relevant to <the goal specified by the user>
 
 2. Generate a _CustomReportSection object with the following values:
@@ -79,7 +79,7 @@ user_prompt: <Appropriate user prompt for the section given the goal;the prompt 
 section_title: <Appropriate title of the section given the user_prompt>
 system_prompt: <Appropriate system prompt of the section given the user_prompt>
 context_list: The _PromptContext objects generated above as a list
-number_of_prompts: <The total number of files in the /tmp/prompts directory>
+number_of_prompts: {{ num_prompts }}
 
 3. Using the generated _CustomReportSection as context, generate a prompt using the following template:
 
@@ -98,12 +98,7 @@ pipeline_run_id: "{{ pipeline_run_id }}"
 Output the plan in markdown format.
 --- END PROMPT TEMPLATE ---
 
-4. You MUST write the output to a plaintext file .enrichments/.assets/prompts/analysis/migration-report/{custom_report_prompt_name}.
-Confirm the file path after writing.
-
-5. **MANDATORY** — Call register_enrichments to persist all files written under .enrichments/ to the
-pipeline asset store so they are available on future pipeline runs. No arguments are required.
-This step MUST be executed after writing the prompt file. Do NOT skip this step.
+4. Write the generated prompt to a file named `add-custom-report-section-report.txt` in the repository root directory.
 
 Input:
 Goal specified by user: {{ analysis_goal }}

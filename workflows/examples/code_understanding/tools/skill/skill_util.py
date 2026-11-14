@@ -162,6 +162,8 @@ def run_local_skill(
     git_slug: str,
     use_rhoai_mcp: bool = False,
     skill_params: dict | None = None,
+    enrichment_dest: str | None = None,
+    persist_enrichments: bool = False,
 ) -> str | None:
     """
     Run a local skill by name against repo_dir.
@@ -175,6 +177,8 @@ def run_local_skill(
         repo_dir,
         git_slug,
         use_rhoai_mcp,
+        enrichment_dest=enrichment_dest,
+        persist_enrichments=persist_enrichments,
     )
 
 
@@ -183,9 +187,25 @@ def run_skill(
     repo_dir: str,
     git_slug: str,
     use_rhoai_mcp: bool = False,
+    enrichment_dest: str | None = None,
+    persist_enrichments: bool = False,
 ) -> str | None:
-    """
-    Run a single skill against repo_dir.
+    """Run a single skill against repo_dir.
+
+    Args:
+        skill:                Skill configuration.
+        repo_dir:             Root of the cloned repository.
+        git_slug:             Repository slug for artifact namespacing.
+        use_rhoai_mcp:        Whether to use the RHOAI MCP server.
+        enrichment_dest:      If set, the report file produced by the skill is
+                              moved to this path (parent dirs created automatically).
+                              A warning is logged when the skill produces no report
+                              or the report is empty.
+        persist_enrichments:  If True, ``register_enrichments`` is called after
+                              the skill completes (idempotent).
+
+    Returns:
+        Path to the report file, or None if no report was produced.
     """
     logging.info("Running skill: %s", skill.name)
 
@@ -202,7 +222,7 @@ def run_skill(
         [
             get_read_asset_tool(repo_dir, git_slug),
             get_register_enrichments_tool(repo_dir, git_slug),
-            get_download_base_prompts_tool(),
+            get_download_base_prompts_tool(repo_dir),
         ]
         if skill.repo is None
         else None
@@ -221,15 +241,48 @@ def run_skill(
     else:
         asyncio.run(coro)
 
+    report_path = _collect_report(skill, repo_dir, enrichment_dest)
+
+    if persist_enrichments:
+        from loaders.default_asset_loader import DefaultAssetLoader
+
+        DefaultAssetLoader().register_enrichments(repo_dir, git_slug)
+
+    return report_path
+
+
+def _collect_report(skill: SkillConfig, repo_dir: str, enrichment_dest: str | None) -> str | None:
+    """Locate the skill's report file, optionally move it, and return its path."""
     for ext in ("json", "txt", "md"):
         candidate = os.path.join(repo_dir, f"{skill.name}-report.{ext}")
-        if os.path.exists(candidate):
-            dest = os.path.join(repo_dir, skill.target_dir) if skill.target_dir else repo_dir
-            shutil.move(candidate, dest)
-            candidate = os.path.join(dest, os.path.basename(candidate))
-            with open(candidate, "r", encoding="utf-8") as f:
-                logging.info(f"[{skill.name}] report content:\n{f.read()}")
-            return candidate
+        if not os.path.exists(candidate):
+            continue
+
+        if enrichment_dest:
+            os.makedirs(os.path.dirname(enrichment_dest), exist_ok=True)
+            shutil.move(candidate, enrichment_dest)
+            report_path = enrichment_dest
+        elif skill.target_dir:
+            dest_dir = os.path.join(repo_dir, skill.target_dir)
+            shutil.move(candidate, dest_dir)
+            report_path = os.path.join(dest_dir, os.path.basename(candidate))
+        else:
+            report_path = candidate
+
+        with open(report_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        if not content.strip():
+            logging.warning("[%s] report file is empty: %s", skill.name, report_path)
+        else:
+            logging.info("[%s] report content:\n%s", skill.name, content)
+        return report_path
+
+    if enrichment_dest:
+        logging.warning(
+            "[%s] skill did not produce a report file (expected at %s)",
+            skill.name,
+            enrichment_dest,
+        )
     return None
 
 
@@ -239,12 +292,16 @@ def run_composite_skill(
     git_slug: str,
     use_rhoai_mcp: bool = False,
     skill_params: dict | None = None,
+    persist_enrichments: bool = False,
 ) -> None:
-    """
-    Run a composite skill against repo_dir using the autonomous agent pattern.
+    """Run a composite skill against repo_dir using the autonomous agent pattern.
 
     Loads the composite skill's body as agent instructions, injects the enabled
     skills list, and invokes an agent equipped with the run_skill tool.
+
+    Args:
+        persist_enrichments:  If True, ``register_enrichments`` is called after
+                              the composite skill completes (idempotent).
     """
     from loaders.default_asset_loader import DefaultAssetLoader
     from tools.skill.skill_tool import get_run_skill_tool
@@ -279,3 +336,6 @@ def run_composite_skill(
             pool.submit(asyncio.run, coro).result()
     else:
         asyncio.run(coro)
+
+    if persist_enrichments:
+        DefaultAssetLoader().register_enrichments(repo_dir, git_slug)

@@ -739,7 +739,9 @@ def detect_languages(source_path: str, git_slug: str) -> list:
         )
 
         try:
-            run_local_skill("add-languages", source_path, git_slug=git_slug)
+            run_local_skill(
+                "add-languages", source_path, git_slug=git_slug, persist_enrichments=True
+            )
         except Exception:
             logging.error("add-languages skill failed", exc_info=True)
 
@@ -793,20 +795,40 @@ def run_preflight(
     logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
     try:
-        run_composite_skill(source_path, "external-metadata", git_slug=git_slug)
+        run_composite_skill(
+            source_path, "external-metadata", git_slug=git_slug, persist_enrichments=True
+        )
     except Exception:
         logging.error("Composite skill 'external-metadata' failed", exc_info=True)
 
     if analysis_goal:
         try:
+            from loaders.default_asset_loader import DefaultAssetLoader
+            from utils.loader_utils import get_global_scoped_enrichment_dir
             from utils.pipeline_utils import get_pipeline_run_id
 
             run_id = get_pipeline_run_id()
+            loader = DefaultAssetLoader()
+            num_prompts = loader.num_prompts("analysis/migration-report")
+
+            enrichment_dest = os.path.join(
+                get_global_scoped_enrichment_dir(source_path),
+                "prompts",
+                "analysis",
+                "migration-report",
+                f"{num_prompts}.txt",
+            )
             run_local_skill(
                 "add-custom-report-section",
                 source_path,
                 git_slug=git_slug,
-                skill_params={"analysis_goal": analysis_goal, "pipeline_run_id": run_id},
+                skill_params={
+                    "analysis_goal": analysis_goal,
+                    "pipeline_run_id": run_id,
+                    "num_prompts": num_prompts,
+                },
+                enrichment_dest=enrichment_dest,
+                persist_enrichments=True,
             )
         except Exception:
             logging.error(
