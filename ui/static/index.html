@@ -637,9 +637,10 @@
       font-size: inherit;
     }
     .cu-md-table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.9em; }
-    .cu-md-table th, .cu-md-table td { border: 1px solid var(--cu-border); padding: 0.4rem 0.75rem; text-align: left; }
+    .cu-md-table th, .cu-md-table td { border: 1px solid var(--cu-border); padding: 0.4rem 0.75rem; text-align: left; vertical-align: top; }
     .cu-md-table th { background: #f0f4f8; font-weight: 600; }
     .cu-md-table tr:nth-child(even) td { background: #f9fbfd; }
+    .cu-md-table td pre { max-width: 22rem; overflow-x: auto; margin: 0; font-size: 0.85em; }
     .cu-md pre.mermaid { background: transparent; color: inherit; padding: 0; }
     .cu-diagram-err { position: relative; display: inline-flex; align-items: center; gap: 0.3rem; cursor: default; color: var(--cu-gold); font-size: 0.85rem; font-weight: 600; padding: 0.15rem 0.4rem; border: 1px solid var(--cu-gold); border-radius: 3px; background: #fffbe6; }
     .cu-diagram-flyover { position: fixed; z-index: 9999; max-width: 480px; min-width: 220px; background: #fff; border: 1px solid var(--cu-border); border-left: 4px solid var(--cu-gold); border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.13); padding: 0.65rem 0.85rem; font-size: 0.82rem; pointer-events: none; }
