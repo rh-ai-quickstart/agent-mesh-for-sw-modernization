@@ -14,17 +14,17 @@ so there is no need to create a new entity-relationship mapping;
 the metadata is meant to provide hints to make the existing mapping better
 
 [ FORMAT ]
-The output should be a section entitled "Potential Metadata Additions to Improve Scores",
-and should focus on the weaker areas of the report with evaluation scores of 3 or lower.
+The output should be a section entitled "Potential Metadata Additions to Optimize Scores", and should focus on the weaker areas of the report with
+evaluation scores of 3 or lower.
 It should include a table with the the following columns for each potential addition:
 1. Metadata
 2. Industry-known static tool for generating the metadata if it exists; if no industry known tool exists, say N/A (do not include any additional information)
 3. Why it helps
-4. Specific questions from the evaluation that it can improve
+4. Specific questions from the evaluation that it can optimize
 5. Sample LLM prompt; for any tool calls, use either industry known tools or custom scripts if industry known tools do not exist
 6. Custom scripts (or N/A if none are used for tool calls); include sample code
 
-DO NOT include any additional verbiage. Only include the “Potential Metadata Additions to Improve Scores” table described above.
+DO NOT include any additional verbiage. Only include the “Potential Metadata Additions to Optimize Scores” table described above.
 The output should be in Markdown format.
 
 JSON payload:
