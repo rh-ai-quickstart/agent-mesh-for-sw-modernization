@@ -1122,7 +1122,7 @@
         } else {
           fences.push(`<pre><code>${esc(content)}</code></pre>`);
         }
-        return `\n\n%%FENCE${fences.length - 1}%%\n\n`;
+        return `%%FENCE${fences.length - 1}%%`;
       });
       const lines = text.split("\n");
       const html = [];
@@ -1202,7 +1202,9 @@
         if (!para.length) { i += 1; continue; } // skip unrecognised line, avoid infinite loop
         html.push(`<p>${inlineMd(para.join(" "))}</p>`);
       }
-      return `<div class="cu-md">${html.join("")}</div>`;
+      let rendered = html.join("");
+      rendered = rendered.replace(/%%FENCE(\d+)%%/g, (_, idx) => fences[Number(idx)]);
+      return `<div class="cu-md">${rendered}</div>`;
     }
 
     function parseCsv(text) {
