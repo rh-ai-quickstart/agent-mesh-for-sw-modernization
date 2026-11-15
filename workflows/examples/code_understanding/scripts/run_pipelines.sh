@@ -17,6 +17,7 @@
 #   GIT_REPO              Git repository URL to analyse (required for --single-repo)
 #   GIT_BRANCH            Git branch to clone (default: main)
 #   PIPELINE_RUN_ID       KFP run ID of a previous full pipeline run (required for --analysis-only)
+#   ANALYSIS_GOAL         Optional analysis goal for a custom report section (--single-repo only)
 #   PARENT_SOURCE_PATH                 Parent source path (default: source)
 #   PARENT_TARGET_PATH                 Parent target path (default: target)
 #   KFP_DATA_INDEXING_OUTPUT_PATH      GraphRAG base path (default: graph_rag_app/source)
@@ -42,6 +43,7 @@ Environment variables:
   GIT_REPO            Git repository URL to analyse (required for --single-repo)
   GIT_BRANCH          Git branch to clone (default: main)
   PIPELINE_RUN_ID     KFP run ID of a previous full pipeline run (required for --analysis-only)
+  ANALYSIS_GOAL       Optional analysis goal for a custom report section (--single-repo only)
   PARENT_SOURCE_PATH                Parent source path (default: source)
   PARENT_TARGET_PATH                Parent target path (default: target)
   KFP_DATA_INDEXING_OUTPUT_PATH     GraphRAG base path (default: graph_rag_app/source)
@@ -59,6 +61,7 @@ TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 GIT_REPO="${GIT_REPO:-}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 PIPELINE_RUN_ID="${PIPELINE_RUN_ID:-}"
+ANALYSIS_GOAL="${ANALYSIS_GOAL:-}"
 ANALYSIS_ONLY="false"
 SOURCE_PATH="${PARENT_SOURCE_PATH:-source}"
 TARGET_PATH="${PARENT_TARGET_PATH:-target}"
@@ -142,7 +145,7 @@ if [[ "$MODE" == "single" ]]; then
         exit 1
     fi
     trigger_pipeline "single_repo" "single_repo_${TIMESTAMP}" \
-        "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\"}" \
+        "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\", \"analysis_goal\": \"$ANALYSIS_GOAL\"}" \
         "[{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\"}]" \
         "$ANALYSIS_ONLY"
 else

@@ -400,6 +400,7 @@ help-all:
 	@echo "  PIPELINE_GIT_BRANCH         Override the branch used by run-pipelines"
 	@echo "  PIPELINE_GIT_REPO_LIST      Override the repository-list file"
 	@echo "  PIPELINE_RUN_ID             Pipeline ID for --analysis-only or index export"
+	@echo "  ANALYSIS_GOAL               Optional analysis goal for a custom report section (--single-repo only)"
 	@echo "  ARGS                        Arguments passed to run-pipelines"
 	@echo "  KFP_NAMESPACE               Namespace used for this project"
 	@echo "  INDEX_GIT_SLUG              Export the latest completed single-repository index"
@@ -1187,6 +1188,7 @@ run-pipelines:
 		--set-string runPipelines.args="$${ARGS:---single-repo}" \
 		--set-string runPipelines.targetPath="$(KFP_DATA_GENERATION_OUTPUT_PATH)" \
 		--set-string runPipelines.graphragSourcePath="$(KFP_DATA_INDEXING_OUTPUT_PATH)" \
+		--set-string runPipelines.analysisGoal="$(ANALYSIS_GOAL)" \
 		$(HELM_PIPELINE_TOOLS_ARGS) \
 		-s templates/run-pipelines-job.yaml | oc apply -n $(KFP_NAMESPACE) -f -; \
 	echo "==> Waiting for pipeline submission to complete..."; \
