@@ -82,7 +82,7 @@ Respond ONLY with valid JSON in this exact format:
 
             actual_answer = asyncio.run(analyzer.query_with_llm(input))
 
-            repo_context = build_repo_context(graphrag_source_dir)
+            repo_context = build_repo_context(graphrag_source_dir, question=input)
 
             reference_response = completion(
                 **_llm_kwargs("GROUND_TRUTH"),

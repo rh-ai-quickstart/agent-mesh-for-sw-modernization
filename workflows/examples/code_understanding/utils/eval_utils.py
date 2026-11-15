@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import csv
+import functools
 import io
 import logging
 import os
+import pathlib
 from typing import Any
 
 import pandas as pd
+import yaml
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
@@ -166,3 +169,136 @@ def generate_improvement_plan(df: pd.DataFrame) -> str:
     except Exception as e:
         logging.warning("Failed to generate improvement plan: %s", e)
         return f"_Improvement plan generation failed: {e}_"
+
+
+def get_exclude_patterns() -> set[str]:
+    """Return glob patterns for files that should be excluded from codebase ingestion."""
+    return {
+        "*.lock",
+        "*.min.js",
+        "*.min.css",
+        "dist/*",
+        "vendor/*",
+        "node_modules/*",
+        "*.egg-info/*",
+        "*.pyc",
+        "__pycache__/*",
+        "*_metadata.txt",
+        "*.svg",
+        "*.png",
+        "*.jpg",
+        "*.jpeg",
+        "*.gif",
+        "*.woff",
+        "*.woff2",
+        "*.map",
+    }
+
+
+@functools.lru_cache(maxsize=None)
+def load_graphrag_eval_config(source_dir: str) -> dict:
+    """Load GraphRAG ``settings.yaml`` and derive evaluation context limits.
+
+    The returned dict contains ``max_file_size``, ``max_context_chars``, and
+    ``max_selected_files``.  Values are derived from the GraphRAG indexing
+    parameters so the ground-truth LLM receives a comparable retrieval budget
+    to the GraphRAG candidate.  Environment variables (``EVAL_MAX_FILE_SIZE``,
+    ``EVAL_MAX_CONTEXT_CHARS``, ``EVAL_MAX_SELECTED_FILES``) take precedence
+    when set.
+    """
+    settings_path = os.path.join(source_dir, "settings.yaml")
+    config: dict = {}
+
+    if os.path.isfile(settings_path):
+        try:
+            with open(settings_path) as f:
+                config = yaml.safe_load(f) or {}
+        except Exception as e:
+            logging.warning("Could not load graphrag settings from %s: %s", settings_path, e)
+
+    chunk_size = int((config.get("chunks") or {}).get("size", 1200))
+    cr = config.get("community_reports") or {}
+    max_input_length = int(cr.get("max_input_length", 8000))
+    max_cluster_size = int((config.get("cluster_graph") or {}).get("max_cluster_size", 10))
+
+    return {
+        "max_file_size": int(os.environ.get("EVAL_MAX_FILE_SIZE", chunk_size * 40)),
+        "max_context_chars": int(os.environ.get("EVAL_MAX_CONTEXT_CHARS", max_input_length * 10)),
+        "max_selected_files": int(os.environ.get("EVAL_MAX_SELECTED_FILES", max_cluster_size * 2)),
+    }
+
+
+def select_relevant_files_from_tree(
+    tree: str, question: str, max_selected_files: int = 20
+) -> list[str]:
+    """Use a cheap LLM call to pick the most relevant file paths for *question*.
+
+    Args:
+        tree: The project directory listing (e.g. from gitingest).
+        question: The evaluation question.
+        max_selected_files: Maximum number of files to request.
+
+    Returns:
+        A list of relative file paths selected by the LLM.
+    """
+    from litellm import completion
+
+    response = completion(
+        model=f"{os.getenv('GROUND_TRUTH_LLM_PROVIDER')}/{os.getenv('GROUND_TRUTH_LLM_ID')}",
+        api_base=os.getenv("GROUND_TRUTH_LLM_API_BASE"),
+        api_key=os.getenv("GROUND_TRUTH_LLM_TOKEN"),
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"Given this project file listing:\n{tree}\n\n"
+                    f"Which files (max {max_selected_files}) are most relevant to "
+                    f'answering: "{question}"\n\n'
+                    "Return ONLY file paths, one per line. No commentary."
+                ),
+            }
+        ],
+    )
+    raw = response.choices[0].message.content or ""
+    return [line.strip() for line in raw.splitlines() if line.strip()]
+
+
+def read_selected_files(source_dir: str, paths: list[str], max_context_chars: int = 80000) -> str:
+    """Read selected files from the ``input/`` subdirectory and format them.
+
+    Args:
+        source_dir: Root directory of the GraphRAG source (must contain an
+            ``input/`` subdirectory with the raw source files).
+        paths: Relative file paths to read.
+        max_context_chars: Maximum total characters to include.
+
+    Returns:
+        Concatenated file contents with headers, truncated to
+        *max_context_chars*.
+    """
+    input_dir = pathlib.Path(source_dir) / "input"
+    sections: list[str] = []
+    total = 0
+    for rel_path in paths:
+        # Strip leading slashes or input/ prefix that the LLM might include
+        clean = rel_path.lstrip("/")
+        for prefix in ("input/", "input\\"):
+            if clean.startswith(prefix):
+                clean = clean[len(prefix) :]
+        fp = input_dir / clean
+        if not fp.is_file():
+            continue
+        try:
+            text = fp.read_text(errors="replace")
+        except Exception:
+            continue
+        header = f"--- {clean} ---"
+        section = f"{header}\n{text}\n"
+        if total + len(section) > max_context_chars:
+            remaining = max_context_chars - total
+            if remaining > len(header) + 100:
+                sections.append(f"{header}\n{text[:remaining - len(header) - 1]}\n")
+            break
+        sections.append(section)
+        total += len(section)
+    return "\n".join(sections)
