@@ -809,13 +809,14 @@ def run_preflight(
 
             run_id = get_pipeline_run_id()
             loader = DefaultAssetLoader()
-            num_prompts = loader.num_prompts("analysis/migration-report")
+            num_prompts = loader.num_prompts("analysis/migration-report/enhanced")
 
             enrichment_dest = os.path.join(
                 get_global_scoped_enrichment_dir(source_path),
                 "prompts",
                 "analysis",
                 "migration-report",
+                "enhanced",
                 f"{num_prompts}.txt",
             )
             run_local_skill(
