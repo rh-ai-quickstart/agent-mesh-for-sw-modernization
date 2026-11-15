@@ -551,8 +551,25 @@ class DependencyAnalyzer:
             raise ValueError(f"Required environment variable {keyerr} is not set")
 
     @staticmethod
+    def _extract_column(context_data, key: str, columns: list[str]) -> list[str]:
+        """Return non-null string values from the first matching column in a context DataFrame."""
+        df = context_data.get(key, pd.DataFrame())
+        if df is None or (hasattr(df, "empty") and df.empty):
+            return []
+        for col in columns:
+            if col in df.columns:
+                vals = df[col].dropna().astype(str).tolist()
+                if vals:
+                    return vals
+        return []
+
+    @staticmethod
     def extract_context_content(context_data) -> str:
         """Extracts and concatenates context text from GraphRAG context_data.
+
+        Checks community reports (global search) and text-unit sources, entities,
+        and relationships (local search) so the returned string reflects the full
+        context the GraphRAG analyzer used to produce its answer.
 
         Args:
             context_data: The context_data dict returned by query_with_llm when
@@ -565,17 +582,21 @@ class DependencyAnalyzer:
         if not isinstance(context_data, dict):
             return ""
 
-        reports = context_data.get("reports", pd.DataFrame())
+        sep = "\n\n---\n\n"
+        extract = DependencyAnalyzer._extract_column
+        sections = []
 
-        if not reports.empty and "full_content" in reports.columns:
-            return "\n\n---\n\n".join(reports["full_content"].dropna().astype(str).tolist())
+        for key, cols in (
+            ("reports", ["full_content", "summary", "content"]),
+            ("sources", ["text"]),
+            ("entities", ["description"]),
+            ("relationships", ["description"]),
+        ):
+            vals = extract(context_data, key, cols)
+            if vals:
+                sections.append(sep.join(vals))
 
-        sources = context_data.get("sources", pd.DataFrame())
-
-        if not sources.empty and "text" in sources.columns:
-            return "\n\n---\n\n".join(sources["text"].dropna().astype(str).tolist())
-
-        return ""
+        return sep.join(sections)
 
     def raw_data(self):
         """Return the raw dataframes used for analysis"""
