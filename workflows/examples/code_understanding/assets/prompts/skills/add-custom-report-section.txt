@@ -100,10 +100,6 @@ Output the plan in markdown format.
 
 4. Write the generated prompt to a file named `add-custom-report-section-report.txt` in the repository root directory.
 
-5. **MANDATORY** — Call register_enrichments to persist all files written under .enrichments/ to the
-pipeline asset store so they are available on future pipeline runs. No arguments are required.
-This step MUST be executed after writing the prompt file. Do NOT skip this step.
-
 Input:
 Goal specified by user: {{ analysis_goal }}
 
