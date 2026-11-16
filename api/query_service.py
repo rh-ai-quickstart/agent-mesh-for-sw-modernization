@@ -29,6 +29,7 @@ os.environ.setdefault("SSL_VERIFY", "false")
 # Redirect the cache to a writable temp directory before numba is imported.
 os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
 
+from services.list_runs import get_original_pipeline_run_id  # noqa: E402
 from services.run_adhoc_query import run_adhoc_query as _run_adhoc_query  # noqa: E402
 
 _jobs: dict[str, dict[str, Any]] = {}
@@ -49,6 +50,11 @@ def submit_query(
 ) -> dict[str, Any]:
     if not question.strip():
         raise ValueError("Question must not be empty.")
+    # If the run is an analysis-only rerun, resolve to the original indexing run.
+    if pipeline_run_id:
+        original = get_original_pipeline_run_id(pipeline_run_id, namespace=namespace)
+        if original:
+            pipeline_run_id = original
     query_id = str(uuid.uuid4())
     _jobs[query_id] = {"status": "running", "result": None, "error": None}
 
