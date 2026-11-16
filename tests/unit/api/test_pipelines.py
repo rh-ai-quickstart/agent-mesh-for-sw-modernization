@@ -119,6 +119,11 @@ def test_pipeline_status_passes_selected_run_id_to_report_lookup(monkeypatch):
         "_fetch_reports",
         lambda job_id, git_slug, multi_repo: seen.append(job_id) or (None, "report", None),
     )
+    monkeypatch.setattr(
+        pipeline_service,
+        "get_original_pipeline_run_id",
+        lambda run_id, namespace=None: "",
+    )
 
     status = pipeline_service.get_run_status("selected-kfp")
 
