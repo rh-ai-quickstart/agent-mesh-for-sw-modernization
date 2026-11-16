@@ -141,10 +141,11 @@ def list_uploaded_indexes_as_runs() -> list[dict[str, Any]]:
 
 
 def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Map git_slug -> single-repo index metadata (multi_repo entries excluded)."""
+    """Map git_slug -> newest single-repo index metadata (multi_repo entries excluded)."""
+    # indexes is newest-first; iterate oldest-first so last-wins keeps the newest.
     return {
         item["git_slug"]: item
-        for item in indexes
+        for item in reversed(indexes)
         if item.get("git_slug") and not item.get("multi_repo")
     }
 
