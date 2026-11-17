@@ -126,7 +126,13 @@ class MlFlowAssetLoader(AssetLoader):
                 static_base_uri = self._get_artifact_base_uri(
                     client, static_experiment, "tags.latest = 'true'"
                 )
-                enrichment_uris.insert(0, os.path.join(static_base_uri, asset_file_path))
+                # Strip the enrichment prefix so the URI matches the static
+                # asset layout (e.g. mappings/language_mappings.json instead
+                # of results/.enrichments/.assets/mappings/...).
+                static_asset_path = asset_file_path.removeprefix(
+                    f"{AssetLoader.RESULTS_PATH_PREFIX_ENRICHMENTS}/.assets/"
+                )
+                enrichment_uris.insert(0, os.path.join(static_base_uri, static_asset_path))
             return enrichment_uris
 
         filter_string = (
