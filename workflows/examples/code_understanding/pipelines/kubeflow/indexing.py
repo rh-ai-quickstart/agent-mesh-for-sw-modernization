@@ -104,7 +104,12 @@ def graphrag_evaluation_op(
             pipeline_run_id=pipeline_run_id,
         )
 
-    df = results if isinstance(results, pd.DataFrame) else pd.DataFrame(results or [])
+    if isinstance(results, dict):
+        df = results.get("results", pd.DataFrame())
+    elif isinstance(results, pd.DataFrame):
+        df = results
+    else:
+        df = pd.DataFrame(results or [])
     df.to_csv(eval_results.path, index=False)
 
 

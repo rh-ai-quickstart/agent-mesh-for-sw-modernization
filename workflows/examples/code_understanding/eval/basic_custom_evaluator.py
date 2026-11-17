@@ -298,4 +298,22 @@ Respond ONLY with valid JSON in this exact format:
             },
         )
 
-        return df
+        from utils.eval_utils import generate_improvement_plan
+
+        plan = generate_improvement_plan(df)
+
+        plan_file = os.path.join(tempfile.gettempdir(), f"improvement_plan_{slug}.md")
+        with open(plan_file, "w") as f:
+            f.write(plan)
+
+        DefaultAssetLoader().log_results(
+            plan_file,
+            artifact_path=artifact_path,
+            tags={
+                "category": "improvement",
+                "git_slug": slug,
+                "multi_repo": str(multi_repo),
+            },
+        )
+
+        return {"results": df, "improvement_plan": plan}

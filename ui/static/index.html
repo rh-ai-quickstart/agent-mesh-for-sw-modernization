@@ -90,6 +90,7 @@
     body.dark .cu-modal-footer { border-top-color: #3a3a3a; }
     body.dark .cu-slider-header { border-bottom-color: #3a3a3a; }
     body.dark .cu-progress { background: #2a2a2a; }
+    body.dark .cu-improvement-row { color: #a0a0a0; }
 
     body.dark .cu-row-fail td.gridjs-td { background-color: #3a1a1a !important; color: #fff !important; }
     body.dark tr.cu-row-fail { background-color: #3a1a1a !important; color: #fff !important; }
@@ -245,6 +246,8 @@
     #report-viewer-subtitle { font-size: 0.8rem; color: var(--cu-gray); margin-bottom: 0.6rem; }
     .cu-report-viewer-body { background: #fff; border: 1px solid var(--cu-border); border-radius: 0.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05); padding: 1.5rem; }
     .cu-report-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--cu-border); margin-bottom: 0.75rem; }
+    .cu-improvement-row { display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--cu-gray); }
+    .cu-improvement-row.disabled { opacity: 0.45; cursor: default; }
     .cu-bubble-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; padding-top: 0.35rem; border-top: 1px solid #f0f0f0; }
     .cu-bubble-dl-btn { background: none; border: none; padding: 0.15rem 0.2rem; color: #c8cacc; display: inline-flex; align-items: center; border-radius: 3px; line-height: 0; cursor: pointer; }
     .cu-bubble-dl-btn:hover { color: var(--cu-gray); background: #f0f0f0; }
@@ -891,6 +894,12 @@
           <button type="button" class="cu-report-tab active" data-report="analysis">Analysis</button>
           <button type="button" class="cu-report-tab" data-report="evaluation">Analysis Evaluation</button>
         </div>
+        <div id="improvement-plan-row" class="cu-improvement-row hidden">
+          <span>View improvement plan</span>
+          <button type="button" class="cu-btn-icon" id="improvement-plan-btn" data-tooltip="View improvement plan">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
+        </div>
         <div class="cu-report-viewer-body">
           <div id="report-viewer-content" class="cu-md"></div>
         </div>
@@ -958,6 +967,18 @@
       </div>
     </div>
   </div>
+  <div id="improvement-modal" class="cu-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="improvement-modal-title">
+    <div class="cu-modal" style="width:90vw;max-width:90vw;height:90vh;max-height:90vh;display:flex;flex-direction:column">
+      <div class="cu-modal-header">
+        <h3 id="improvement-modal-title">Improvement Plan</h3>
+        <button type="button" class="cu-modal-close" id="improvement-modal-close" aria-label="Close">&#x2715;</button>
+      </div>
+      <div class="cu-modal-body cu-md" id="improvement-modal-content" style="overflow-y:auto;flex:1"></div>
+      <div class="cu-bubble-footer" id="improvement-modal-footer" style="padding:0.5rem 1rem">
+        <button class="cu-bubble-dl-btn" id="improvement-dl-btn" title="Download improvement plan" aria-label="Download improvement plan"></button>
+      </div>
+    </div>
+  </div>
   <div id="chat-slider-overlay" class="cu-slider-overlay hidden"></div>
   <div id="chat-slider" class="cu-slider">
     <div class="cu-slider-header">
@@ -1016,7 +1037,6 @@
           // Capture source before mermaid.run() mutates the node.
           const src = node.textContent || "";
           try {
-            node.dataset.processed = "true";
             // Catch mermaid-internal unhandled rejections (e.g. RangeError)
             // that bypass the returned promise.
             let escapedErr = null;
@@ -1094,7 +1114,7 @@
               return l.replace(/\s*%%.*$/, "");  // strip ALL %% comments (standalone and inline)
             }).join("\n")
             .replace(/\[([^\]"]+)\]/g, (m, label) => /[()]/.test(label) ? `["${label}"]` : m);
-          fences.push(`<pre class="mermaid">${esc(sanitized)}</pre>`);
+          fences.push(`<pre class="mermaid">${sanitized}</pre>`);
         } else {
           fences.push(`<pre><code>${esc(content)}</code></pre>`);
         }
@@ -1327,6 +1347,40 @@
 
       const reports = { analysis: snap.analysis_report, evaluation: snap.evaluation_report };
 
+      const ipRow = $("improvement-plan-row");
+      const ipBtn = $("improvement-plan-btn");
+      if (snap.improvement_plan) {
+        ipBtn.disabled = false;
+        ipRow.classList.remove("disabled");
+        ipRow.removeAttribute("title");
+        ipBtn.onclick = () => {
+          $("improvement-modal-content").innerHTML = renderMarkdown(snap.improvement_plan);
+          runMermaid($("improvement-modal-content"));
+          const dlBtn = $("improvement-dl-btn");
+          dlBtn.innerHTML = iconDownload;
+          dlBtn.onclick = () => {
+            const blob = new Blob([snap.improvement_plan], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "improvement_plan.md";
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+          const modal = $("improvement-modal");
+          modal.classList.remove("hidden");
+          const inner = modal.querySelector(".cu-modal");
+          inner.classList.remove("cu-animate-in");
+          void inner.offsetWidth;
+          inner.classList.add("cu-animate-in");
+        };
+      } else {
+        ipBtn.disabled = true;
+        ipBtn.onclick = null;
+        ipRow.classList.add("disabled");
+        ipRow.setAttribute("title", "No improvement plan exists for this report");
+      }
+
       function appendReportDl(rawContent, filename) {
         const mime = filename.endsWith(".csv") ? "text/csv" : "text/markdown";
         const footer = document.createElement("div");
@@ -1348,6 +1402,7 @@
         $("tab-analysis").querySelectorAll(".cu-report-tab").forEach((t) => {
           t.classList.toggle("active", t.dataset.report === type);
         });
+        $("improvement-plan-row").classList.toggle("hidden", type !== "evaluation");
         const content = reports[type];
         if (type === "evaluation") {
           $("report-viewer-content").innerHTML = "";
@@ -2127,7 +2182,11 @@
     $("analyze-modal-close").onclick = closeAnalyzeModal;
     $("analyze-modal-cancel").onclick = closeAnalyzeModal;
     $("analyze-modal").addEventListener("click", (e) => { if (e.target === $("analyze-modal")) closeAnalyzeModal(); });
+    const closeImprovementModal = () => $("improvement-modal").classList.add("hidden");
+    $("improvement-modal-close").onclick = closeImprovementModal;
+    $("improvement-modal").addEventListener("click", (e) => { if (e.target === $("improvement-modal")) closeImprovementModal(); });
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("improvement-modal").classList.contains("hidden")) closeImprovementModal();
       if (e.key === "Escape" && !$("analyze-modal").classList.contains("hidden")) closeAnalyzeModal();
       if (e.key === "Escape" && $("chat-slider").classList.contains("open")) closeChatSlider();
     });

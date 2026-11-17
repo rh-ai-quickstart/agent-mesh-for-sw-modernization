@@ -20,7 +20,11 @@ if _CU_ROOT not in sys.path:
 
 from services.fetch_reports import fetch_reports as _fetch_reports  # noqa: E402
 from services.get_run_status import get_kfp_run_state  # noqa: E402
-from services.list_runs import get_run_git_metadata, list_kfp_runs  # noqa: E402
+from services.list_runs import (  # noqa: E402
+    get_original_pipeline_run_id,
+    get_run_git_metadata,
+    list_kfp_runs,
+)
 from services.trigger_run import trigger_run as _trigger_run  # noqa: E402
 from services.update_repos import log_repos  # noqa: E402
 
@@ -89,10 +93,19 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
 
     evaluation_report: str | None = None
     analysis_report: str | None = None
+    improvement_plan: str | None = None
     evaluation_scores: dict[str, Any] | None = None
     if state in {"SUCCEEDED", "SKIPPED"}:
         git_slug, multi_repo = get_run_git_metadata(job_id, namespace=namespace)
-        evaluation_report, analysis_report = _fetch_reports(job_id, git_slug, multi_repo)
+        evaluation_report, analysis_report, improvement_plan = _fetch_reports(
+            job_id, git_slug, multi_repo
+        )
+        if not evaluation_report:
+            original_run_id = get_original_pipeline_run_id(job_id, namespace=namespace)
+            if original_run_id:
+                evaluation_report, _, improvement_plan = _fetch_reports(
+                    original_run_id, git_slug, multi_repo
+                )
         if evaluation_report:
             from utils.eval_utils import aggregate_evaluation_scores
 
@@ -102,5 +115,6 @@ def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:
         "status": state.lower(),
         "evaluation_report": evaluation_report,
         "analysis_report": analysis_report,
+        "improvement_plan": improvement_plan,
         "evaluation_scores": evaluation_scores,
     }

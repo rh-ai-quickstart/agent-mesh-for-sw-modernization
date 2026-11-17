@@ -28,10 +28,10 @@ def fetch_reports(
     kfp_trigger_id: str,
     git_slug: str | None,
     multi_repo: bool,
-) -> tuple[str | None, str | None]:
-    """Return (evaluation_report, analysis_report) downloaded from MLflow."""
+) -> tuple[str | None, str | None, str | None]:
+    """Return (evaluation_report, analysis_report, improvement_plan) downloaded from MLflow."""
     if not multi_repo and not git_slug:
-        return None, None
+        return None, None, None
     try:
         from loaders.asset_loader import AssetLoader
         from loaders.mlflow_asset_loader import MlFlowAssetLoader
@@ -76,10 +76,11 @@ def fetch_reports(
         return (
             _get(AssetLoader.RESULTS_PATH_PREFIX_EVAL, "evaluation"),
             _get(AssetLoader.RESULTS_PATH_PREFIX_PIPELINES, "analysis"),
+            _get(AssetLoader.RESULTS_PATH_PREFIX_EVAL, "improvement"),
         )
     except Exception:
         logging.error(
             f"Could not fetch reports for git_slug='{git_slug}', multi_repo='{multi_repo}':"
         )
         logging.error(traceback.format_exc())
-        return None, None
+        return None, None, None
