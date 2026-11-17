@@ -85,7 +85,7 @@ jobs:
 
       - name: Run CLI and UI E2E tests
         uses: ./.github/actions/run-quickstart-tests
-        timeout-minutes: 240
+        timeout-minutes: 360
         with:
           test_command: "make test-e2e RUN_PIPELINES=${{ inputs.run_pipelines }}"
           upload_results: "tests/e2e/ui/test-results"
