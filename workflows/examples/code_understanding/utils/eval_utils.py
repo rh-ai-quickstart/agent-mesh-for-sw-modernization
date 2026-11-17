@@ -89,7 +89,8 @@ def aggregate_evaluation_scores(evaluation_csv: str | None) -> dict[str, Any] | 
         return None
 
     headers = rows[0]
-    score_cols = [(i, h) for i, h in enumerate(headers) if "/v1/score" in h]
+    _KNOWN = {"faithfulness", "answer_relevance", "answer_similarity", "answer_correctness"}
+    score_cols = [(i, h) for i, h in enumerate(headers) if "/v1/score" in h or h in _KNOWN]
     if not score_cols:
         return None
 
