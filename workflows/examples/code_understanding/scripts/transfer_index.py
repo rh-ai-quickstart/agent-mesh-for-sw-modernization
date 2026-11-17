@@ -111,6 +111,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             command.add_argument("--bundle", type=Path, default=os.getenv("INDEX_BUNDLE") or None)
         if operation == "import":
             command.add_argument("--force", action="store_true")
+            command.add_argument(
+                "--pipeline-run-id",
+                default=os.getenv("PIPELINE_RUN_ID") or None,
+            )
     args = parser.parse_args(argv)
     args.namespace = os.getenv("KFP_NAMESPACE", "")
     if not args.namespace or not args.namespace.strip():
@@ -159,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
             elif args.operation == "export":
                 result = transfer.export_index(args.git_slug, args.pipeline_run_id, args.bundle)
             else:
-                result = transfer.import_index(args.bundle, args.force)
+                result = transfer.import_index(args.bundle, args.force, args.pipeline_run_id)
     except Exception as exc:
         logging.error("Index %s failed: %s", args.operation, exc)
         if args.operation == "import":

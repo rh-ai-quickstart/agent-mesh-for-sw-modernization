@@ -105,7 +105,7 @@ def list_indexed_repos() -> dict[str, Any]:
                 metadata = _run_index_metadata(run)
             except ValueError:
                 continue
-            key = (metadata["git_slug"], metadata["multi_repo"])
+            key = (metadata["git_slug"], metadata["multi_repo"], metadata["uploaded"])
             if key in seen:
                 continue
             seen.add(key)
@@ -115,11 +115,37 @@ def list_indexed_repos() -> dict[str, Any]:
         return {"ok": False, "source": "mlflow", "indexes": [], "message": str(exc)}
 
 
+def list_uploaded_indexes_as_runs() -> list[dict[str, Any]]:
+    """Return uploaded indexes as synthetic run entries for the UI runs list."""
+    data = list_indexed_repos()
+    runs: list[dict[str, Any]] = []
+    for idx in data.get("indexes") or []:
+        if not idx.get("uploaded"):
+            continue
+        kfp_run_id = idx.get("kfp_run_id", "")
+        slug = idx.get("git_slug", "")
+        runs.append(
+            {
+                "run_id": kfp_run_id or idx.get("run_id", ""),
+                "name": f"Uploaded index: {slug}" if slug else "Uploaded index",
+                "status": "Succeeded",
+                "start_time": idx.get("indexed_at"),
+                "git_slug": slug if not idx.get("multi_repo") else None,
+                "git_repo": None,
+                "git_branch": None,
+                "uploaded": True,
+                **({"repos": []} if idx.get("multi_repo") else {}),
+            }
+        )
+    return runs
+
+
 def index_lookup(indexes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Map git_slug -> single-repo index metadata (multi_repo entries excluded)."""
+    """Map git_slug -> newest single-repo index metadata (multi_repo entries excluded)."""
+    # indexes is newest-first; iterate oldest-first so last-wins keeps the newest.
     return {
         item["git_slug"]: item
-        for item in indexes
+        for item in reversed(indexes)
         if item.get("git_slug") and not item.get("multi_repo")
     }
 
@@ -153,6 +179,7 @@ def queryable_repos(
         options.append(
             {
                 **item,
+                "git_slug": slug,
                 "label": f"{short} @ {item['git_branch']}",
                 "key": f"{item['git_repo']}|{item['git_branch']}",
                 "use_global": False,

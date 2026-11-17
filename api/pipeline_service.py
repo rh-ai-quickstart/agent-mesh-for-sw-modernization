@@ -70,8 +70,18 @@ def submit_pipeline_run(
 
 
 def list_pipeline_runs(namespace: str | None = None) -> list[dict[str, Any]]:
-    """Return all KFP runs newest-first with their current status."""
-    return list_kfp_runs(namespace=namespace)
+    """Return all KFP runs newest-first, plus uploaded indexes as synthetic entries."""
+    runs = list_kfp_runs(namespace=namespace)
+    try:
+        try:
+            from ui.indexes import list_uploaded_indexes_as_runs
+        except ImportError:
+            from indexes import list_uploaded_indexes_as_runs
+
+        runs.extend(list_uploaded_indexes_as_runs())
+    except Exception:
+        logging.debug("Uploaded-index discovery failed", exc_info=True)
+    return runs
 
 
 def get_run_status(job_id: str, namespace: str | None = None) -> dict[str, Any]:

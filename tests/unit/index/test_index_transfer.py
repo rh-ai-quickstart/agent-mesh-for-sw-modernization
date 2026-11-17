@@ -387,6 +387,102 @@ def test_failed_post_import_validation_marks_run_failed(tmp_path, monkeypatch):
     client.set_terminated.assert_called_once_with("new-id", "FAILED")
 
 
+def _successful_import(tmp_path, monkeypatch, pipeline_run_id="pipeline-123"):
+    """Set up mocks for import_index that pass all post-import validation.
+
+    Returns (bundle, client, wrapper) so callers can invoke import_index with overrides.
+    """
+    metadata = native_metadata()
+    if pipeline_run_id is None:
+        del metadata["mlflow"]["tags"]["pipeline_run_id"]
+    else:
+        metadata["mlflow"]["tags"]["pipeline_run_id"] = pipeline_run_id
+    bundle = write_bundle(tmp_path / "valid.tar.gz", metadata)
+    digest = transfer.bundle_sha256(bundle)
+    client = fake_client(runs=[])
+
+    # Build the tags that import_index will construct for the destination run.
+    source_tags = dict(metadata["mlflow"]["tags"])
+    tags = {
+        key: value
+        for key, value in source_tags.items()
+        if not key.startswith("index_transfer.") and key not in {"uploaded", "bundle_sha256"}
+    }
+    tags.pop("mlflow.parentRunId", None)
+    provenance = {
+        "uploaded": "true",
+        "bundle_sha256": digest,
+        "index_transfer.source_run_id": metadata["mlflow"]["info"]["run_id"],
+        "index_transfer.source_experiment_id": metadata["mlflow"]["info"]["experiment_id"],
+        "index_transfer.destination_namespace": "destination",
+        "index_transfer.source_start_time": str(metadata["mlflow"]["info"]["start_time"]),
+        "index_transfer.source_end_time": str(metadata["mlflow"]["info"]["end_time"]),
+    }
+    dest_tags = {**tags, **provenance}
+
+    destination = SimpleNamespace(
+        info=SimpleNamespace(
+            run_id="new-id",
+            experiment_id="source-exp",
+            status="FINISHED",
+            lifecycle_stage="active",
+            start_time=1,
+            end_time=2,
+        ),
+        data=SimpleNamespace(tags=dest_tags),
+    )
+    client.get_run.return_value = destination
+    package_stub(monkeypatch, importer=MagicMock(return_value=(destination, None)))
+    # Remote files must match local files in the bundle.
+    client.list_artifacts.return_value = [
+        SimpleNamespace(
+            path="results/datasets/repos/owner-repo-main/entities.parquet",
+            is_dir=False,
+            file_size=4,
+        )
+    ]
+    wrapper = transfer.IndexTransfer(client, "destination")
+    return bundle, client, wrapper
+
+
+def test_import_override_sets_tag_when_bundle_has_no_pipeline_run_id(tmp_path, monkeypatch):
+    bundle, client, wrapper = _successful_import(tmp_path, monkeypatch, pipeline_run_id=None)
+    result = wrapper.import_index(bundle, pipeline_run_id_fallback="generated-uuid")
+    assert result["outcome"] == "imported"
+    assert result["pipeline_run_id"] == "generated-uuid"
+    client.set_tag.assert_called_once_with("new-id", "pipeline_run_id", "generated-uuid")
+
+
+def test_import_override_ignored_when_bundle_has_pipeline_run_id(tmp_path, monkeypatch):
+    bundle, client, wrapper = _successful_import(
+        tmp_path, monkeypatch, pipeline_run_id="pipeline-123"
+    )
+    result = wrapper.import_index(bundle, pipeline_run_id_fallback="ignored-uuid")
+    assert result["outcome"] == "imported"
+    assert result["pipeline_run_id"] == "pipeline-123"
+    client.set_tag.assert_not_called()
+
+
+def test_cli_import_passes_pipeline_run_id_fallback(monkeypatch, capsys):
+    monkeypatch.setenv("KFP_NAMESPACE", "destination")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    result = {
+        "operation": "import",
+        "outcome": "imported",
+        "pipeline_run_id": "custom-uuid",
+        "source_run_id": "s",
+        "destination_run_id": "d",
+    }
+    wrapper = MagicMock()
+    wrapper.import_index.return_value = result
+    monkeypatch.setattr(cli, "IndexTransfer", MagicMock(return_value=wrapper))
+    rc = cli.main(["import", "--bundle", "index.tar.gz", "--pipeline-run-id", "custom-uuid"])
+    assert rc == 0
+    wrapper.import_index.assert_called_once()
+    call_args = wrapper.import_index.call_args
+    assert call_args[0][2] == "custom-uuid"  # pipeline_run_id_fallback positional
+
+
 def test_cli_requires_kfp_namespace(monkeypatch):
     monkeypatch.setenv("MLFLOW_WORKSPACE", "unrelated-workspace")
     with pytest.raises(SystemExit) as exc:
