@@ -27,7 +27,7 @@ def install_analysis_stubs(monkeypatch, *, missing_index=False):
     graphrag_module = ModuleType("utils.graphrag_utils")
 
     class FakeAnalyzer:
-        def __init__(self, source_path, git_slug="", multi_repo=False):
+        def __init__(self, source_path, git_slug="", multi_repo=False, pipeline_run_id=""):
             analyzer_instances.append((source_path, git_slug, multi_repo))
 
         @staticmethod

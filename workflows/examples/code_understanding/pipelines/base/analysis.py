@@ -19,6 +19,7 @@ class AnalysisPipeline:
         git_repo: str = "",
         git_branch: str = "",
         multi_repo: bool = False,
+        pipeline_run_id: str = "",
     ):
         """Generates a migration report from the GraphRAG index and returns the result."""
         import asyncio
@@ -34,7 +35,10 @@ class AnalysisPipeline:
         git_slug = generate_git_slug(git_repo, git_branch) if git_repo else None
 
         analyzer = DependencyAnalyzer(
-            graphrag_source_path, git_slug=git_slug or "", multi_repo=multi_repo
+            graphrag_source_path,
+            git_slug=git_slug or "",
+            multi_repo=multi_repo,
+            pipeline_run_id=pipeline_run_id,
         )
 
         report = asyncio.run(analyzer.generate_migration_report())
@@ -213,6 +217,7 @@ def write_migration_report(
         git_repo=git_repo,
         git_branch=git_branch,
         multi_repo=multi_repo,
+        pipeline_run_id=pipeline_run_id,
     )
     if dirname := os.path.dirname(report_path):
         os.makedirs(dirname, exist_ok=True)

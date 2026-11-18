@@ -45,6 +45,7 @@ def single_repo_pipeline(
     multi_repo: bool = False,
     pipeline_run_id: str = "",
     runnable_repos: str = "[]",
+    analysis_goal: str = "",
 ):
 
     if uses_kfp():
@@ -54,6 +55,7 @@ def single_repo_pipeline(
             git_branch=git_branch,
             multi_repo=multi_repo,
             pipeline_run_id=pipeline_run_id,
+            analysis_goal=analysis_goal,
         )
 
         idx = IndexingPipeline.run(
@@ -89,6 +91,7 @@ def single_repo_pipeline(
             source_path=source_path,
             target_path=target_path,
             multi_repo=multi_repo,
+            analysis_goal=analysis_goal,
         )
 
         IndexingPipeline().run(
@@ -113,6 +116,7 @@ def multi_repo_pipeline(
     parent_target_path: str = os.getenv("PARENT_TARGET_PATH", "target"),
     runnable_repos: str = "[]",  # JSON-encoded; avoids KFP v2 parameterType: LIST drop
     pipeline_run_id: str = "",
+    analysis_goal: str = "",
 ):
 
     if uses_kfp():
@@ -120,7 +124,9 @@ def multi_repo_pipeline(
         rp = DataGenerationPipeline.get_repo_list(runnable_repos=runnable_repos)
 
         dg = DataGenerationPipeline.run_multi_repo(
-            runnable_repos=rp.output, pipeline_run_id=pipeline_run_id
+            runnable_repos=rp.output,
+            pipeline_run_id=pipeline_run_id,
+            analysis_goal=analysis_goal,
         )
 
         idx = IndexingPipeline.run_multi_repo(
@@ -142,7 +148,7 @@ def multi_repo_pipeline(
                 " pipeline will do nothing."
             )
 
-        DataGenerationPipeline().run_multi_repo(git_repos)
+        DataGenerationPipeline().run_multi_repo(git_repos, analysis_goal=analysis_goal)
 
         IndexingPipeline().run_multi_repo(parent_target_path=parent_target_path)
 

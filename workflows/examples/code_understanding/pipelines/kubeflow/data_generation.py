@@ -80,6 +80,7 @@ def preflight_op(
     source_dir: Input[Dataset],
     multi_repo: bool = False,
     pipeline_run_id: str = "",
+    analysis_goal: str = "",
 ) -> NamedTuple("Outputs", [("languages", list), ("external_metadata_json", str)]):
     """Runs preflight relevant skills."""
     import json
@@ -104,7 +105,12 @@ def preflight_op(
     with read_from_input_artifact(source_dir) as tmp_source:
         git_slug = code_utils.generate_slug_from_repo(git_repo, git_branch)
         try:
-            result = run_preflight(tmp_source, git_slug, pipeline_run_id=pipeline_run_id)
+            result = run_preflight(
+                tmp_source,
+                git_slug,
+                pipeline_run_id=pipeline_run_id,
+                analysis_goal=analysis_goal,
+            )
         except Exception:
             logging.error(
                 "Preflight failed for repo=%s branch=%s git_slug=%s:\n%s",
@@ -221,6 +227,7 @@ def _run_pipeline(
     git_branch: str = os.getenv("GIT_BRANCH", "main"),
     multi_repo: bool = False,
     pipeline_run_id: str = "",
+    analysis_goal: str = "",
 ) -> Dataset:
 
     prep = prepare_environment_op(
@@ -235,6 +242,7 @@ def _run_pipeline(
         source_dir=prep.outputs["source_dir"],
         multi_repo=multi_repo,
         pipeline_run_id=pipeline_run_id,
+        analysis_goal=analysis_goal,
     )
 
     gen = generate_code_and_meta_op(
@@ -252,7 +260,7 @@ def _run_pipeline(
 
 @dsl.pipeline(name="data-generation-multi-repo-pipeline")
 def _run_pipeline_multi_repo(  # noqa: B006 — mutable default is safe here: KFP
-    runnable_repos: list = [], pipeline_run_id: str = ""
+    runnable_repos: list = [], pipeline_run_id: str = "", analysis_goal: str = ""
 ):
     """Generates code metadata for all repositories in the repo list."""
 
@@ -265,6 +273,7 @@ def _run_pipeline_multi_repo(  # noqa: B006 — mutable default is safe here: KF
             git_branch=repo.git_branch,
             multi_repo=True,
             pipeline_run_id=pipeline_run_id,
+            analysis_goal=analysis_goal,
         )
 
 

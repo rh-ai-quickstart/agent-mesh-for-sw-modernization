@@ -19,9 +19,5 @@ metadata:
 ---
 Use the run_skill tool to execute each skill in the enabled skills list against the target repository.
 
-Once all skills have been executed, call register_enrichments to persist all files written under
-.enrichments/ to the pipeline asset store so they are available on future pipeline runs.
-No arguments are required.
-
-Do NOT write any files directly. Only use run_skill to execute skills and register_enrichments to
-persist their outputs. Do not create test files, scratch files, or any other intermediate output.
+Do NOT write any files directly. Only use run_skill to execute skills.
+Do not create test files, scratch files, or any other intermediate output.

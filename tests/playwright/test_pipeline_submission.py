@@ -125,7 +125,7 @@ def test_analyze_submits_selected_repositories(page: Page, mock_console, repo_co
     with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
         page.locator("#start-analysis").click()
     page.wait_for_load_state("networkidle")
-    assert submissions == [{"repos": REPOS[:repo_count]}]
+    assert submissions == [{"repos": REPOS[:repo_count], "analysis_goal": ""}]
 
 
 def test_analyze_without_selected_repositories_is_disabled(page: Page, mock_console):
