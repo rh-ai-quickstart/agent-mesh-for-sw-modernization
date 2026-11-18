@@ -1,6 +1,8 @@
+import json
 import sys
 from types import ModuleType
 
+import pandas as pd
 import utils
 from pipelines.base import data_generation
 
@@ -113,3 +115,60 @@ def test_multi_repo_uses_isolated_paths_and_preserves_results(monkeypatch):
     ]
     assert all(call["multi_repo"] for call in calls)
     assert [result["status"] for result in results] == ["complete", "error"]
+
+
+def test_save_code_and_metadata_merges_multiple_external_metadata(monkeypatch, tmp_path):
+    from loaders.default_asset_loader import DefaultAssetLoader
+
+    df = pd.DataFrame(
+        [
+            {
+                "file_path": "src/app.py",
+                "code": "print('hello')",
+                "extracted_data": json.dumps({"language": "python", "functions": []}),
+            }
+        ]
+    )
+
+    external_metadata = [
+        {
+            "runtime_stack": ["python3.11"],
+            "libraries": ["flask"],
+            "repo_packages": ["mylib"],
+        },
+        {
+            "runtime_stack": ["python3.12"],
+            "libraries": ["requests"],
+            "repo_packages": ["otherlib"],
+        },
+    ]
+
+    monkeypatch.setattr(DefaultAssetLoader, "download", lambda self, path: {})
+
+    saved_records = []
+
+    def capture_save(metadata, target_path, rel_file_path, **kwargs):
+        saved_records.append(kwargs.get("external_metadata", {}))
+
+    monkeypatch.setattr(data_generation, "save_metadata_file", capture_save)
+    monkeypatch.setattr(data_generation, "generate_code_comment", lambda **kwargs: "")
+
+    data_generation.save_code_and_metadata_files(
+        df=df,
+        target_path=str(tmp_path),
+        git_repo="https://github.com/example/repo",
+        git_slug="example-repo-main",
+        language="python",
+        config=False,
+        external_metadata=external_metadata,
+    )
+
+    assert len(saved_records) == 1
+    record = saved_records[0]
+
+    assert "python3.11" in record["runtime_stack"]
+    assert "python3.12" in record["runtime_stack"]
+    assert "flask" in record["libraries"]
+    assert "requests" in record["libraries"]
+    assert "mylib" in record["repo_packages"]
+    assert "otherlib" in record["repo_packages"]

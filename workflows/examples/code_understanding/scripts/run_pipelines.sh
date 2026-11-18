@@ -99,9 +99,8 @@ import os, json, logging
 from services.trigger_run import trigger_run
 from services.update_repos import log_repos
 params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
-analysis_goal = os.environ.get("ANALYSIS_GOAL", "")
-if analysis_goal and os.environ["KFP_TRIGGER_PIPELINE"] == "single_repo":
-    params["analysis_goal"] = analysis_goal
+if os.environ["KFP_TRIGGER_PIPELINE"] == "single_repo":
+    params["analysis_goal"] = os.environ.get("ANALYSIS_GOAL", "")
 repos_json = os.environ.get("KFP_TRIGGER_REPOS_JSON", "")
 if repos_json:
     try:
