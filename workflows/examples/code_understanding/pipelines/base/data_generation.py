@@ -462,6 +462,7 @@ def save_code_and_metadata_files(
     """Writes annotated code and flattened metadata files to target_path."""
     import logging
     import os
+    from functools import reduce
     from pathlib import Path
 
     from loaders.default_asset_loader import DefaultAssetLoader
@@ -500,14 +501,12 @@ def save_code_and_metadata_files(
 
             target_file_path = os.path.join(target_path, Path(rel_file_path).with_suffix(".txt"))
 
-            record = next(
-                (
-                    m
-                    for m in (external_metadata or [])
-                    if "file_path" not in m or m.get("file_path") == rel_file_path
-                ),
-                {},
-            )
+            matching = [
+                m
+                for m in (external_metadata or [])
+                if "file_path" not in m or m.get("file_path") == rel_file_path
+            ]
+            record = reduce(json_utils.merge_json, matching) if matching else {}
 
             code_header_comment = (
                 generate_code_comment(

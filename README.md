@@ -338,6 +338,18 @@ make run-pipelines ARGS="--single-repo" \
   PIPELINE_GIT_BRANCH=main
 ```
 
+Optionally, for single-repository pipelines, you can include the ANALYSIS_GOAL
+setting to indicate a specific goal that the analysis should focus on.
+**Note:** Analysis goals are only supported in KFP mode (not local execution).
+For example:
+
+```sh
+make run-pipelines ARGS="--single-repo" \
+  PIPELINE_GIT_REPO=https://github.com/agapebondservant/tic-tac-toe-sample \
+  PIPELINE_GIT_BRANCH=main \
+  ANALYSIS_GOAL="Migrate this repository to a modern Python application deployed on Openshift."
+```
+
 The command submits a run named `single_repo_<timestamp>` and prints its run
 ID. Submission is not pipeline completion. In your OpenShift AI project's
 Pipelines view, wait for that run to succeed before reviewing its report. You can find this by navigating to **Develop & train > Pipelines > Runs** in the Openshift AI console. 

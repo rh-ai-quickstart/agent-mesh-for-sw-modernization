@@ -286,8 +286,10 @@ def read_selected_files(source_dir: str, paths: list[str], max_context_chars: in
         for prefix in ("input/", "input\\"):
             if clean.startswith(prefix):
                 clean = clean[len(prefix) :]
-        fp = input_dir / clean
+        fp = (input_dir / clean).resolve()
         if not fp.is_file():
+            continue
+        if not str(fp).startswith(str(input_dir.resolve()) + os.sep):
             continue
         try:
             text = fp.read_text(errors="replace")

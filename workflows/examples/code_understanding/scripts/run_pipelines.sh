@@ -17,6 +17,7 @@
 #   GIT_REPO              Git repository URL to analyse (required for --single-repo)
 #   GIT_BRANCH            Git branch to clone (default: main)
 #   PIPELINE_RUN_ID       KFP run ID of a previous full pipeline run (required for --analysis-only)
+#   ANALYSIS_GOAL         Optional analysis goal for a custom report section (--single-repo only)
 #   PARENT_SOURCE_PATH                 Parent source path (default: source)
 #   PARENT_TARGET_PATH                 Parent target path (default: target)
 #   KFP_DATA_INDEXING_OUTPUT_PATH      GraphRAG base path (default: graph_rag_app/source)
@@ -42,6 +43,7 @@ Environment variables:
   GIT_REPO            Git repository URL to analyse (required for --single-repo)
   GIT_BRANCH          Git branch to clone (default: main)
   PIPELINE_RUN_ID     KFP run ID of a previous full pipeline run (required for --analysis-only)
+  ANALYSIS_GOAL       Optional analysis goal for a custom report section (--single-repo only)
   PARENT_SOURCE_PATH                Parent source path (default: source)
   PARENT_TARGET_PATH                Parent target path (default: target)
   KFP_DATA_INDEXING_OUTPUT_PATH     GraphRAG base path (default: graph_rag_app/source)
@@ -59,6 +61,7 @@ TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 GIT_REPO="${GIT_REPO:-}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 PIPELINE_RUN_ID="${PIPELINE_RUN_ID:-}"
+ANALYSIS_GOAL="${ANALYSIS_GOAL:-}"
 ANALYSIS_ONLY="false"
 SOURCE_PATH="${PARENT_SOURCE_PATH:-source}"
 TARGET_PATH="${PARENT_TARGET_PATH:-target}"
@@ -96,6 +99,8 @@ import os, json, logging
 from services.trigger_run import trigger_run
 from services.update_repos import log_repos
 params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
+if os.environ["KFP_TRIGGER_PIPELINE"] == "single_repo":
+    params["analysis_goal"] = os.environ.get("ANALYSIS_GOAL", "")
 repos_json = os.environ.get("KFP_TRIGGER_REPOS_JSON", "")
 if repos_json:
     try:

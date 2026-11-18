@@ -188,10 +188,9 @@ Respond ONLY with valid JSON in this exact format:
             axis=1,
         )
 
-        repo_context = build_repo_context(graphrag_source_dir)
-
         def _ground_truth(input_text):
             try:
+                repo_context = build_repo_context(graphrag_source_dir, question=input_text)
                 return (
                     completion(
                         **_llm_kwargs("GROUND_TRUTH"),
