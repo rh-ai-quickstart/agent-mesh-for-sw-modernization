@@ -145,8 +145,10 @@ class LocalAssetLoader(AssetLoader):
 
     def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
         """Downloads all prompts under the prefixed local directory."""
-        count = self.num_prompts(prompt_path_prefix)
-        return [self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs) for i in range(count)]
+        return [
+            self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs)
+            for i in range(self.num_prompts(prompt_path_prefix))
+        ]
 
     def register_enrichments(
         self,

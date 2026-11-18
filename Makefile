@@ -1188,7 +1188,7 @@ run-pipelines:
 		--set-string runPipelines.args="$${ARGS:---single-repo}" \
 		--set-string runPipelines.targetPath="$(KFP_DATA_GENERATION_OUTPUT_PATH)" \
 		--set-string runPipelines.graphragSourcePath="$(KFP_DATA_INDEXING_OUTPUT_PATH)" \
-		--set-string runPipelines.analysisGoal="$(ANALYSIS_GOAL)" \
+		--set-string runPipelines.analysisGoal="$$(echo "$$ANALYSIS_GOAL" | sed 's/,/\\,/g')" \
 		$(HELM_PIPELINE_TOOLS_ARGS) \
 		-s templates/run-pipelines-job.yaml | oc apply -n $(KFP_NAMESPACE) -f -; \
 	echo "==> Waiting for pipeline submission to complete..."; \

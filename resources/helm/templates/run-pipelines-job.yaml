@@ -37,7 +37,7 @@ spec:
             - name: KFP_DATA_INDEXING_OUTPUT_PATH
               value: "{{ .Values.runPipelines.graphragSourcePath }}"
             - name: ANALYSIS_GOAL
-              value: "{{ .Values.runPipelines.analysisGoal | default "" }}"
+              value: {{ .Values.runPipelines.analysisGoal | default "" | quote }}
             - name: AGENTMESH_REPO_URL
               value: "{{ .Values.repoUrl }}"
             - name: AGENTMESH_REPO_REF
