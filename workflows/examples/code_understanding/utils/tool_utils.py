@@ -161,9 +161,11 @@ def get_download_base_prompts_tool(repo_dir: str, destination_folder: str = "tmp
         """
         from loaders.default_asset_loader import DefaultAssetLoader
 
-        resolved = (
+        resolved = os.path.realpath(
             download_dir if os.path.isabs(download_dir) else os.path.join(repo_dir, download_dir)
         )
+        if not resolved.startswith(os.path.realpath(repo_dir) + os.sep):
+            return f"Error: download_dir must be inside the repository ({repo_dir})"
         loader = DefaultAssetLoader()
         prompts = loader.download_prompts("analysis/migration-report")
         os.makedirs(resolved, exist_ok=True)

@@ -338,8 +338,10 @@ make run-pipelines ARGS="--single-repo" \
   PIPELINE_GIT_BRANCH=main
 ```
 
-Optionally, for single-repository pipelines, you can include the ANALYSIS_GOAL 
-setting to indicate a specific goal that the analysis should focus on — for example:
+Optionally, for single-repository pipelines, you can include the ANALYSIS_GOAL
+setting to indicate a specific goal that the analysis should focus on.
+**Note:** Analysis goals are only supported in KFP mode (not local execution).
+For example:
 
 ```sh
 make run-pipelines ARGS="--single-repo" \

@@ -99,6 +99,9 @@ import os, json, logging
 from services.trigger_run import trigger_run
 from services.update_repos import log_repos
 params = json.loads(os.environ["KFP_TRIGGER_PARAMS"])
+analysis_goal = os.environ.get("ANALYSIS_GOAL", "")
+if analysis_goal and os.environ["KFP_TRIGGER_PIPELINE"] == "single_repo":
+    params["analysis_goal"] = analysis_goal
 repos_json = os.environ.get("KFP_TRIGGER_REPOS_JSON", "")
 if repos_json:
     try:
@@ -145,7 +148,7 @@ if [[ "$MODE" == "single" ]]; then
         exit 1
     fi
     trigger_pipeline "single_repo" "single_repo_${TIMESTAMP}" \
-        "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\", \"analysis_goal\": \"$ANALYSIS_GOAL\"}" \
+        "{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\", \"parent_source_path\": \"$SOURCE_PATH\", \"parent_target_path\": \"$TARGET_PATH\", \"pipeline_run_id\": \"$PIPELINE_RUN_ID\"}" \
         "[{\"git_repo\": \"$GIT_REPO\", \"git_branch\": \"$GIT_BRANCH\"}]" \
         "$ANALYSIS_ONLY"
 else
