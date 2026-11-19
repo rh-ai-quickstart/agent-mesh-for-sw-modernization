@@ -1139,6 +1139,7 @@ run-adhoc-query:
 		--set-string adhocQuery.gitBranch="$(GIT_BRANCH)" \
 		--set-string adhocQuery.retryCount="$${RETRY_COUNT:-3}" \
 		--set-string adhocQuery.pipelineRunId="$(PIPELINE_RUN_ID)" \
+		--set-string adhocQuery.enhanced="$(ENHANCED)" \
 		--set analysis.image.registry="$(KFP_IMAGE_REGISTRY)" \
 		--set analysis.image.name="$(KFP_ANALYSIS_BASE_IMAGE_NAME)" \
 		--set analysis.image.tag="$(KFP_ANALYSIS_BASE_IMAGE_TAG)" \

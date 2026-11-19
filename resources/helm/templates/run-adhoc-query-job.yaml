@@ -43,6 +43,8 @@ spec:
               value: "{{ .Values.adhocQuery.gitBranch }}"
             - name: PIPELINE_RUN_ID
               value: "{{ .Values.adhocQuery.pipelineRunId }}"
+            - name: ENHANCED
+              value: "{{ .Values.adhocQuery.enhanced }}"
             - name: GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY
               value: "true"
             - name: AGENTMESH_REPO_URL

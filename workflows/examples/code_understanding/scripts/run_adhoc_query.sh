@@ -10,6 +10,7 @@
 #   USE_GLOBAL       Use global search; set to "0" for local search (default: "1")
 #   RETRY_COUNT      Number of retries on failure (default: 3)
 #   PIPELINE_RUN_ID  Optional pipeline run ID to tag the query result with
+#   ENHANCED         Fall back to LLM knowledge when GraphRAG has no data (default: "0")
 
 set -euo pipefail
 
@@ -23,8 +24,9 @@ GIT_REPO="${GIT_REPO:-}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 MULTI_REPO="${MULTI_REPO:-false}"
 PIPELINE_RUN_ID="${PIPELINE_RUN_ID:-}"
+ENHANCED="${ENHANCED:-0}"
 
-RESULT=$(QUESTION="$QUESTION" USE_GLOBAL="$USE_GLOBAL" RETRY_COUNT="$RETRY_COUNT" GIT_REPO="$GIT_REPO" GIT_BRANCH="$GIT_BRANCH" MULTI_REPO="$MULTI_REPO" PIPELINE_RUN_ID="$PIPELINE_RUN_ID" \
+RESULT=$(QUESTION="$QUESTION" USE_GLOBAL="$USE_GLOBAL" RETRY_COUNT="$RETRY_COUNT" GIT_REPO="$GIT_REPO" GIT_BRANCH="$GIT_BRANCH" MULTI_REPO="$MULTI_REPO" PIPELINE_RUN_ID="$PIPELINE_RUN_ID" ENHANCED="$ENHANCED" \
   PYTHONPATH="$CODE_UNDERSTANDING_DIR:${PYTHONPATH:-}" \
   python3 - << 'PYEOF'
 import os
@@ -37,6 +39,7 @@ result = run_adhoc_query(
     git_branch=os.environ.get("GIT_BRANCH", "main"),
     multi_repo=os.environ.get("MULTI_REPO", "false").lower() == "true",
     pipeline_run_id=os.environ.get("PIPELINE_RUN_ID", ""),
+    enhanced=os.environ.get("ENHANCED", "0") == "1",
 )
 print(result)
 PYEOF

@@ -6,6 +6,38 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../
 from utils.otel_utils import enable_telemetry  # noqa: E402
 
 ##############################################################################
+# Enhanced adhoc-query helpers
+##############################################################################
+
+
+def _is_unhelpful_response(text: str) -> bool:
+    """Return True if the GraphRAG response indicates it could not answer."""
+    if not text or not text.strip():
+        return True
+    from graphrag.prompts.query.global_search_reduce_system_prompt import (
+        NO_DATA_ANSWER,
+    )
+
+    return NO_DATA_ANSWER.lower() in text.strip().lower()
+
+
+def _get_enhanced_prompt(base_prompt: str, context_data) -> str:
+    """Build an LLM prompt that includes any GraphRAG context found so far."""
+    import os
+
+    from utils.graphrag_utils import DependencyAnalyzer
+
+    context_text = DependencyAnalyzer.extract_context_content(context_data)
+    if not context_text:
+        return base_prompt
+    max_context = int(os.environ.get("ENHANCED_MAX_CONTEXT_CHARS", 80000))
+    return (
+        "Use the following context where relevant, supplementing"
+        " with your own knowledge:\n\n" + context_text[:max_context] + "\n\n" + base_prompt
+    )
+
+
+##############################################################################
 # Pipeline stage
 ##############################################################################
 
@@ -93,6 +125,7 @@ class AnalysisPipeline:
         multi_repo: bool = False,
         pipeline_run_id: str = "",
         namespace: str | None = None,
+        enhanced: bool = False,
     ):
         """Queries the GraphRAG index with an LLM and returns the result."""
         import asyncio
@@ -149,14 +182,29 @@ class AnalysisPipeline:
                 " Group git repositories by their git repo url."
             )
 
-        result = asyncio.run(
+        full_query = question + postamble
+        result, context_data = asyncio.run(
             analyzer.query_with_llm(
-                question + postamble,
+                full_query,
                 retry_count=retry_count,
                 use_global=use_global,
+                include_context=True,
                 response_type="Multiple Paragraphs, plain text, no markdown formatting",
             )
         )
+
+        if enhanced and _is_unhelpful_response(result):
+            logging.info(
+                "GraphRAG returned unhelpful response; retrying with LLM knowledge (enhanced mode)"
+            )
+            result = asyncio.run(
+                analyzer.query_with_llm(
+                    _get_enhanced_prompt(full_query, context_data),
+                    retry_count=retry_count,
+                    bypass_index=True,
+                    response_type="Multiple Paragraphs, plain text, no markdown formatting",
+                )
+            )
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 

@@ -12,6 +12,7 @@ def run_adhoc_query(
     multi_repo: bool = False,
     pipeline_run_id: str = "",
     namespace: str | None = None,
+    enhanced: bool = False,
 ) -> str:
     """Query the GraphRAG index with an LLM and return the result."""
     from pipelines.base.analysis import run_adhoc_query_pipeline
@@ -25,4 +26,5 @@ def run_adhoc_query(
         multi_repo=multi_repo,
         pipeline_run_id=pipeline_run_id,
         namespace=namespace,
+        enhanced=enhanced,
     )

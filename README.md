@@ -396,7 +396,24 @@ The Tic‑Tac‑Toe codebase is organized as a single GAME package that cont
 1. **PLAY (the orchestrator)** – PLAY is the entry point and drives the entire game loop.  It initializes the board, alternates turns, calls the move‑generation routines, updates the display, and checks for win or draw conditions.  It also...
 ```
 
+If the response indicates that the knowledge graph did not contain enough 
+information to answer a query, you can run an **enhanced query**. Pass 
+`--enhanced` to supplement the knowledge graph's data with the LLM's internal knowledge:
 
+```sh
+./wrappers/adhoc.sh \
+  "What are the common security vulnerabilities in Spring Boot applications like this one?" \
+  --git-repo https://github.com/agapebondservant/tic-tac-toe-sample \
+  --git-branch main \
+  --enhanced
+```
+
+Because of the nature of LLM generation tasks, enhanced queries carry a higher 
+risk of hallucination than purely graph-grounded answers. This approach should only 
+be used when the question's scope goes beyond what was captured during indexing
+— for example, asking about industry best practices, comparing the codebase to
+external frameworks, or requesting migration guidance that depends on knowledge
+of target platforms. 
 
 ### 8. Analyze multiple repositories
 

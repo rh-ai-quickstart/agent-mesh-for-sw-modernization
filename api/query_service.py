@@ -46,6 +46,7 @@ def submit_query(
     multi_repo: bool = False,
     pipeline_run_id: str = "",
     namespace: str | None = None,
+    enhanced: bool = False,
 ) -> dict[str, Any]:
     if not question.strip():
         raise ValueError("Question must not be empty.")
@@ -68,6 +69,7 @@ def submit_query(
                 multi_repo=multi_repo,
                 pipeline_run_id=pipeline_run_id,
                 namespace=namespace,
+                enhanced=enhanced,
             )
             _jobs[query_id] = {"status": "succeeded", "result": result, "error": None}
         except Exception as exc:

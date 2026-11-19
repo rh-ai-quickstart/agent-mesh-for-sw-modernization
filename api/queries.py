@@ -24,6 +24,7 @@ class RunQueryRequest(BaseModel):
     git_branch: str = "main"
     multi_repo: bool = False
     pipeline_run_id: str = ""
+    enhanced: bool = False
 
 
 @router.post("/queries")
