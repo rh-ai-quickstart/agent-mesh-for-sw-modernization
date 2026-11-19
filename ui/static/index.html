@@ -1082,7 +1082,7 @@
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], chatKey: null, thinking: null,
-      animateLatest: false, chatRunId: null, queryPoll: null,
+      animateLatest: false,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1603,7 +1603,7 @@
         <td><div style="display:flex;align-items:center;gap:0.4rem"><span class="cu-job-dot ${esc(run.status)}"></span><span class="cu-muted" style="font-size:0.85rem">${repoCell}</span></div></td>
         <td><span class="cu-chip ${run.uploaded ? "uploaded" : succeeded ? "indexed" : (run.status === "Failed" || run.status === "Cancelled") ? "failed" : ""}">${run.uploaded ? "Uploaded" : esc(run.status)}</span></td>
         <td><span class="cu-muted" style="font-size:0.8rem">${started}</span></td>
-        <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-git-slug="${esc(run.git_slug || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-run-id="${esc(run.run_id || '')}" data-tooltip="Explore code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ""}</td>
+        <td style="text-align:center">${succeeded ? `<button type="button" class="cu-btn-icon cu-run-chat" data-git-repo="${esc(run.git_repo || '')}" data-git-branch="${esc(run.git_branch || '')}" data-git-slug="${esc(run.git_slug || '')}" data-multi-repo="${isMulti}" data-run-title="${esc(title)}" data-run-name="${esc(run.name || '')}" data-tooltip="Explore code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ""}</td>
       </tr>`;
     }
 
@@ -1665,8 +1665,7 @@
             btn.dataset.multiRepo === "true",
             btn.dataset.runTitle || "",
             btn.dataset.runName || "",
-            btn.dataset.gitSlug || "",
-            btn.dataset.runId || ""
+            btn.dataset.gitSlug || ""
           );
         });
       });
@@ -1923,15 +1922,13 @@
     }
 
     function pollQuery(queryId) {
-      if (state.queryPoll) clearInterval(state.queryPoll);
       const POLL_INTERVAL_MS = 3000;
       const MAX_POLLS = 200; // 10 minutes
       let polls = 0;
-      state.queryPoll = setInterval(async () => {
+      const interval = setInterval(async () => {
         polls += 1;
         if (polls > MAX_POLLS) {
-          clearInterval(state.queryPoll);
-          state.queryPoll = null;
+          clearInterval(interval);
           setThinking(null);
           renderChat();
           banner("Query timed out. The analysis is taking longer than expected.", true);
@@ -1940,22 +1937,19 @@
         try {
           const snap = await api(`/api/v2/queries/${queryId}`);
           if (snap.status === "succeeded") {
-            clearInterval(state.queryPoll);
-            state.queryPoll = null;
+            clearInterval(interval);
             state.chat.push({ role: "assistant", content: snap.result || "" });
             setThinking(null);
             state.animateLatest = true;
             renderChat();
           } else if (snap.status === "failed") {
-            clearInterval(state.queryPoll);
-            state.queryPoll = null;
+            clearInterval(interval);
             setThinking(null);
             renderChat();
             banner(snap.error || "Query failed.", true);
           }
         } catch (e) {
-          clearInterval(state.queryPoll);
-          state.queryPoll = null;
+          clearInterval(interval);
           setThinking(null);
           renderChat();
           banner(String(e.message || e), true);
@@ -2004,9 +1998,8 @@
       state.poll = setInterval(tick, 4000);
     }
 
-    function openChatSlider(gitRepo, gitBranch, isMulti, runTitle, runName, gitSlug, pipelineRunId) {
+    function openChatSlider(gitRepo, gitBranch, isMulti, runTitle, runName, gitSlug) {
       renderChatSelect();
-      state.chatRunId = pipelineRunId || "";
       let newKey = null;
       if (gitRepo || isMulti || gitSlug) {
         const sel = $("slider-chat-repo");
@@ -2035,14 +2028,12 @@
       $("chat-slider").classList.remove("open");
       $("chat-slider-overlay").classList.add("hidden");
       if (state.thinking && state.thinking.kind === "query") {
-        if (state.queryPoll) { clearInterval(state.queryPoll); state.queryPoll = null; }
         setThinking(null);
         banner("Query cancelled.");
         setTimeout(() => { if ($("banner").textContent === "Query cancelled.") banner(""); }, 3000);
       }
       state.chat = [];
       state.chatKey = null;
-      state.chatRunId = null;
     }
     $("chat-slider-close").onclick = closeChatSlider;
     $("chat-slider-overlay").onclick = closeChatSlider;
@@ -2070,7 +2061,7 @@
             git_branch: option.git_branch || "main",
             use_global: option.use_global || false,
             multi_repo: option.multi_repo || false,
-            pipeline_run_id: state.chatRunId || option.kfp_run_id || "",
+            pipeline_run_id: option.kfp_run_id || "",
           }),
         });
         pollQuery(result.query_id);

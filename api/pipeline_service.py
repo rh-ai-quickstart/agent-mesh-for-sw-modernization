@@ -54,7 +54,7 @@ def submit_pipeline_run(
         "pipeline_run_id": pipeline_run_id,
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
-        "analysis_goal": analysis_goal,
+        **({"analysis_goal": analysis_goal} if analysis_goal else {}),
     }
 
     try:

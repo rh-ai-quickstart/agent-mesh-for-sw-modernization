@@ -572,10 +572,8 @@ class MlFlowAssetLoader(AssetLoader):
 
     def download_prompts(self, prompt_path_prefix: str, **kwargs) -> list[tuple[str, dict]]:
         """Downloads all prompts from the MLflow registry matching the given prefix."""
-        return [
-            self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs)
-            for i in range(self.num_prompts(prompt_path_prefix))
-        ]
+        count = self.num_prompts(prompt_path_prefix)
+        return [self.download_prompt(f"{prompt_path_prefix}/{i}", **kwargs) for i in range(count)]
 
     def register_enrichments(
         self,

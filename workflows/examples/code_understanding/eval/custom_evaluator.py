@@ -1,6 +1,17 @@
 import functools
+import logging
 import os
+import pathlib
 from abc import ABC, abstractmethod
+
+from utils.eval_utils import (
+    get_exclude_patterns,
+    load_graphrag_eval_config,
+    read_selected_files,
+    select_relevant_files_from_tree,
+)
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper())
 
 _DEFAULT_EVAL_DATASET = os.path.normpath(
     os.path.join(
@@ -15,70 +26,91 @@ _DEFAULT_EVAL_DATASET = os.path.normpath(
 
 
 @functools.lru_cache(maxsize=None)
-def build_repo_context(graphrag_source_dir: str = "") -> str:
-    """Returns codebase source as LLM-ready context by ingesting graphrag_source_dir/input.
+def _ingest_codebase(graphrag_source_dir: str, max_file_size: int = 50000) -> tuple[str, str]:
+    """Ingest the codebase once and cache the result.
 
-    Result is cached so repeated calls for the same directory do not re-run gitingest.
-    Logs a warning and returns an empty string if no directory is provided, the directory
-    is missing, or ingestion fails.
+    Returns:
+        (tree, content) where tree is the directory structure and content is all
+        file contents concatenated.  Returns ("", "") on failure.
     """
-    import logging
-    import pathlib
-
-    if not graphrag_source_dir:
-
-        logging.warning(
-            "No graphrag_source_dir provided; ground truth LLM will have no source context."
-        )
-
-        return ""
-
     codebase_dir = pathlib.Path(graphrag_source_dir) / "input"
 
     if not codebase_dir.is_dir():
-
         logging.warning(
             "Codebase directory %s not found; ground truth LLM will have no source context.",
             codebase_dir,
         )
-
-        return ""
+        return ("", "")
 
     try:
         from gitingest import ingest
 
-        _, _, content = ingest(
+        _, tree, content = ingest(
             str(codebase_dir),
-            max_file_size=50_000,  # TODO: make this an environment variable setting
-            exclude_patterns={
-                "*.lock",
-                "*.min.js",
-                "*.min.css",
-                "dist/*",
-                "vendor/*",
-                "node_modules/*",
-                "*.egg-info/*",
-                "*.pyc",
-                "__pycache__/*",
-                "*_metadata.txt",
-            },
+            max_file_size=max_file_size,
+            exclude_patterns=get_exclude_patterns(),
         )
-
-        _MAX_CONTEXT_CHARS = 480_000  # TODO: make this an environment variable setting
-        if len(content) > _MAX_CONTEXT_CHARS:
-            logging.warning(
-                "Codebase context truncated from %d to %d chars (~120K tokens).",
-                len(content),
-                _MAX_CONTEXT_CHARS,
-            )
-            content = content[:_MAX_CONTEXT_CHARS]
-
-        return f"Source code of the codebase being analyzed:\n\n{content}"
-
+        return (tree or "", content or "")
     except Exception as e:
         logging.warning("Failed to ingest codebase from %s: %s", codebase_dir, e)
+        return ("", "")
 
-    return ""
+
+def build_repo_context(graphrag_source_dir: str = "", question: str = "") -> str:
+    """Returns codebase source as LLM-ready context.
+
+    Context limits are derived from the GraphRAG ``settings.yaml`` in
+    *graphrag_source_dir* so that the ground-truth LLM receives a comparable
+    retrieval budget to the GraphRAG candidate.  When *question* is provided
+    and the codebase exceeds the derived ``max_context_chars``, a cheap LLM
+    call selects the most relevant files.
+
+    Result of the underlying gitingest call is cached so repeated calls for
+    the same directory do not re-ingest.
+    """
+    if not graphrag_source_dir:
+        logging.warning(
+            "No graphrag_source_dir provided; ground truth LLM will have no source context."
+        )
+        return ""
+
+    cfg = load_graphrag_eval_config(graphrag_source_dir)
+    max_file_size = cfg["max_file_size"]
+    max_context_chars = cfg["max_context_chars"]
+    max_selected_files = cfg["max_selected_files"]
+
+    tree, content = _ingest_codebase(graphrag_source_dir, max_file_size)
+    if not content:
+        return ""
+
+    # Small codebase — return everything
+    if len(content) <= max_context_chars:
+        return f"Source code of the codebase being analyzed:\n\n{content}"
+
+    # Large codebase without a question — truncate (backwards-compatible)
+    if not question:
+        logging.warning(
+            "Codebase context truncated from %d to %d chars.",
+            len(content),
+            max_context_chars,
+        )
+        return f"Source code of the codebase being analyzed:\n\n{content[:max_context_chars]}"
+
+    # Large codebase with a question — select relevant files
+    if not tree:
+        logging.warning("No directory tree available; falling back to truncation.")
+        return f"Source code of the codebase being analyzed:\n\n{content[:max_context_chars]}"
+
+    try:
+        paths = select_relevant_files_from_tree(tree, question, max_selected_files)
+        focused = read_selected_files(graphrag_source_dir, paths, max_context_chars)
+        if focused:
+            return f"Source code of the codebase being analyzed:\n\n{focused}"
+        logging.warning("File selection returned no readable files; falling back to truncation.")
+    except Exception as e:
+        logging.warning("File selection failed (%s); falling back to truncation.", e)
+
+    return f"Source code of the codebase being analyzed:\n\n{content[:max_context_chars]}"
 
 
 class CustomEvaluator(ABC):
