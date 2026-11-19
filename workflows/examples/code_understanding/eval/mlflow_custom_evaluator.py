@@ -62,7 +62,7 @@ class MlFlowCustomEvaluator(CustomEvaluator):
         """
         from litellm import completion
 
-        repo_context = build_repo_context(graphrag_source_dir)
+        repo_context = build_repo_context(graphrag_source_dir, question=input)
 
         try:
             response = completion(

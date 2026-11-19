@@ -57,8 +57,10 @@ def test_pipeline_requests_route_to_existing_pipelines(
         "parent_source_path": "sources",
         "parent_target_path": "targets",
         "runnable_repos": json.dumps(body["repos"]),
-        "analysis_goal": body.get("analysis_goal", ""),
     }
+    analysis_goal = body.get("analysis_goal", "")
+    if analysis_goal:
+        expected_params["analysis_goal"] = analysis_goal
     if pipeline_name == "single_repo":
         expected_params.update(REPO)
 
