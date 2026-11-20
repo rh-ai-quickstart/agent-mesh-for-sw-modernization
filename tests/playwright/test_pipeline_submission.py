@@ -258,7 +258,7 @@ def test_existing_run_can_still_rerun(page: Page, mock_console, mode):
     expect(page.get_by_label("Re-run report only")).to_be_visible()
     expected = {"repos": [REPOS[0]]}
     if mode == "report":
-        page.get_by_label("Re-run report only").check()
+        page.get_by_text("Re-run report only", exact=True).click()
         expected["pipeline_run_id"] = "original-index"
     with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
         page.locator("#rerun-confirm").click()
