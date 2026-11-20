@@ -62,10 +62,10 @@ def mock_console(page: Page):
     page_errors = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
 
-    def open_console(*, indexed=True, runs=None, indexes=None, queryable=QUERYABLE):
+    def open_console(*, indexed=True, runs=None, indexes=None, queryable=QUERYABLE, repos=REPOS):
         responses = {
             "/api/status": {"ok": True, "namespace": "test"},
-            "/api/v2/repositories/catalog-repos": {"repos": REPOS, "default_key": None},
+            "/api/v2/repositories/catalog-repos": {"repos": repos, "default_key": None},
             "/api/indexes": {
                 "ok": True,
                 "indexes": indexes if indexes is not None else [],
@@ -101,7 +101,7 @@ def mock_console(page: Page):
         page.route("**/*", handle_request)
         page.goto(CONSOLE_URL, wait_until="networkidle")
         expect(page.locator("#status")).to_contain_text("Connected")
-        expect(page.locator("#repo-list input[type=checkbox]")).to_have_count(2)
+        expect(page.locator("#repo-list input[type=checkbox]")).to_have_count(len(repos))
         return submissions
 
     yield open_console
@@ -225,10 +225,12 @@ def test_uploaded_index_without_source_run_id_cannot_rerun(page: Page, mock_cons
     expect(page.locator("#run-rerun")).to_be_disabled()
 
 
+@pytest.mark.parametrize("suffix", ["", ".git/"], ids=["plain-url", "clone-url"])
 def test_uploaded_index_marks_existing_catalog_row_without_duplicating_it(
-    page: Page, mock_console
+    page: Page, mock_console, suffix
 ):
     mock_console(
+        repos=[{**REPOS[0], "git_repo": REPOS[0]["git_repo"] + suffix}, REPOS[1]],
         indexes=[
             {
                 "run_id": "mlflow-upload",
@@ -237,7 +239,7 @@ def test_uploaded_index_marks_existing_catalog_row_without_duplicating_it(
                 "multi_repo": False,
                 "uploaded": True,
             },
-        ]
+        ],
     )
     rows = page.locator("#repo-list .cu-repo")
     expect(rows).to_have_count(len(REPOS))

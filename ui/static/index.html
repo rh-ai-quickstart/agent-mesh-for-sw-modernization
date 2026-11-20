@@ -1304,7 +1304,7 @@
     function selectedRepos() { return state.repos.filter((r) => state.selected.has(repoKey(r))); }
     function gitSlug(url, branch) {
       try {
-        const path = new URL(url).pathname.replace(/^\//, "").replace(/\.git$/, "");
+        const path = new URL(url).pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
         const parts = path.split("/").filter(Boolean);
         const name = parts.pop() || "repo";
         const owner = parts.pop() || "";
