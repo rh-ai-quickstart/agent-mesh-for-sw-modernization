@@ -5,7 +5,6 @@ require --run-pipelines (or make test-cli-e2e RUN_PIPELINES=true). The query tes
 uses the existing index. Timeouts below are in seconds and specific to each test.
 Failed waits cancel the submitted run and allow 60 seconds to confirm termination.
 The analysis-only test requires the bundled prebuilt index to be installed.
-Multi-repo pipeline and combined-index query tests are temporarily skipped.
 """
 
 import re
@@ -318,7 +317,6 @@ def test_single_repo_pipeline_creates_report_and_index(
 
 
 @pytest.mark.pipeline
-@pytest.mark.skip(reason="Multi-repo E2E tests are temporarily disabled.")
 def test_multi_repo_pipeline_creates_report_and_index(
     run_cli, deployed_kfp_client, deployed_mlflow_client, deployed_namespace, tmp_path
 ):
@@ -337,7 +335,6 @@ def test_multi_repo_pipeline_creates_report_and_index(
 
 
 @pytest.mark.pipeline
-@pytest.mark.skip(reason="Multi-repo E2E tests are temporarily disabled.")
 def test_multi_repo_combined_index_query_returns_answer(run_cli):
     output = run_cli(
         [

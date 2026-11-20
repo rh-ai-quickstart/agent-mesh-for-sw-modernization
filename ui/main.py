@@ -117,7 +117,7 @@ def get_indexes(
 ) -> dict[str, Any]:
     from api import repositories_service
 
-    data = indexes.list_indexed_repos()
+    data = indexes.list_indexed_repos(cu_namespace)
     catalog_entries = repositories_service.get_catalog_repos(cu_namespace)
     options = indexes.queryable_repos(data.get("indexes") or [], catalog_entries)
     return {**data, "queryable": options}

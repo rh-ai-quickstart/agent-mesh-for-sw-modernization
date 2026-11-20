@@ -102,6 +102,7 @@ def list_kfp_runs(page_size: int = 50, namespace: str | None = None) -> list[dic
                 "git_slug": _get_git_slug(r),
                 "git_repo": git_repo or None,
                 "git_branch": git_branch or None,
+                "source_pipeline_run_id": params.get("pipeline_run_id") or "",
                 **({"repos": runnable_repos} if runnable_repos else {}),
             }
         )

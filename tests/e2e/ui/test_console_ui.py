@@ -96,9 +96,17 @@ def test_analyze_opens_confirmation_modal(page: Page) -> None:
 
 def test_recent_run_can_open_its_analysis_report(page: Page) -> None:
     page.locator('.cu-nav-item[data-tab="runs"]').click()
-    succeeded = page.locator('#run-list .cu-run-select[data-succeeded="true"]')
-    if succeeded.count() == 0:
-        pytest.skip("No successful pipeline runs are available to open.")
+    succeeded = page.locator(
+        '#run-list .cu-run-select[data-succeeded="true"][data-uploaded="false"]'
+    )
+    next_page = page.locator("#run-next:enabled")
+    page_number = page.locator("#run-paginator span")
+    while succeeded.count() == 0:
+        if not next_page.is_visible():
+            pytest.skip("No successful pipeline runs are available to open.")
+        previous_page = page_number.inner_text()
+        next_page.click()
+        expect(page_number).not_to_have_text(previous_page)
 
     succeeded.first.check()
     page.locator("#run-view-report").click()
@@ -134,3 +142,37 @@ def test_chat_slider_opens_from_run(page: Page) -> None:
 
     page.locator("#chat-slider-close").click()
     expect(slider).not_to_have_class(re.compile(r"open"))
+
+
+def test_chat_returns_an_answer_from_the_uploaded_index(page: Page) -> None:
+    page.locator('.cu-nav-item[data-tab="runs"]').click()
+    chat = page.locator(
+        '#run-list tr:has(.cu-run-select[data-uploaded="true"]) '
+        '.cu-run-chat[data-git-slug="agapebondservant-tic-tac-toe-sample-main"]'
+    ).first
+    expect(chat).to_be_visible()
+    source_run_id = chat.get_attribute("data-run-id")
+    assert source_run_id, "The uploaded index has no source run ID"
+    chat.click()
+
+    slider = page.locator("#chat-slider")
+    slider.get_by_placeholder("Ask about the selected code…").fill(
+        "How does the game determine when a player wins?"
+    )
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/v2/queries")
+        and response.request.method == "POST",
+        timeout=30_000,
+    ) as submission:
+        slider.get_by_role("button", name="Send", exact=True).click()
+
+    response = submission.value
+    assert response.ok, f"Query submission failed: {response.status} {response.text()}"
+    assert response.request.post_data_json["pipeline_run_id"] == source_run_id
+
+    answer = slider.locator(".cu-bubble.assistant:not(.thinking-msg)")
+    finished = answer.get_by_role("button", name="Download response")
+    error = page.locator('#banner[role="alert"]')
+    expect(finished.or_(error)).to_be_visible(timeout=QUERY_TIMEOUT_MS)
+    assert not error.is_visible(), error.inner_text()
+    expect(answer).to_contain_text(re.compile(r"\b(?:rows?|columns?|diagonals?)\b", re.I))

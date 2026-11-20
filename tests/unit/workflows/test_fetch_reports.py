@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from services import fetch_reports as reports
 
 
@@ -14,6 +15,7 @@ def _inject_fake_loader(
     eval_files=None,
     analysis_files=None,
     improvement_files=None,
+    newer_adhoc_query=False,
     raise_on=(),
     fail_init=False,
 ):
@@ -39,6 +41,12 @@ def _inject_fake_loader(
             category = asset_tags.get("category", "")
             if category in raise_on:
                 raise Exception(f"not found: {category}")
+            if (
+                category == "analysis"
+                and newer_adhoc_query
+                and asset_tags.get("adhoc_query", "") is not None
+            ):
+                raise FileNotFoundError("The latest matching run only contains a query answer")
             os.makedirs(download_dir, exist_ok=True)
             files_map = {
                 "evaluation": eval_files,
@@ -58,13 +66,17 @@ def _inject_fake_loader(
     monkeypatch.setitem(sys.modules, "loaders.asset_loader", asset_mod)
 
 
-def test_fetch_reports_downloads_analysis_report(monkeypatch):
+@pytest.mark.parametrize("git_slug, multi_repo", [("repo-main", False), (None, True)])
+def test_fetch_reports_downloads_analysis_report_after_adhoc_query(
+    monkeypatch, git_slug, multi_repo
+):
     _inject_fake_loader(
         monkeypatch,
-        analysis_files={"migration_report_repo-main.md": "# Current analysis"},
+        analysis_files={"migration_report.md": "# Current analysis"},
+        newer_adhoc_query=True,
     )
 
-    evaluation, analysis, improvement = reports.fetch_reports("selected-kfp", "repo-main", False)
+    evaluation, analysis, improvement = reports.fetch_reports("selected-kfp", git_slug, multi_repo)
 
     assert evaluation is None
     assert analysis == "# Current analysis"

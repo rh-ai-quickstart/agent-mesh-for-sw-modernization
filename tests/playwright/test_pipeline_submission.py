@@ -62,14 +62,14 @@ def mock_console(page: Page):
     page_errors = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
 
-    def open_console(*, indexed=True, runs=None):
+    def open_console(*, indexed=True, runs=None, indexes=None, queryable=QUERYABLE, repos=REPOS):
         responses = {
             "/api/status": {"ok": True, "namespace": "test"},
-            "/api/v2/repositories/catalog-repos": {"repos": REPOS, "default_key": None},
+            "/api/v2/repositories/catalog-repos": {"repos": repos, "default_key": None},
             "/api/indexes": {
                 "ok": True,
-                "indexes": [],
-                "queryable": QUERYABLE if indexed else [],
+                "indexes": indexes if indexes is not None else [],
+                "queryable": queryable if indexed else [],
             },
             "/api/namespaces": {"namespaces": ["test"], "current": "test"},
             "/api/v2/pipelines/runs": {"runs": runs if runs is not None else []},
@@ -101,7 +101,7 @@ def mock_console(page: Page):
         page.route("**/*", handle_request)
         page.goto(CONSOLE_URL, wait_until="networkidle")
         expect(page.locator("#status")).to_contain_text("Connected")
-        expect(page.locator("#repo-list input[type=checkbox]")).to_have_count(2)
+        expect(page.locator("#repo-list input[type=checkbox]")).to_have_count(len(repos))
         return submissions
 
     yield open_console
@@ -134,6 +134,135 @@ def test_analyze_without_selected_repositories_is_disabled(page: Page, mock_cons
 
     analyze_btn = page.locator("#open-analyze")
     expect(analyze_btn).to_be_disabled()
+
+
+@pytest.mark.parametrize("tab", ["repos", "runs"])
+def test_uploaded_index_can_rerun_report(page: Page, mock_console, tab):
+    index = {
+        "run_id": "mlflow-upload",
+        "kfp_run_id": "source-kfp-run",
+        "git_slug": "example-prebuilt-main",
+        "multi_repo": False,
+        "uploaded": True,
+    }
+    repo = {"git_repo": "https://uploaded/example/prebuilt", "git_branch": "main"}
+    submissions = mock_console(
+        indexes=[index],
+        queryable=[*QUERYABLE, {**repo, "git_slug": index["git_slug"]}],
+        runs=[
+            {
+                "run_id": index["kfp_run_id"],
+                "git_slug": index["git_slug"],
+                "name": "Uploaded index",
+                "status": "Succeeded",
+                "uploaded": True,
+                "source_pipeline_run_id": index["kfp_run_id"],
+            },
+        ],
+    )
+    if tab == "repos":
+        row = page.locator("#repo-list .cu-repo").filter(has_text=index["git_slug"])
+        expect(row.get_by_text("Uploaded", exact=True)).to_be_visible()
+        row.get_by_role("button", name="Re-run").click()
+    else:
+        page.locator('.cu-nav-item[data-tab="runs"]').click()
+        page.locator(".cu-run-select").check()
+        expect(page.locator("#run-view-report")).to_be_disabled()
+        page.locator("#run-rerun").click()
+
+    expect(page.get_by_label("Re-run report only")).to_be_checked()
+    expect(page.get_by_label("Re-run from scratch")).to_be_hidden()
+    with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
+        page.locator("#rerun-confirm").click()
+    assert submissions == [{"repos": [repo], "pipeline_run_id": index["kfp_run_id"]}]
+
+
+def test_combined_upload_is_visible_without_rerun(page: Page, mock_console):
+    mock_console(
+        indexes=[
+            {
+                "run_id": "mlflow-upload",
+                "kfp_run_id": "source-kfp-run",
+                "git_slug": "",
+                "multi_repo": True,
+                "uploaded": True,
+            },
+        ],
+        runs=[
+            {
+                "run_id": "source-kfp-run",
+                "name": "Uploaded index",
+                "status": "Succeeded",
+                "uploaded": True,
+                "source_pipeline_run_id": "source-kfp-run",
+                "multi_repo": True,
+            },
+        ],
+    )
+    row = page.locator("#repo-list .cu-repo").filter(has_text="Combined multi-repo index")
+    expect(row.get_by_text("Uploaded", exact=True)).to_be_visible()
+    expect(row.get_by_role("button", name="Re-run")).to_have_count(0)
+    page.locator('.cu-nav-item[data-tab="runs"]').click()
+    page.locator(".cu-run-select").check()
+    expect(page.locator("#run-rerun")).to_be_disabled()
+
+
+def test_uploaded_index_without_source_run_id_cannot_rerun(page: Page, mock_console):
+    mock_console(
+        runs=[
+            {
+                "run_id": "mlflow-upload",
+                "git_slug": "example-one-develop",
+                "name": "Uploaded index",
+                "status": "Succeeded",
+                "uploaded": True,
+                "source_pipeline_run_id": "",
+            },
+        ]
+    )
+    page.locator('.cu-nav-item[data-tab="runs"]').click()
+    page.locator(".cu-run-select").check()
+    expect(page.locator("#run-rerun")).to_be_disabled()
+
+
+@pytest.mark.parametrize("suffix", ["", ".git/"], ids=["plain-url", "clone-url"])
+def test_uploaded_index_marks_existing_catalog_row_without_duplicating_it(
+    page: Page, mock_console, suffix
+):
+    mock_console(
+        repos=[{**REPOS[0], "git_repo": REPOS[0]["git_repo"] + suffix}, REPOS[1]],
+        indexes=[
+            {
+                "run_id": "mlflow-upload",
+                "kfp_run_id": "source-kfp-run",
+                "git_slug": "example-one-develop",
+                "multi_repo": False,
+                "uploaded": True,
+            },
+        ],
+    )
+    rows = page.locator("#repo-list .cu-repo")
+    expect(rows).to_have_count(len(REPOS))
+    expect(rows.first.get_by_text("Uploaded", exact=True)).to_be_visible()
+
+
+@pytest.mark.parametrize("mode", ["scratch", "report"])
+def test_existing_run_can_still_rerun(page: Page, mock_console, mode):
+    runs = [{**MOCK_RUNS[0], "source_pipeline_run_id": "original-index"}, MOCK_RUNS[1]]
+    submissions = mock_console(runs=runs)
+    page.locator('.cu-nav-item[data-tab="runs"]').click()
+    page.locator(".cu-run-select").first.check()
+    page.locator("#run-rerun").click()
+
+    expect(page.get_by_label("Re-run from scratch")).to_be_checked()
+    expect(page.get_by_label("Re-run report only")).to_be_visible()
+    expected = {"repos": [REPOS[0]]}
+    if mode == "report":
+        page.get_by_text("Re-run report only", exact=True).click()
+        expected["pipeline_run_id"] = "original-index"
+    with page.expect_response(f"{CONSOLE_URL}/api/v2/pipelines/runs/mock-run"):
+        page.locator("#rerun-confirm").click()
+    assert submissions == [expected]
 
 
 def test_runs_tab_renders_run_list(page: Page, mock_console):
