@@ -1082,7 +1082,7 @@
     const state = {
       repos: [], selected: new Set(), indexes: [], queryable: [],
       defaultKey: null, poll: null, chat: [], chatKey: null, thinking: null,
-      animateLatest: false, chatRunId: null, queryPoll: null,
+      animateLatest: false, chatRunId: null, queryPoll: null, rerunTarget: null,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1304,7 +1304,7 @@
     function selectedRepos() { return state.repos.filter((r) => state.selected.has(repoKey(r))); }
     function gitSlug(url, branch) {
       try {
-        const path = new URL(url).pathname.replace(/^\//, "").replace(/\.git$/, "");
+        const path = new URL(url).pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
         const parts = path.split("/").filter(Boolean);
         const name = parts.pop() || "repo";
         const owner = parts.pop() || "";
@@ -1552,18 +1552,36 @@
 
     const iconDownload = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 
+    function indexedRepo(slug) {
+      const match = state.queryable.find((o) => !o.use_global && o.git_slug === slug);
+      if (!match?.git_repo || match.git_repo === slug) return null;
+      if (match.git_repo.startsWith("https://uploaded/") && gitSlug(match.git_repo, match.git_branch) !== slug) return null;
+      return {git_repo: match.git_repo, git_branch: match.git_branch};
+    }
+
+    function rerunTarget(run) {
+      if (run.uploaded && run.multi_repo) return null;
+      const sourceRunId = run.source_pipeline_run_id || (run.uploaded ? "" : run.run_id);
+      const repo = run.git_repo ? [{git_repo: run.git_repo, git_branch: run.git_branch || "main"}] : [];
+      const repos = run.repos?.length ? run.repos : repo;
+      if (!sourceRunId || !repos.length) return null;
+      const reportOnly = run.uploaded || repos.some((r) => r.git_repo.startsWith("https://uploaded/"));
+      return {sourceRunId, repos, reportOnly};
+    }
+
     function runListCard(run) {
       const succeeded = run.status === "Succeeded" || run.status === "Skipped";
-      const isMulti = (run.name || "").startsWith("multi_repo");
+      const isMulti = run.multi_repo || (run.name || "").startsWith("multi_repo");
       if (!run.git_repo && run.git_slug && !isMulti) {
-        const match = state.queryable.find((o) => o.git_slug === run.git_slug);
-        if (match) { run = { ...run, git_repo: match.git_repo, git_branch: match.git_branch }; }
+        const match = indexedRepo(run.git_slug);
+        if (match) run = {...run, ...match};
       }
       const title = isMulti
         ? "Combined repos"
         : run.git_repo ? shortName(run.git_repo).replace(/\.git$/, "") : (run.git_slug || run.name);
       const started = run.start_time ? esc(prettyRelativeDate(run.start_time)) : "—";
       const storedRepos = run.repos || null;
+      const rerun = rerunTarget(run);
       const repoSummary = storedRepos && storedRepos.length
         ? `${storedRepos.map((r) => `${esc(shortName(r.git_repo))} @ ${esc(r.git_branch)}`).join(", ")}`
         : isMulti
@@ -1593,7 +1611,7 @@
       return `<tr>
         <td>
           <div style="display:flex;align-items:center;gap:0.75rem">
-            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-repos="${esc(JSON.stringify(storedRepos || (run.git_repo ? [{git_repo: run.git_repo, git_branch: run.git_branch || "main"}] : [])))}" data-succeeded="${succeeded}" data-uploaded="${!!run.uploaded}"/>
+            <input type="checkbox" class="cu-check cu-radio cu-run-select" data-run-id="${esc(run.run_id)}" data-run-name="${esc(run.name)}" data-title="${esc(title)}" data-git-repo="${esc(run.git_repo || "")}" data-git-branch="${esc(run.git_branch || "")}" data-rerun="${rerun ? esc(JSON.stringify(rerun)) : ""}" data-succeeded="${succeeded}" data-uploaded="${!!run.uploaded}"/>
             <div>
               <span class="cu-index-title">${esc(title)}</span>
               <div class="cu-index-owner" style="font-size:0.8rem">${esc(run.name || "")}</div>
@@ -1634,15 +1652,14 @@
           const uploaded = cb.dataset.uploaded === "true";
           $("run-view-report").disabled = !(selected && succeeded && !uploaded);
           $("run-download-report").disabled = !(selected && succeeded && !uploaded);
-          $("run-rerun").disabled = !(selected && succeeded && !uploaded);
+          $("run-rerun").disabled = !(selected && succeeded && cb.dataset.rerun);
           $("run-view-report").dataset.runId = selected ? cb.dataset.runId : "";
           $("run-view-report").dataset.runName = selected ? cb.dataset.runName : "";
           $("run-view-report").dataset.gitRepo = selected ? cb.dataset.gitRepo : "";
           $("run-view-report").dataset.gitBranch = selected ? cb.dataset.gitBranch : "";
           $("run-download-report").dataset.runId = selected ? cb.dataset.runId : "";
           $("run-download-report").dataset.runName = selected ? cb.dataset.runName : "";
-          $("run-rerun").dataset.runId = selected ? cb.dataset.runId : "";
-          $("run-rerun").dataset.repos = selected ? cb.dataset.repos : "[]";
+          $("run-rerun").dataset.rerun = selected ? cb.dataset.rerun : "";
           updateRunSelectionNote(selected ? cb : null);
         });
       });
@@ -1685,13 +1702,18 @@
     }
 
     function renderRepos() {
+      const uploadedIndexes = state.indexes.filter((i) => i.uploaded);
+      const catalogSlugs = new Set(state.repos.map((r) => gitSlug(r.git_repo, r.git_branch)));
       $("repo-list").innerHTML = state.repos.map((r) => {
         const key = repoKey(r);
         const slug = (shortName(r.git_repo) || "").replace(/\.git$/, "");
-        const indexed = state.indexes.some((i) => !i.multi_repo && (i.git_slug || "").includes(slug));
+        const repoSlug = gitSlug(r.git_repo, r.git_branch);
+        const indexed = state.indexes.some((i) => !i.multi_repo && i.git_slug === repoSlug);
+        const uploaded = uploadedIndexes.some((i) => !i.multi_repo && i.git_slug === repoSlug);
         const chips = [
           `<span class="cu-chip">${esc(r.git_branch)}</span>`,
           indexed ? '<span class="cu-chip indexed">indexed</span>' : "",
+          uploaded ? '<span class="cu-chip uploaded">Uploaded</span>' : "",
         ].join("");
         return `<label class="cu-repo">
           <input class="cu-check" type="checkbox" data-key="${esc(key)}" ${state.selected.has(key) ? "checked" : ""}/>
@@ -1704,7 +1726,27 @@
           </span>
           <span class="cu-chips">${chips}</span>
         </label>`;
-      }).join("");
+      }).join("") + uploadedIndexes
+        .filter((i) => i.multi_repo || !catalogSlugs.has(i.git_slug))
+        .map((i) => {
+          const rerun = rerunTarget({
+            ...indexedRepo(i.git_slug), uploaded: true, multi_repo: i.multi_repo,
+            source_pipeline_run_id: i.kfp_run_id,
+          });
+          const rerunButton = i.multi_repo ? "" : `<button type="button" class="cu-btn cu-btn-secondary cu-uploaded-rerun"
+            data-rerun="${rerun ? esc(JSON.stringify(rerun)) : ""}"${rerun ? "" : " disabled"}>Re-run</button>`;
+          return `<div class="cu-repo">
+            <span></span>
+            <span class="cu-repo-title">${esc(i.multi_repo ? "Combined multi-repo index" : i.git_slug)}</span>
+            <span class="cu-chips">
+              <span class="cu-chip uploaded">Uploaded</span>
+              ${rerunButton}
+            </span>
+          </div>`;
+        }).join("");
+      $("repo-list").querySelectorAll(".cu-uploaded-rerun").forEach((btn) => {
+        btn.onclick = () => openRerun(btn.dataset.rerun);
+      });
       $("repo-list").querySelectorAll("input").forEach((el) => {
         el.addEventListener("change", () => {
           if (el.checked) state.selected.add(el.dataset.key); else state.selected.delete(el.dataset.key);
@@ -1839,8 +1881,7 @@
           $("run-rerun").disabled = true;
           $("run-view-report").dataset.runId = "";
           $("run-download-report").dataset.runId = "";
-          $("run-rerun").dataset.runId = "";
-          $("run-rerun").dataset.repos = "[]";
+          $("run-rerun").dataset.rerun = "";
         };
         renderRunPage(0);
         $("run-view-report").onclick = async function() {
@@ -2088,26 +2129,34 @@
       a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.tab); });
     });
     $("back-to-runs").onclick = () => showTab("runs");
-    $("run-rerun").onclick = () => {
-      if (state.thinking) return;
-      const btn = $("run-rerun");
-      if (!btn.dataset.runId) return;
-      // Reset radio to default
+    function openRerun(rerun) {
+      if (state.thinking || !rerun) return;
+      state.rerunTarget = JSON.parse(rerun);
+      const {reportOnly} = state.rerunTarget;
       const scratchRadio = document.querySelector('input[name="rerun-mode"][value="scratch"]');
-      if (scratchRadio) { scratchRadio.checked = true; scratchRadio.dispatchEvent(new Event("change")); }
+      const reportRadio = document.querySelector('input[name="rerun-mode"][value="report"]');
+      scratchRadio.disabled = reportOnly;
+      scratchRadio.closest("label").classList.toggle("hidden", scratchRadio.disabled);
+      const defaultMode = reportOnly ? reportRadio : scratchRadio;
+      defaultMode.checked = true;
+      defaultMode.dispatchEvent(new Event("change"));
       $("rerun-modal").classList.remove("hidden");
-    };
+    }
+    $("run-rerun").onclick = () => openRerun($("run-rerun").dataset.rerun);
     // Radio change handler
     document.querySelectorAll('input[name="rerun-mode"]').forEach((radio) => {
       radio.addEventListener("change", () => {
         const mode = document.querySelector('input[name="rerun-mode"]:checked').value;
         $("rerun-description").textContent = mode === "scratch"
           ? "Regenerates the knowledge graph from scratch."
-          : "Regenerates the analysis report only.";
+          : "Generates an analysis report using the existing index.";
       });
     });
     // Rerun modal close
-    function closeRerunModal() { $("rerun-modal").classList.add("hidden"); }
+    function closeRerunModal() {
+      state.rerunTarget = null;
+      $("rerun-modal").classList.add("hidden");
+    }
     $("rerun-close").onclick = closeRerunModal;
     $("rerun-cancel").onclick = closeRerunModal;
     $("rerun-modal").addEventListener("click", (e) => { if (e.target === $("rerun-modal")) closeRerunModal(); });
@@ -2116,30 +2165,23 @@
     });
     // Rerun confirm handler
     $("rerun-confirm").onclick = async () => {
+      if (!state.rerunTarget || state.thinking) return;
+      const {sourceRunId, repos} = state.rerunTarget;
       const mode = document.querySelector('input[name="rerun-mode"]:checked').value;
       closeRerunModal();
-      const btn = $("run-rerun");
-      const runId = btn.dataset.runId;
-      const repos = JSON.parse(btn.dataset.repos || "[]");
-      if (!runId || !repos.length) return;
-      const origContent = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = `<svg style="animation:cu-spin 1s linear infinite" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Re-run`;
       const label = mode === "scratch" ? "Re-running from scratch" : "Re-running analysis";
       const statusMsg = mode === "scratch" ? "Submitting full re-run job…" : "Submitting analysis-only job…";
       setThinking({ kind: "pipeline", label, status: statusMsg });
       try {
         const body = { repos };
-        if (mode === "report") body.pipeline_run_id = runId;
+        if (mode === "report") body.pipeline_run_id = sourceRunId;
         const result = await api("/api/v2/pipelines", { method: "POST", body: JSON.stringify(body) });
         setThinking({ kind: "pipeline", label, status: `KFP run ${result.job_id} started` });
         pollV2(result.job_id);
+        showTab("runs");
       } catch (e) {
         setThinking(null);
         banner(String(e.message || e), true);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = origContent;
       }
     };
     $("select-all").onclick = () => { state.repos.forEach((r) => state.selected.add(repoKey(r))); renderRepos(); };

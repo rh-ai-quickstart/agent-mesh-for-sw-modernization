@@ -221,8 +221,7 @@ class AnalysisPipeline:
             ),
             content=f"Question: {question}\n\nAnswer:\n{result}",
             tags={
-                "category": "analysis",
-                "adhoc_query": "true",
+                "category": "adhoc-query",
                 "git_slug": git_slug,
                 "multi_repo": use_multi_repo,
                 **({"pipeline_run_id": pipeline_run_id} if pipeline_run_id else {}),

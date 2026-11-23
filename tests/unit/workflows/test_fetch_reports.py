@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from services import fetch_reports as reports
 
 
@@ -19,6 +20,7 @@ def _inject_fake_loader(
 ):
     """Inject fake loaders into sys.modules to intercept fetch_reports' internal imports."""
     raise_on = set(raise_on)
+    download_tags = []
 
     class FakeAssetLoader:
         RESULTS_PATH_PREFIX_EVAL = "results/eval"
@@ -36,6 +38,7 @@ def _inject_fake_loader(
                 raise ConnectionError("MLflow is unavailable")
 
         def download_dir(self, artifact_path, download_dir, experiment_name, asset_tags):
+            download_tags.append(asset_tags)
             category = asset_tags.get("category", "")
             if category in raise_on:
                 raise Exception(f"not found: {category}")
@@ -56,19 +59,26 @@ def _inject_fake_loader(
     asset_mod = ModuleType("loaders.asset_loader")
     asset_mod.AssetLoader = FakeAssetLoader
     monkeypatch.setitem(sys.modules, "loaders.asset_loader", asset_mod)
+    return download_tags
 
 
-def test_fetch_reports_downloads_analysis_report(monkeypatch):
-    _inject_fake_loader(
+@pytest.mark.parametrize("git_slug, multi_repo", [("repo-main", False), (None, True)])
+def test_fetch_reports_downloads_analysis_report_by_category(monkeypatch, git_slug, multi_repo):
+    download_tags = _inject_fake_loader(
         monkeypatch,
-        analysis_files={"migration_report_repo-main.md": "# Current analysis"},
+        analysis_files={"migration_report.md": "# Current analysis"},
     )
 
-    evaluation, analysis, improvement = reports.fetch_reports("selected-kfp", "repo-main", False)
+    evaluation, analysis, improvement = reports.fetch_reports("selected-kfp", git_slug, multi_repo)
 
     assert evaluation is None
     assert analysis == "# Current analysis"
     assert improvement is None
+    scope_tags = {"multi_repo": True} if multi_repo else {"git_slug": git_slug}
+    assert download_tags == [
+        {**scope_tags, "pipeline_run_id": "selected-kfp", "category": category}
+        for category in ("evaluation", "analysis", "improvement")
+    ]
 
 
 def test_fetch_reports_returns_none_when_download_fails(monkeypatch):

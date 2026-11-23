@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 REPO = {"git_repo": "https://github.com/example/one", "git_branch": "develop"}
 SECOND_REPO = {"git_repo": "https://github.com/example/two", "git_branch": "main"}
+INDEX_REPO = {"git_repo": "https://uploaded/example/one", "git_branch": "develop"}
 
 
 @pytest.fixture
@@ -72,12 +73,41 @@ def test_pipeline_requests_route_to_existing_pipelines(
     }
 
 
+def test_report_only_rerun_without_checkout_source(client, monkeypatch):
+    submissions = []
+
+    def unexpected_catalog_update(*args, **kwargs):
+        pytest.fail("Index identifiers must not be added to the repository catalog")
+
+    def trigger(name, run_name, params, *, namespace, enable_caching):
+        submissions.append((name, params, namespace, enable_caching))
+        return SimpleNamespace(run_id="new-run")
+
+    monkeypatch.setattr(pipeline_service, "log_repos", unexpected_catalog_update)
+    monkeypatch.setattr(pipeline_service, "_trigger_run", trigger)
+
+    response = client.post(
+        "/api/v2/pipelines", json={"repos": [INDEX_REPO], "pipeline_run_id": "source-kfp-run"}
+    )
+
+    assert response.status_code == 200
+    [(name, params, namespace, enable_caching)] = submissions
+    assert name == "single_repo"
+    assert params["pipeline_run_id"] == "source-kfp-run"
+    assert {key: params[key] for key in ("git_repo", "git_branch")} == INDEX_REPO
+    assert json.loads(params["runnable_repos"]) == []
+    assert namespace == "selected-namespace"
+    assert enable_caching is True
+
+
 @pytest.mark.parametrize(
     "body",
     [
         {},
         {"repos": []},
         {"pipeline_run_id": "some-run"},
+        {"repos": [INDEX_REPO]},
+        {"repos": [REPO, INDEX_REPO], "pipeline_run_id": "some-run"},
     ],
 )
 def test_invalid_pipeline_requests_are_rejected_before_submission(client, monkeypatch, body):

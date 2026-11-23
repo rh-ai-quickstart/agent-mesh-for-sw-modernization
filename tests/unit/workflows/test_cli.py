@@ -76,6 +76,7 @@ def capture_submission(tmp_path):
         "KFP_NAMESPACE": "test",
         "GIT_REPO": "https://github.com/example/repo",
         "GIT_BRANCH": "develop",
+        "ANALYSIS_GOAL": "",
         "PARENT_SOURCE_PATH": "custom/source",
         "PARENT_TARGET_PATH": "custom/target",
     }

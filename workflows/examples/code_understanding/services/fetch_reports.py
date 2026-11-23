@@ -44,6 +44,7 @@ def fetch_reports(
             base_tags["pipeline_run_id"] = kfp_trigger_id
 
         def _get(prefix: str, category: str) -> str | None:
+            asset_tags = {**base_tags, "category": category}
             artifact_path = AssetLoader.get_log_results_artifact_path(
                 prefix, git_slug=git_slug, multi_repo=multi_repo
             )
@@ -54,7 +55,7 @@ def fetch_reports(
                         artifact_path,
                         download_dir=download_dir,
                         experiment_name=loader.RESULT_ASSET_EXPERIMENT,
-                        asset_tags={**base_tags, "category": category},
+                        asset_tags=asset_tags,
                     )
                     content = _read_dir_contents(download_dir)
                     logging.info(
@@ -68,7 +69,7 @@ def fetch_reports(
                     logging.error(
                         f"Error: Could not download {category} report"
                         f" from artifact '{artifact_path}', "
-                        f"tags: {base_tags}, experiment: {loader.RESULT_ASSET_EXPERIMENT}"
+                        f"tags: {asset_tags}, experiment: {loader.RESULT_ASSET_EXPERIMENT}"
                     )
                     logging.error(traceback.format_exc())
                     return None

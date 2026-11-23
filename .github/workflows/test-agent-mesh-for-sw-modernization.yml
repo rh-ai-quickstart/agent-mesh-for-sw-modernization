@@ -29,6 +29,16 @@ jobs:
   test:
     name: agent-mesh-for-sw-modernization (${{ inputs.branch }})
     runs-on: ubuntu-latest
+    env:
+      KFP_NAMESPACE: agent-mesh-ci-project-1
+      DEPLOY_EMBEDDING_MODEL: "true"
+      CUSTOM_EVALUATOR: mlflow
+      GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY: "true"
+      ALLOW_DYNAMIC_LANGUAGE_SUPPORT: "true"
+      GRAPHRAG_LLM_ID: ${{ vars.GRAPHRAG_LLM_ID }}
+      GRAPHRAG_LLM_API_BASE: ${{ vars.GRAPHRAG_LLM_API_BASE }}
+      GRAPHRAG_LLM_PROVIDER: ${{ vars.GRAPHRAG_LLM_PROVIDER }}
+      GRAPHRAG_LLM_PROVIDER_SETTINGS_XML: ${{ vars.GRAPHRAG_LLM_PROVIDER_SETTINGS_XML }}
     steps:
       - uses: actions/checkout@v5
 
@@ -48,18 +58,13 @@ jobs:
         with:
           repo_url: https://github.com/${{ github.repository }}
           ref: ${{ inputs.branch }}
-          namespace: agent-mesh-ci-project-1
-          deploy_command: "make install MANAGE_NAMESPACE=false DEPLOY_EMBEDDING_MODEL=true AGENT_MODEL=qwen WAIT_TIMEOUT=10m CUSTOM_EVALUATOR=basic"
+          namespace: ${{ env.KFP_NAMESPACE }}
+          deploy_command: "make install MANAGE_NAMESPACE=false AGENT_MODEL=qwen WAIT_TIMEOUT=10m"
         env:
           PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
           PROD_SERVER: ${{ secrets.PROD_SERVER }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           GRAPHRAG_LLM_TOKEN: ${{ secrets.GRAPHRAG_LLM_TOKEN }}
-          GRAPHRAG_LLM_ID: ${{ vars.GRAPHRAG_LLM_ID }}
-          GRAPHRAG_LLM_API_BASE: ${{ vars.GRAPHRAG_LLM_API_BASE }}
-          GRAPHRAG_LLM_PROVIDER: ${{ vars.GRAPHRAG_LLM_PROVIDER }}
-          GRAPHRAG_LLM_PROVIDER_SETTINGS_XML: ${{ vars.GRAPHRAG_LLM_PROVIDER_SETTINGS_XML }}
-          KFP_NAMESPACE: agent-mesh-ci-project-1
 
       - name: Deploy console app
         run: |
@@ -80,8 +85,6 @@ jobs:
             make deploy-console-app
         working-directory: ./quickstart
         timeout-minutes: 15
-        env:
-          KFP_NAMESPACE: agent-mesh-ci-project-1
 
       - name: Run CLI and UI E2E tests
         uses: ./.github/actions/run-quickstart-tests
@@ -95,21 +98,12 @@ jobs:
           # apply-secrets must receive the same configuration as installation.
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           GRAPHRAG_LLM_TOKEN: ${{ secrets.GRAPHRAG_LLM_TOKEN }}
-          GRAPHRAG_LLM_ID: ${{ vars.GRAPHRAG_LLM_ID }}
-          GRAPHRAG_LLM_API_BASE: ${{ vars.GRAPHRAG_LLM_API_BASE }}
-          GRAPHRAG_LLM_PROVIDER: ${{ vars.GRAPHRAG_LLM_PROVIDER }}
-          GRAPHRAG_LLM_PROVIDER_SETTINGS_XML: ${{ vars.GRAPHRAG_LLM_PROVIDER_SETTINGS_XML }}
-          DEPLOY_EMBEDDING_MODEL: "true"
-          CUSTOM_EVALUATOR: basic
-          KFP_NAMESPACE: agent-mesh-ci-project-1
 
       - name: Cleanup
         if: always()
         uses: ./.github/actions/cleanup
         with:
           cleanup_command: "make uninstall"
-        env:
-          KFP_NAMESPACE: agent-mesh-ci-project-1
 
       - name: Clean up MLflow experiments
         if: always()
@@ -117,7 +111,6 @@ jobs:
         timeout-minutes: 5
         env:
           MLFLOW_GATEWAY_URL: ${{ secrets.MLFLOW_GATEWAY_URL }}
-          KFP_NAMESPACE: agent-mesh-ci-project-1
         run: |
           : "${MLFLOW_GATEWAY_URL:?MLFLOW_GATEWAY_URL secret must be set}"
           make clean-mlflow LOCAL_MLFLOW_TRACKING_URI="$MLFLOW_GATEWAY_URL"

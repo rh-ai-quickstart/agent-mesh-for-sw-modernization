@@ -47,20 +47,25 @@ def submit_pipeline_run(
     run_name = f"{pipeline_name}_{timestamp}"
     mode = "single-repo" if single else "multi-repo"
     enable_caching = bool(pipeline_run_id)
+    # Index-only URLs let the pipeline reconstruct the slug when the Git remote is unknown.
+    source_repos = [repo for repo in repos if not repo["git_repo"].startswith("https://uploaded/")]
+    if len(source_repos) != len(repos) and not (single and pipeline_run_id):
+        raise ValueError("A repository URL is required outside single-repository report reruns.")
 
     params: dict[str, Any] = {
         **({"git_repo": git_repo, "git_branch": git_branch} if single else {}),
-        "runnable_repos": json.dumps(repos),
+        "runnable_repos": json.dumps(source_repos),
         "pipeline_run_id": pipeline_run_id,
         "parent_source_path": os.getenv("PARENT_SOURCE_PATH", "source"),
         "parent_target_path": os.getenv("PARENT_TARGET_PATH", "target"),
         **({"analysis_goal": analysis_goal} if analysis_goal else {}),
     }
 
-    try:
-        log_repos(repos, namespace)
-    except Exception:
-        logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
+    if source_repos:
+        try:
+            log_repos(source_repos, namespace)
+        except Exception:
+            logging.info("log_repos failed; continuing with pipeline submission.", exc_info=True)
 
     run = _trigger_run(
         pipeline_name,
@@ -86,7 +91,7 @@ def list_pipeline_runs(namespace: str | None = None) -> list[dict[str, Any]]:
         except ImportError:
             from indexes import list_uploaded_indexes_as_runs
 
-        runs.extend(list_uploaded_indexes_as_runs())
+        runs.extend(list_uploaded_indexes_as_runs(namespace))
     except Exception:
         logging.debug("Uploaded-index discovery failed", exc_info=True)
     return runs

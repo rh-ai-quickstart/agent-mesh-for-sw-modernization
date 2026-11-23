@@ -252,10 +252,6 @@ def test_pipeline_artifact_checks_use_run_and_repository_scope(tmp_path, multi_r
                 data=SimpleNamespace(tags={"multi_repo": str(not multi_repo)}),
             ),
             SimpleNamespace(
-                info=SimpleNamespace(run_id="query"),
-                data=SimpleNamespace(tags={"multi_repo": str(multi_repo), "adhoc_query": "true"}),
-            ),
-            SimpleNamespace(
                 info=SimpleNamespace(run_id="matching-artifacts"),
                 data=SimpleNamespace(tags={"multi_repo": str(multi_repo)}),
             ),
@@ -288,6 +284,9 @@ def test_pipeline_artifact_checks_use_run_and_repository_scope(tmp_path, multi_r
     )
     helpers["_assert_index"](client, "namespace", "selected-run", tmp_path, multi_repo=multi_repo)
 
+    analysis_search, index_search = client.search_runs.call_args_list
+    assert "tags.category = 'analysis'" in analysis_search.kwargs["filter_string"]
+    assert "tags.category = 'indexing'" in index_search.kwargs["filter_string"]
     assert client.download_artifacts.call_count == 6
 
 

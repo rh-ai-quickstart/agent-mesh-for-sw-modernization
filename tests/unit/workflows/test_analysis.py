@@ -12,6 +12,10 @@ def install_analysis_stubs(monkeypatch, *, missing_index=False):
 
     class FakeLoader:
         RESULTS_PATH_PREFIX_PIPELINES = "results/pipelines"
+        RESULTS_PATH_PREFIX_ADHOC_QUERIES = "results/adhoc_queries"
+
+        def __init__(self, namespace=None):
+            pass
 
         @staticmethod
         def get_log_results_artifact_path(prefix, git_slug=None, multi_repo=False):
@@ -37,6 +41,9 @@ def install_analysis_stubs(monkeypatch, *, missing_index=False):
 
         async def generate_migration_report(self):
             return "migration report"
+
+        async def query_with_llm(self, *args, **kwargs):
+            return "query answer", None
 
     graphrag_module.DependencyAnalyzer = FakeAnalyzer
     monkeypatch.setitem(sys.modules, "utils.graphrag_utils", graphrag_module)
@@ -79,3 +86,20 @@ def test_adhoc_query_reports_missing_multi_repo_index(monkeypatch):
     assert "no multi-repository index was found" in result
     assert analyzer_instances == []
     assert logged_results == []
+
+
+def test_adhoc_query_logs_answer_with_its_own_category(monkeypatch):
+    logged_results, _ = install_analysis_stubs(monkeypatch)
+
+    result = analysis.AnalysisPipeline().run_adhoc_query(
+        question="What changed?", pipeline_run_id="selected-kfp"
+    )
+
+    assert result.strip() == "query answer"
+    assert logged_results[0][1]["artifact_path"] == "results/adhoc_queries/multi-repo"
+    assert logged_results[0][1]["tags"] == {
+        "category": "adhoc-query",
+        "git_slug": "",
+        "multi_repo": True,
+        "pipeline_run_id": "selected-kfp",
+    }

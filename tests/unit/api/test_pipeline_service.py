@@ -48,6 +48,7 @@ def test_uploaded_indexes_appended_as_synthetic_entries():
     assert synthetic["name"] == "Uploaded index: repo-main"
     assert synthetic["status"] == "Succeeded"
     assert synthetic["uploaded"] is True
+    assert synthetic["source_pipeline_run_id"] == "uploaded-123"
     assert synthetic["git_repo"] is None
     assert synthetic["git_branch"] is None
 
@@ -91,6 +92,7 @@ def test_multi_repo_uploaded_index_has_repos_key():
     assert len(runs) == 1
     assert runs[0]["repos"] == []
     assert runs[0]["git_slug"] is None
+    assert runs[0]["multi_repo"] is True
 
 
 def test_index_discovery_failure_does_not_break_kfp_runs():

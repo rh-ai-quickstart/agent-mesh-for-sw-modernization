@@ -70,7 +70,7 @@ def create_mlflow_client() -> Any:
     return MlflowClient()
 
 
-def list_indexed_repos() -> dict[str, Any]:
+def list_indexed_repos(namespace: str | None = None) -> dict[str, Any]:
     """Return indexed repositories discovered from MLflow artifact runs."""
     if os.getenv("ASSET_LOADER", "local").strip().lower() != "mlflow":
         return {
@@ -82,7 +82,7 @@ def list_indexed_repos() -> dict[str, Any]:
 
     try:
         client = create_mlflow_client()
-        experiment_name = result_directory_experiment_name()
+        experiment_name = result_directory_experiment_name(namespace)
         experiment = client.get_experiment_by_name(experiment_name)
         if experiment is None:
             return {
@@ -98,7 +98,7 @@ def list_indexed_repos() -> dict[str, Any]:
             order_by=["attributes.start_time DESC"],
             max_results=200,
         )
-        seen: set[tuple[str, bool]] = set()
+        seen: set[tuple[str, bool, bool]] = set()
         indexes: list[dict[str, Any]] = []
         for run in runs:
             try:
@@ -115,9 +115,9 @@ def list_indexed_repos() -> dict[str, Any]:
         return {"ok": False, "source": "mlflow", "indexes": [], "message": str(exc)}
 
 
-def list_uploaded_indexes_as_runs() -> list[dict[str, Any]]:
+def list_uploaded_indexes_as_runs(namespace: str | None = None) -> list[dict[str, Any]]:
     """Return uploaded indexes as synthetic run entries for the UI runs list."""
-    data = list_indexed_repos()
+    data = list_indexed_repos(namespace)
     runs: list[dict[str, Any]] = []
     for idx in data.get("indexes") or []:
         if not idx.get("uploaded"):
@@ -134,6 +134,8 @@ def list_uploaded_indexes_as_runs() -> list[dict[str, Any]]:
                 "git_repo": None,
                 "git_branch": None,
                 "uploaded": True,
+                "source_pipeline_run_id": kfp_run_id,
+                "multi_repo": idx["multi_repo"],
                 **({"repos": []} if idx.get("multi_repo") else {}),
             }
         )
