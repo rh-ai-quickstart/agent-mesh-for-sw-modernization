@@ -45,9 +45,6 @@ def fetch_reports(
 
         def _get(prefix: str, category: str) -> str | None:
             asset_tags = {**base_tags, "category": category}
-            if category == "analysis":
-                # Ad hoc answers share the category and source run ID with migration reports.
-                asset_tags["adhoc_query"] = None
             artifact_path = AssetLoader.get_log_results_artifact_path(
                 prefix, git_slug=git_slug, multi_repo=multi_repo
             )

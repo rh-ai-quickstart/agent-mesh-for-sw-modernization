@@ -58,7 +58,6 @@ def _artifact_run(
             run
             for run in runs
             if str(run.data.tags.get("multi_repo", "")).lower() == str(multi_repo).lower()
-            and str(run.data.tags.get("adhoc_query", "")).lower() != "true"
         ),
         None,
     )
