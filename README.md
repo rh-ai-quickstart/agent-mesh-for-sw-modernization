@@ -21,7 +21,7 @@ Analyze legacy code with GraphRAG on Red Hat OpenShift AI to uncover dependencie
   - [4. Install on OpenShift AI](#4-install-on-openshift-ai)
   - [5. Ask a question using the prebuilt index](#5-ask-a-question-using-the-prebuilt-index)
   - [6. Generate a migration report using the prebuilt index](#6-generate-a-migration-report-using-the-prebuilt-index)
-  - [7. Run your first code analysis](#7-run-your-first-code-analysis)
+  - [7. Run your first full code analysis](#7-run-your-first-full-code-analysis)
     - [7.1 Analyze the sample repository](#71-analyze-the-sample-repository)
     - [7.2 Review the modernization results](#72-review-the-modernization-results)
     - [7.3 Ask questions about the code](#73-ask-questions-about-the-code)
@@ -39,8 +39,6 @@ Analyze legacy code with GraphRAG on Red Hat OpenShift AI to uncover dependencie
   - [Build container images](#build-container-images)
   - [Further reading](#further-reading)
 - [Tags](#tags)
-
-
 
 ## Detailed description
 
@@ -90,8 +88,6 @@ default MLflow-backed installation.
 reports, and asking questions.
 - Helm and Make targets for installation, verification, and cleanup.
 
-
-
 ### What you'll do
 
 In this quickstart, you will deploy the workflow, ask a question using the
@@ -108,10 +104,7 @@ The architecture illustrates the path from raw source code through automated dat
 
 ## Requirements
 
-
-
 ### Minimum hardware requirements
-
 
 | Resource           | Minimum or example                                                  | Used for                                          |
 | ------------------ | ------------------------------------------------------------------- | ------------------------------------------------- |
@@ -119,7 +112,6 @@ The architecture illustrates the path from raw source code through automated dat
 | Persistent storage | Default `StorageClass` able to provision a 50 GiB ReadWriteOnce PVC | S4-backed S3-compatible object storage            |
 | NVIDIA L40S GPU    | 1, if hosting the example `gpt-oss-120b` endpoint                   | GraphRAG chat model                               |
 | NVIDIA L40S GPU    | 1, if hosting the example `e5-mistral-7b-instruct` endpoint         | Embedding model                                   |
-
 
 If you use existing OpenAI-compatible model endpoints, their GPUs do not need
 to be part of the Quickstart cluster.
@@ -138,8 +130,6 @@ to be part of the Quickstart cluster.
 - **Optional:** Red Hat build of OpenTelemetry Operator. [Installation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/distributed_tracing/distributed-tracing-otel-install)
 - **Optional:** Tempo Operator. [Installation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/distributed_tracing/distributed-tracing-tempo-install)
 
-
-
 ### Required user permissions
 
 The installer needs permission to manage project resources, including workloads,
@@ -149,15 +139,15 @@ ImageStreams, service accounts, Roles, and RoleBindings, and to grant the chart'
 Cluster-scoped permissions are needed for these operations:
 
 - **Namespace setup:** create the target namespace and apply its OpenShift AI
-  metadata. To skip this step, have an administrator prepare the namespace with
-  the `opendatahub.io/dashboard: "true"` label, then use
-  `make install MANAGE_NAMESPACE=false`.
+metadata. To skip this step, have an administrator prepare the namespace with
+the `opendatahub.io/dashboard: "true"` label, then use
+`make install MANAGE_NAMESPACE=false`.
 - **Read access:** installation reads the cluster ingress configuration, and the
-  console reads the target Namespace object.
+console reads the target Namespace object.
 - **Optional telemetry:** read the OpenTelemetry and Tempo CRDs. Creating a
-  separate telemetry namespace also requires namespace management permissions.
+separate telemetry namespace also requires namespace management permissions.
 - **Optional console plugin:** manage `ConsolePlugin` and `ConsoleLink` resources
-  and update the cluster console configuration.
+and update the cluster console configuration.
 
 Additional namespaced permissions are needed to read the gateway and its Route
 in `openshift-ingress` and read console resources in `openshift-console` for the optional plugin.
@@ -185,12 +175,10 @@ login command provided by your cluster's web console before installing.
 Provide reachable OpenAI-compatible endpoints for the chat and embedding
 roles. These model guides show example deployments:
 
-
 | Role                | Example                  | Guide                                                                              |
 | ------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
 | GraphRAG chat       | `gpt-oss-120b`           | [Deploy the chat model](resources/models/deploying-gpt-oss-120b.md)                |
 | GraphRAG embeddings | `e5-mistral-7b-instruct` | [Deploy the embedding model](resources/models/deploying-e5-mistral-7b-instruct.md) |
-
 
 You can have `make install` deploy the bundled embedding model instead of
 supplying an external embedding endpoint.
@@ -214,7 +202,8 @@ Replace the template placeholders with real values. For this walkthrough, set
 - `GIT_USERNAME` and `GIT_TOKEN` if the analyzed repository or the Quickstart
 source repository requires authentication.
 
-See [Configuration variables](#configuration-variables) for the full list.
+See [Configuration variables](#configuration-variables) for the environment
+settings and common Make overrides.
 
 ### 4. Install on OpenShift AI
 
@@ -238,8 +227,6 @@ To deploy an agent model and use it for the supported agentic tasks, set `AGENT_
 ```sh
 make install AGENT_MODEL=qwen
 ```
-
-
 
 ### 5. Ask a question using the prebuilt index
 
@@ -274,27 +261,13 @@ Core Functions (Modules)
 The deployed embedding model works with the prebuilt index. If you use a
 different model, its embeddings must match the `intfloat/e5-mistral-7b-instruct`
 embedding space and 4,096 dimensions. Otherwise,
-[rebuild the index](#7-run-your-first-code-analysis) with your model.
+[rebuild the index](#7-run-your-first-full-code-analysis) with your model.
 
 ### 6. Generate a migration report using the prebuilt index
 
-You can generate a migration report from the same prebuilt Tic-Tac-Toe index
-without re-running data generation or indexing. Submit the single-repository
-pipeline with `--analysis-only`, passing the **run ID** of the full pipeline
-run whose index you want to reuse.
-
-The run ID is printed at the end of every `make run-pipelines` invocation:
-
-```
-✅ Submitted: SUCCESS
-==> Pipeline run ID: <the pipeline-run-id>
-```
-
-It can also be found in the OpenShift AI console under **Develop & train >
-Pipelines > Runs** — open the completed full run and copy the value shown in
-the **pipeline_run_id** input parameter.
-
-For the prebuilt index, you can use the following pipeline run ID:
+Use the same prebuilt Tic-Tac-Toe index you queried in section 5 to generate
+a migration report. The command supplies the prebuilt index's run ID as
+`PIPELINE_RUN_ID`.
 
 ```sh
 make run-pipelines ARGS="--single-repo --analysis-only" \
@@ -314,17 +287,15 @@ task's Markdown migration report.
 
 ![Analysis only MLflow report](docs/images/analysis_only_mlflow_report.png)
 
-Look for the components and dependencies it
-identifies, then compare its suggested migration order with the sample source
-code. The report is also available through the optional Code Understanding
-console, where a completed run can be expanded and its analysis downloaded.
+Look for the components and dependencies the report identifies, then compare
+its suggested migration order with the sample source code. To download the
+report from the optional Code Understanding console, select the completed run
+in **Runs** and click **Download Report**.
 
 The report gives you a starting point for discussion, not an automatic code  
 change.
 
-### 7. Run your first code analysis
-
-
+### 7. Run your first full code analysis
 
 #### 7.1 Analyze the sample repository
 
@@ -350,15 +321,30 @@ make run-pipelines ARGS="--single-repo" \
   ANALYSIS_GOAL="Migrate this repository to a modern Python application deployed on Openshift."
 ```
 
-The command submits a run named `single_repo_<timestamp>` and prints its run
-ID. Submission is not pipeline completion. In your OpenShift AI project's
-Pipelines view, wait for that run to succeed before reviewing its report. You can find this by navigating to **Develop & train > Pipelines > Runs** in the Openshift AI console. 
+The command submits a run named `single_repo_<timestamp>`. After submission,
+`make run-pipelines` prints the pipeline run ID at the end of its output.
+
+```text
+✅ Submitted: SUCCESS
+==> Pipeline run ID: <the pipeline-run-id>
+```
+
+In OpenShift AI, go to **Develop & train > Pipelines > Runs** and wait for the
+run to succeed.
 
 ![Openshift AI single repo pipeline](docs/images/single_repo_pipeline.png)
 
 This step can take a while. GraphRAG indexing is compute-intensive, and the
 run time depends on the repository size and the resources available to the
 pipeline.
+
+To generate another report from this index later, use the printed run ID as
+`PIPELINE_RUN_ID` in the
+[analysis-only command](#6-generate-a-migration-report-using-the-prebuilt-index).
+You can also find the ID in OpenShift AI. Open the completed run and copy
+**Run ID** from the **Details** tab.
+
+![Details tab of a completed OpenShift AI single-repository run showing the Run ID](docs/images/single_repo_run_details.png)
 
 #### 7.2 Review the modernization results
 
@@ -370,7 +356,7 @@ the query step.
 
 #### 7.3 Ask questions about the code
 
-You can use the same command as earlier to ask additional questions targeting the index you just created:
+Query the latest index for the sample repository and branch.
 
 ```sh
 wrappers/adhoc.sh \
@@ -379,10 +365,12 @@ wrappers/adhoc.sh \
   --git-branch main
 ```
 
+To query a specific index, add `--pipeline-run-id '<full-run-id>'` using the
+ID of the full pipeline run that built it.
+
 The wrapper submits a query job and prints its answer when the job completes.
 Try another question, such as which modules depend on a component you plan to
-replace. Supplying `--git-repo` matters here: without it, the wrapper queries
-a multi-repository index, which may not exist yet.
+replace.
 
 Expected output:
 
@@ -472,8 +460,6 @@ Example output:
 - **Migration sequence:** the **northpolesouthern‑train** repository must be built or migrated before the **northpolesouthern‑timetable** repository can be compiled or executed...
 ```
 
-
-
 ### 9. Analyze your own repositories
 
 For a single-repository analysis, set `GIT_REPO` and `GIT_BRANCH` in `.env` to
@@ -495,48 +481,67 @@ reads source code and does not modify your repositories.
 
 ### 10. Explore the optional console
 
-
-
 #### 10.1 Deploying the console
 
 The standalone Code Understanding console offers a visual way to select
-repositories, start analysis, inspect reports, and ask questions. To deploy the application:
+repositories, start analysis, inspect reports, and ask questions. Deploy it
+with the following command.
 
 ```sh
 make deploy-console-app
 ```
 
-The target prints its route. 
+Open the HTTPS route printed by the command.
 
 An OpenShift console plugin is also available for administrators. It requires
-OpenShift 4.21 or later and cluster-wide console permissions. Deploy it with
-`make deploy-console-plugin`; the target enables the plugin and prints its URL.
+OpenShift 4.21 or later and cluster-wide console permissions. The
+`make deploy-console-plugin` target deploys and enables the plugin, then
+prints its URL.
 
-#### 10.2 Console overview
+#### 10.2 Select repositories and start an analysis
 
-![Console repositories tab](docs/images/console_repositories.png)
+In **Repositories**, choose one repository for a focused analysis or select
+multiple repositories for a combined analysis. To add your own, click
+**Add new repository** and enter its URL and branch.
 
-The **Repositories** tab shows a list of example repositories to index and analyze. You can add your own using the input box on the bottom. Select one repository or multiple repositories, then open **Indexing** and click **Run Indexing** to run the full data generation, indexing, and analysis pipeline.
+![Repositories with the Tic-Tac-Toe sample selected](docs/images/console_repositories.png)
 
-![Console Indexing tab for running the full pipeline](docs/images/console_indexing.png)
+Click **Analyze** and review your selection in **Confirm Run Analysis**. For a
+single repository, you can expand **Special Outcomes** to specify what the
+report should cover. Click **Start Analysis** to submit the full data
+generation, indexing, and analysis pipeline. The console opens **Runs** so
+you can track its progress.
 
-#### 10.3 Running analysis and viewing reports
+![Confirm Run Analysis dialog for the selected repository](docs/images/console_start_analysis.png)
 
-![Console Analysis tab with an indexed repository selected](docs/images/console_analysis.png)
+#### 10.3 View reports and re-run analysis
 
-The **Analysis** tab generates new reports using an existing index. Choose an indexed repository or the **Combined multi-repo index**, then click **Run Analysis**. This skips data generation and indexing. Its repository dropdown has the same options as Chat, and its selection is independent of the Repositories tab.
+![Runs with a completed analysis selected and report actions available](docs/images/console_runs.png)
 
-On the left-hand side, **Recent Runs** shows both full pipeline and analysis-only runs. Clicking on a successful run's report option opens the **Analysis** tab and displays its analysis and evaluation reports. Reports can also be downloaded.
+In **Runs**, select a completed run with a report, then click **View Report**
+to open its **Analysis** page or **Download Report** to save the Markdown
+report.
 
-![Console Analysis tab displaying a migration report](docs/images/console_report.png)
+![Migration report with a dependency graph and the Analysis Evaluation tab](docs/images/console_report.png)
 
-If no indexed repositories are available, run the full pipeline from **Indexing** first.
+In the report viewer, open **Analysis Evaluation** to review the evaluation
+and, when available, view or download its improvement plan.
 
-#### 10.4 Chat interface
+For a run that supports **Re-run**, choose one of the available modes.
 
-![Console chat tab](docs/images/console_chat.png)
+- **Re-run from scratch** rebuilds the knowledge graph and generates a report.
+- **Re-run report only** generates a report using the run's existing index.
 
-Navigating to the **Chat** tab will allow you to ask questions on repositories you have indexed to obtain GraphRAG-informed responses. Test it out with the sample queries provided, or you can bring in your own questions!
+![Re-run Analysis dialog showing both modes for a completed run](docs/images/console_rerun.png)
+
+#### 10.4 Query the code knowledge graph
+
+In **Runs**, click the **Explore code** speech-bubble icon on a completed
+run. Choose a sample query or enter your own question and click **Send**.
+The answer uses the knowledge graph for that run's repository or combined
+repositories.
+
+![Code knowledge graph query panel for a Tic-Tac-Toe run](docs/images/console_chat.png)
 
 ### 11. What you've accomplished
 
@@ -693,15 +698,15 @@ be reused; cleanup reports this condition without restoring them.
 
 ## Reference
 
-
-
 ### How the workflow works
 
 1. **Data generation** collects relevant files from the chosen repository,
-  converts them to text, and adds metadata for indexing.
+
+   converts them to text, and adds metadata for indexing.
 2. **Data indexing** builds a GraphRAG representation of the prepared code.
 3. **Data analysis** queries the index and writes a Markdown migration report.
-  Ad hoc queries use that index for further investigation.
+
+   Ad hoc queries use that index for further investigation.
 
 The workflow can use MLflow to store indexes and results and the shared
 `aws-compatible-storage` chart (S4-backed) for S3-compatible storage. A
@@ -710,10 +715,9 @@ Tempo can add tracing when enabled.
 
 ### Configuration variables
 
-`.env.template` lists persistent settings. Make command-line assignments
-override values in `.env`; the Makefile supplies defaults for some omitted
-values.
-
+Copy [.env.template](.env.template) to configure persistent settings. Make
+command-line assignments override values in `.env`, which take precedence
+over inherited environment values and Makefile defaults.
 
 | Variables                                                                                                                              | Purpose                                                          |
 | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
@@ -725,23 +729,27 @@ values.
 | `GROUND_TRUTH_LLM_TOKEN`, `GROUND_TRUTH_LLM_ID`, `GROUND_TRUTH_LLM_API_BASE`, `GROUND_TRUTH_LLM_PROVIDER`, `GROUND_TRUTH_LLM_THINKING` | Optional ground-truth evaluation model                           |
 | `JUDGE_LLM_TOKEN`, `JUDGE_LLM_ID`, `JUDGE_LLM_API_BASE`, `JUDGE_LLM_PROVIDER`, `JUDGE_LLM_THINKING`                                    | Optional judge evaluation model                                  |
 | `CODE_LLM_TOKEN`, `CODE_LLM_ID`, `CODE_LLM_API_BASE`, `CODE_LLM_PROVIDER`                                                              | Optional coding model                                            |
+| `GRAPHRAG_LOCAL_QUERY_SKIP_TLS_VERIFY`                                                                                                   | TLS certificate verification setting for local GraphRAG queries |
+| `ALLOW_DYNAMIC_LANGUAGE_SUPPORT`                                                                                                       | Enable fallback language detection during data generation        |
 | `KFP_NAMESPACE`, `KFP_DATA_GENERATION_OUTPUT_PATH`, `KFP_DATA_INDEXING_OUTPUT_PATH`                                                    | Target project and pipeline data paths                           |
 | `KFP_IMAGE_REGISTRY`                                                                                                                   | Registry for workflow and console images                         |
 | `KFP_DATA_GENERATION_BASE_IMAGE_NAME`, `KFP_INDEXING_BASE_IMAGE_NAME`, `KFP_ANALYSIS_BASE_IMAGE_NAME`, `KFP_PIPELINE_TOOLS_IMAGE_NAME` | Pipeline image names                                             |
 | `KFP_DATA_GENERATION_BASE_IMAGE_TAG`, `KFP_INDEXING_BASE_IMAGE_TAG`, `KFP_ANALYSIS_BASE_IMAGE_TAG`, `KFP_PIPELINE_TOOLS_IMAGE_TAG`     | Optional image tags; default to `BASE_VERSION`                   |
 | `CONSOLE_APP_IMAGE_NAME`, `CONSOLE_PLUGIN_IMAGE_NAME`, `CONSOLE_IMAGE_TAG`                                                             | Optional console image names and tag                             |
+| `CONSOLE_ROUTE_HOST`                                                                                                                   | Optional fully qualified Route host for the standalone console   |
+| `RHOAI_MCP_ENABLED`, `RHOAI_MCP_IMAGE`                                                                                                  | Enable the optional OpenShift AI MCP server and select its image |
 | `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_INSECURE_TLS`, `MLFLOW_TRACKING_AUTH`                                                          | MLflow endpoint, TLS setting, and authentication mode            |
+| `RHOAI_MLFLOW_COST_MONITORING_ENABLED`                                                                                                  | Include model costs in MLflow logging when available            |
 | `ASSET_LOADER`, `INSTALL_PREBUILT_INDEX`, `CUSTOM_EVALUATOR`                                                                           | Asset backend, sample index upload, and evaluator                |
 | `LOGLEVEL`                                                                                                                             | Application logging level                                        |
 | `OTEL_SERVICE_NAME`, `OTEL_NAMESPACE`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER`                                                  | Optional tracing resources and exporter                          |
-| `MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT`                                                                                                 | Dual-export MLflow traces to OTel (defaults to `DEPLOY_OTEL`)    |
+| `MLFLOW_TRACE_ENABLE_OTLP_DUAL_EXPORT`                                                                                                 | Also export MLflow traces to OpenTelemetry. The Makefile default follows `DEPLOY_OTEL`. |
 | `OTEL_SEMCONV_STABILITY_OPT_IN`                                                                                                        | OpenTelemetry semantic-convention setting                        |
 
-
-Useful Make overrides include `DEPLOY_EMBEDDING_MODEL`, `DEPLOY_OTEL`,
-`WORKBENCH_IMAGESTREAM_NAMESPACE`, `PIPELINE_GIT_REPO`,
-`PIPELINE_GIT_BRANCH`, and `PIPELINE_GIT_REPO_LIST`. Run `make help-all` for
-their descriptions and other build and verification options.
+Use `ANALYSIS_GOAL` to request a custom report section in a full
+single-repository run. Use `PIPELINE_RUN_ID` to select an index for
+analysis-only runs or exports, and `--pipeline-run-id` for ad hoc queries.
+Run `make help-all` for other Make overrides.
 
 ### Add external analysis metadata
 
@@ -772,8 +780,6 @@ image tags in `.env` before deploying those images. Set
 - [GraphRAG documentation](https://microsoft.github.io/graphrag/)
 - [Kubeflow Pipelines documentation](https://www.kubeflow.org/docs/components/pipelines/)
 - [MLflow documentation](https://mlflow.org/docs/latest/)
-
-
 
 ## Tags
 
