@@ -1,6 +1,6 @@
 # Modernize Legacy Applications with Agentic Code Understanding
 
-Analyze legacy code with GraphRAG on Red Hat OpenShift AI to uncover dependencies, ask questions about the codebase, and plan a safer migration.
+Analyze legacy code with GraphRAG on Red Hat OpenShift AI to uncover dependencies, ask questions about the codebase, and plan a safer migration. 
 
 ## Table of contents
 
